@@ -1,0 +1,32 @@
+{
+  "name": "pulse-card",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Compact horizontal bar chart card for Home Assistant sensor data visualization",
+  "author": "hiall-fyi",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hiall-fyi/pulse-card"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify",
+    "dev": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitest/coverage-v8": "^2.1.9",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.39.4",
+    "fast-check": "^3.0.0",
+    "globals": "^17.4.0",
+    "jsdom": "^29.0.0",
+    "lit": "^3.3.2",
+    "typescript": "^5.9.3",
+    "vitest": "^2.0.0"
+  }
+}
