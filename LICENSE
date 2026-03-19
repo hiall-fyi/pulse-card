@@ -659,3 +659,16 @@ specific requirements.
 if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU AGPL, see
 <https://www.gnu.org/licenses/>.
+
+---
+
+Copyright (C) 2026 Joe Yiu (@hiall-fyi)
+
+ADDITIONAL TERMS:
+
+Attribution Requirement:
+Any use, modification, or distribution of this software must include
+clear attribution to the original author:
+
+  Original Author: Joe Yiu (@hiall-fyi)
+  Project: Pulse Card - https://github.com/hiall-fyi/pulse-card
