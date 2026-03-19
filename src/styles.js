@@ -17,14 +17,14 @@ export const STYLES = `
   .pulse-card {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--pulse-gap, 12px);
   }
 
   /* Multi-column grid */
   .pulse-card[class*="columns-"] {
     display: grid;
     grid-template-columns: repeat(var(--pulse-columns, 1), 1fr);
-    gap: 16px;
+    gap: var(--pulse-gap, 16px);
   }
 
   /* Bar row — each entity */
@@ -118,16 +118,6 @@ export const STYLES = `
     box-shadow: 0 0 0 1px var(--card-background-color, rgba(255,255,255,0.8));
   }
 
-  /* Vertical target marker */
-  .direction-up .bar-target {
-    top: auto;
-    left: -1px;
-    right: -1px;
-    width: auto;
-    height: 2px;
-    bottom: auto;
-  }
-
   /* Target label [AC-7.4] */
   .bar-target-label {
     position: absolute;
@@ -140,12 +130,6 @@ export const STYLES = `
     white-space: nowrap;
     pointer-events: none;
     opacity: 0.7;
-  }
-  .direction-up .bar-target-label {
-    top: auto;
-    left: auto;
-    right: -4px;
-    transform: translateX(100%);
   }
 
   /* Indicator */
@@ -182,29 +166,6 @@ export const STYLES = `
   }
   .bar-fill.charge {
     animation: pulse-charge 2s ease-in-out infinite;
-  }
-
-  /* Vertical direction */
-  .direction-up {
-    flex-direction: row;
-    align-items: flex-end;
-    gap: 8px;
-  }
-  .direction-up .bar-row {
-    flex-direction: column-reverse;
-    align-items: center;
-  }
-  .direction-up .bar-container {
-    width: var(--pulse-bar-height, 8px);
-    height: 100%;
-  }
-  .direction-up .bar-fill {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100% !important;
-    transition: height var(--pulse-animation-speed, 0.8s) ease;
   }
 
   /* Entity row mode */

@@ -10,7 +10,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.1.0-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.1-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -59,7 +59,6 @@ The original `bar-card` was delisted from HACS in 2025 after years without maint
 - Change indicator (▲/▼) with history comparison
 - Tap, hold, and double-tap actions
 - Charge animation effect
-- Vertical bar direction
 - Entity row mode (for use inside entities card)
 - Sections view grid support
 - Full dark/light theme integration
@@ -149,7 +148,6 @@ positions:
 | `unit_of_measurement` | string | entity unit | Unit suffix |
 | `attribute` | string | — | Use entity attribute instead of state |
 | `target` | number/string | — | Target marker (value or entity ID) |
-| `direction` | string | `right` | `right` or `up` (vertical) |
 | `entity_row` | boolean | `false` | Render without card wrapper |
 | `complementary` | boolean | `false` | Show remaining value |
 | `limit_value` | boolean | `false` | Clamp value to min/max |
@@ -339,19 +337,6 @@ target:
   show_label: true
 ```
 
-### Vertical Bars
-
-```yaml
-type: custom:pulse-card
-direction: up
-height: "200px"
-columns: 3
-entities:
-  - sensor.temperature
-  - sensor.humidity
-  - sensor.pressure
-```
-
 ### Entity Row Mode
 
 Use inside an `entities` card — renders without the card wrapper.
@@ -417,7 +402,6 @@ severity:
 
 - Per-entity overrides in the visual editor are not yet supported — use YAML for per-entity `severity`, `target`, `indicator`, or `positions` config
 - `width`, `saturation`, `hue`, and `entity_config` from bar-card are not supported
-- Vertical mode (`direction: up`) requires explicit `height` (e.g. `200px`) — auto-height is not supported in vertical layout
 - History-based indicator requires the HA `recorder` component to be enabled
 
 ---

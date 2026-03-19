@@ -5,7 +5,7 @@
  */
 
 /** Pulse Card version string. */
-export const VERSION = '0.1.0';
+export const VERSION = '0.1.1';
 
 /** Console log prefix. */
 export const LOG_PREFIX = 'Pulse Card:';
@@ -17,7 +17,6 @@ export const DEFAULTS = {
   height: '8px',
   border_radius: '4px',
   decimal: null,
-  direction: 'right',
   entity_row: false,
   complementary: false,
   limit_value: false,

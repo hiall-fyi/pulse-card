@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-03-19
+
+### Added
+
+- Configurable `gap` option for bar spacing — supports CSS values (e.g. `8px`, `1em`) or numbers ([#2](https://github.com/hiall-fyi/pulse-card/issues/2))
+- Visual editor field for `gap` in Card Settings
+
+### Removed
+
+- Vertical bar direction (`direction: up`) — low utility, poor information density; use dedicated charting cards (ApexCharts, Statistics Graph) for vertical time-series data ([#2](https://github.com/hiall-fyi/pulse-card/issues/2))
+
 ## [0.1.0] - 2026-03-18
 
 ### Added

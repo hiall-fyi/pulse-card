@@ -94,11 +94,11 @@ export {};
  * @property {number} [min]
  * @property {number} [max]
  * @property {number|null} [decimal]
- * @property {string} [direction] - 'right' | 'up'
  * @property {boolean} [entity_row]
  * @property {boolean} [complementary]
  * @property {boolean} [limit_value]
  * @property {number} [columns]
+ * @property {string|number} [gap]
  * @property {number|string|TargetObjectConfig} [target]
  * @property {SeverityEntry[]} [severity]
  * @property {AnimationConfig} [animation]

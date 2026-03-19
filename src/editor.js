@@ -11,7 +11,6 @@ import { LitElement, html, css, nothing } from 'lit';
 
 /**
  * ha-form schema for card-level settings.
- * Note: direction is intentionally omitted — advanced/YAML-only for V1.
  * Positions use flat keys (pos_name, pos_value, pos_icon) mapped to
  * nested config in _settingsChanged.
  */
@@ -41,6 +40,13 @@ const SETTINGS_SCHEMA = [
         label: 'Columns',
         selector: { number: { min: 1, max: 6, mode: 'box' } },
       },
+    ],
+  },
+  {
+    name: '',
+    type: 'grid',
+    schema: [
+      { name: 'gap', label: 'Gap', selector: { text: {} } },
     ],
   },
   {
@@ -248,7 +254,7 @@ class PulseCardEditor extends LitElement {
     const newConfig = { ...this._config };
 
     // Simple flat keys
-    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'min', 'max'];
+    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max'];
     for (const key of simpleKeys) {
       const val = formData[key];
       if (val === undefined || val === null || val === '') {
@@ -316,6 +322,7 @@ class PulseCardEditor extends LitElement {
       border_radius: this._config.border_radius || '',
       color: this._config.color || '',
       columns: this._config.columns || 1,
+      gap: this._config.gap || '',
       min: this._config.min ?? '',
       max: this._config.max ?? '',
       pos_name: this._config.positions?.name ?? 'outside',

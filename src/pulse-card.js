@@ -129,13 +129,20 @@ class PulseCard extends HTMLElement {
     if (!cfg) return;
     const columns = cfg.columns ?? 1;
     const columnsClass = columns > 1 ? ` columns-${columns}` : '';
-    const dirClass = cfg.direction === 'up' ? ' direction-up' : '';
     const entityRowClass = cfg.entity_row ? ' entity-row' : '';
-    const columnsStyle = columns > 1 ? ` style="--pulse-columns:${columns}"` : '';
+    const gap = cfg.gap;
+    let inlineStyle = '';
+    if (columns > 1 || gap !== undefined) {
+      const parts = [];
+      if (columns > 1) parts.push(`--pulse-columns:${columns}`);
+      if (gap !== undefined) parts.push(`--pulse-gap:${typeof gap === 'number' ? `${gap}px` : gap}`);
+      inlineStyle = ` style="${parts.join(';')}"`;
+    }
+    const columnsStyle = inlineStyle;
 
     let inner = '';
     if (cfg.title) inner += `<div class="pulse-title">${escapeHtml(cfg.title)}</div>`;
-    inner += `<div class="pulse-card${columnsClass}${dirClass}${entityRowClass}"${columnsStyle}>`;
+    inner += `<div class="pulse-card${columnsClass}${entityRowClass}"${columnsStyle}>`;
     for (const ec of cfg.entities) inner += this._renderBarRow(ec);
     inner += '</div>';
 
@@ -160,7 +167,6 @@ class PulseCard extends HTMLElement {
   _renderBarRow(ec) {
     const cfg = this._cfg;
     const bs = resolveBarState(ec, cfg, this._hass);
-    const isVertical = cfg.direction === 'up';
 
     // Positions
     const posName = ec.positions?.name ?? cfg.positions?.name ?? 'outside';
@@ -192,12 +198,10 @@ class PulseCard extends HTMLElement {
     const fillStyle = bs.color ? `background-color:${bs.color};` : '';
     const chargeClass = animEffect === 'charge' && !bs.isUnavailable ? ' charge' : '';
     const transitionStyle = animState === 'off' ? 'transition:none;' : '';
-    const fillDim = isVertical
-      ? `height:${bs.fill}%;${transitionStyle}${fillStyle}`
-      : `width:${bs.fill}%;${transitionStyle}${fillStyle}`;
+    const fillDim = `width:${bs.fill}%;${transitionStyle}${fillStyle}`;
 
     // Target marker [US-7]
-    const targetHtml = this._buildTargetHtml(ec, cfg, bs.min, bs.max, isVertical);
+    const targetHtml = this._buildTargetHtml(ec, cfg, bs.min, bs.max);
 
     const barHtml = `
       <div class="bar-container" style="height:${height};border-radius:${borderRadius};--pulse-animation-speed:${animSpeed}s;">
@@ -291,16 +295,15 @@ class PulseCard extends HTMLElement {
    * @param {NormalizedConfig} cfg
    * @param {number} min
    * @param {number} max
-   * @param {boolean} isVertical
    * @returns {string}
    */
-  _buildTargetHtml(ec, cfg, min, max, isVertical) {
+  _buildTargetHtml(ec, cfg, min, max) {
     const targetCfg = ec.target ?? cfg.target;
     const targetNum = this._resolveTargetValue(targetCfg);
     if (targetNum === null) return '';
 
     const targetPct = clamp((targetNum - min) / (max - min), 0, 1) * 100;
-    const targetPos = isVertical ? `bottom:${targetPct}%` : `left:${targetPct}%`;
+    const targetPos = `left:${targetPct}%`;
     const showLabel = this._shouldShowTargetLabel(targetCfg);
     const labelHtml = showLabel
       ? `<span class="bar-target-label">${escapeHtml(targetNum)}</span>`
@@ -325,12 +328,7 @@ class PulseCard extends HTMLElement {
       /** @type {HTMLElement|null} */
       const fillEl = /** @type {HTMLElement|null} */ (row.querySelector('.bar-fill'));
       if (fillEl) {
-        const isVertical = cfg.direction === 'up';
-        if (isVertical) {
-          fillEl.style.height = `${bs.fill}%`;
-        } else {
-          fillEl.style.width = `${bs.fill}%`;
-        }
+        fillEl.style.width = `${bs.fill}%`;
         fillEl.style.backgroundColor = bs.color || '';
 
         // Update icon if severity has icon override
@@ -358,14 +356,7 @@ class PulseCard extends HTMLElement {
       if (targetNum !== null) {
         const targetPct = clamp((targetNum - bs.min) / (bs.max - bs.min), 0, 1) * 100;
         if (targetEl) {
-          const isVertical = cfg.direction === 'up';
-          if (isVertical) {
-            targetEl.style.bottom = `${targetPct}%`;
-            targetEl.style.left = '';
-          } else {
-            targetEl.style.left = `${targetPct}%`;
-            targetEl.style.bottom = '';
-          }
+          targetEl.style.left = `${targetPct}%`;
           targetEl.style.display = '';
           const labelEl = targetEl.querySelector('.bar-target-label');
           if (labelEl) labelEl.textContent = String(targetNum);
