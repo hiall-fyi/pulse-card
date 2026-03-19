@@ -135,7 +135,10 @@ class PulseCard extends HTMLElement {
     if (columns > 1 || gap !== undefined) {
       const parts = [];
       if (columns > 1) parts.push(`--pulse-columns:${columns}`);
-      if (gap !== undefined) parts.push(`--pulse-gap:${typeof gap === 'number' ? `${gap}px` : gap}`);
+      if (gap !== undefined) {
+        const g = typeof gap === 'number' || /^\d+(\.\d+)?$/.test(String(gap)) ? `${gap}px` : gap;
+        parts.push(`--pulse-gap:${g}`);
+      }
       inlineStyle = ` style="${parts.join(';')}"`;
     }
     const columnsStyle = inlineStyle;
@@ -511,7 +514,7 @@ class PulseCard extends HTMLElement {
     const entityCount = this._config?.entities?.length || 1;
     const columns = this._config?.columns || 1;
     const rows = Math.ceil(entityCount / columns);
-    return { columns: 6, min_columns: 3, rows: Math.max(1, rows), min_rows: 1 };
+    return { columns: 12, min_columns: 3, rows: Math.max(1, rows), min_rows: 1 };
   }
 
   /**
