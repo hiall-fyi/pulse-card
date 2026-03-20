@@ -20,7 +20,8 @@ const POSITION_OPTIONS = [
   { value: 'off', label: 'Off' },
 ];
 
-const SETTINGS_SCHEMA = [
+/** Schema: Appearance section. */
+const SCHEMA_APPEARANCE = [
   { name: 'title', label: 'Title', selector: { text: {} } },
   {
     name: '',
@@ -36,16 +37,25 @@ const SETTINGS_SCHEMA = [
     schema: [
       { name: 'color', label: 'Color', selector: { text: {} } },
       {
-        name: 'columns',
-        label: 'Columns',
-        selector: { number: { min: 1, max: 6, mode: 'box' } },
+        name: 'decimal',
+        label: 'Decimals',
+        selector: { number: { min: 0, max: 6, mode: 'box' } },
       },
     ],
   },
+];
+
+/** Schema: Layout section. */
+const SCHEMA_LAYOUT = [
   {
     name: '',
     type: 'grid',
     schema: [
+      {
+        name: 'columns',
+        label: 'Columns',
+        selector: { number: { min: 1, max: 6, mode: 'box' } },
+      },
       { name: 'gap', label: 'Gap', selector: { text: {} } },
     ],
   },
@@ -65,18 +75,23 @@ const SETTINGS_SCHEMA = [
       },
     ],
   },
+  { name: 'target_value', label: 'Target', selector: { text: {} } },
+];
+
+/** Schema: Display section — positions, animation, indicator. */
+const SCHEMA_DISPLAY = [
   {
     name: '',
     type: 'grid',
     schema: [
       {
         name: 'pos_name',
-        label: 'Name Position',
+        label: 'Name',
         selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
       },
       {
         name: 'pos_value',
-        label: 'Value Position',
+        label: 'Value',
         selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
       },
     ],
@@ -87,12 +102,35 @@ const SETTINGS_SCHEMA = [
     schema: [
       {
         name: 'pos_icon',
-        label: 'Icon Position',
+        label: 'Icon',
         selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
       },
       {
+        name: 'pos_indicator',
+        label: 'Indicator',
+        selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
+      },
+    ],
+  },
+  {
+    name: '',
+    type: 'grid',
+    schema: [
+      {
+        name: 'indicator_period',
+        label: 'Lookback (min)',
+        selector: { number: { min: 1, max: 1440, mode: 'box' } },
+      },
+      { name: 'show_delta', label: 'Show Change Amount', selector: { boolean: {} } },
+    ],
+  },
+  {
+    name: '',
+    type: 'grid',
+    schema: [
+      {
         name: 'anim_effect',
-        label: 'Animation',
+        label: 'Effect',
         selector: {
           select: {
             options: [
@@ -102,6 +140,11 @@ const SETTINGS_SCHEMA = [
             mode: 'dropdown',
           },
         },
+      },
+      {
+        name: 'anim_speed',
+        label: 'Speed (s)',
+        selector: { number: { min: 0, max: 5, step: 0.1, mode: 'box' } },
       },
     ],
   },
@@ -136,13 +179,17 @@ class PulseCardEditor extends LitElement {
     super.connectedCallback();
     if (this._helpers) return;
     if (!window.loadCardHelpers) return;
-    const helpers = await window.loadCardHelpers();
-    this._helpers = helpers;
-    const entitiesCard = await helpers.createCardElement({
-      type: 'entities',
-      entities: [],
-    });
-    entitiesCard.constructor.getConfigElement();
+    try {
+      const helpers = await window.loadCardHelpers();
+      this._helpers = helpers;
+      const entitiesCard = await helpers.createCardElement({
+        type: 'entities',
+        entities: [],
+      });
+      entitiesCard.constructor.getConfigElement();
+    } catch {
+      // Helper loading failed — editor still works, just without lazy-loaded components
+    }
   }
 
   /**
@@ -244,8 +291,9 @@ class PulseCardEditor extends LitElement {
   /**
    * Handle ha-form value-changed for card settings.
    * Merges form data into config. Empty strings remove the key (revert to default).
-   * Flat position keys (pos_name, pos_value, pos_icon) are mapped to nested
-   * positions object. Animation effect is mapped to animation.effect.
+   * Flat position keys (pos_name, pos_value, pos_icon, pos_indicator) are mapped
+   * to nested positions object. Animation keys are mapped to animation object.
+   * Indicator keys are mapped to indicator object. Target is mapped to target object.
    * @param {CustomEvent} ev
    */
   _settingsChanged(ev) {
@@ -264,8 +312,45 @@ class PulseCardEditor extends LitElement {
       }
     }
 
+    // Decimal — number field, null means auto
+    const decimalVal = formData.decimal;
+    if (decimalVal !== undefined && decimalVal !== null && decimalVal !== '') {
+      newConfig.decimal = decimalVal;
+    } else {
+      delete newConfig.decimal;
+    }
+
+    // Boolean toggles — only store when true (false = default = omit)
+    // Note: complementary, limit_value, entity_row are YAML-only (not in editor schema)
+    // but if they somehow appear in formData, handle them gracefully
+    const boolKeys = ['complementary', 'limit_value', 'entity_row'];
+    for (const key of boolKeys) {
+      if (formData[key] === true) {
+        newConfig[key] = true;
+      } else if (formData[key] === false) {
+        delete newConfig[key];
+      }
+      // If key not in formData at all, leave existing config untouched
+    }
+
+    // Target — flat key to top-level config; preserve object properties (e.g. show_label)
+    const targetVal = formData.target_value;
+    if (targetVal !== undefined && targetVal !== null && targetVal !== '') {
+      const num = parseFloat(targetVal);
+      const resolvedValue = isNaN(num) ? targetVal : num;
+      // If existing config uses object format, preserve extra properties like show_label
+      const existingTarget = this._config?.target;
+      if (typeof existingTarget === 'object' && existingTarget !== null) {
+        newConfig.target = { ...existingTarget, value: resolvedValue };
+      } else {
+        newConfig.target = resolvedValue;
+      }
+    } else {
+      delete newConfig.target;
+    }
+
     // Positions — flat keys to nested object
-    const posMap = { pos_name: 'name', pos_value: 'value', pos_icon: 'icon' };
+    const posMap = { pos_name: 'name', pos_value: 'value', pos_icon: 'icon', pos_indicator: 'indicator' };
     const positions = { ...(newConfig.positions || {}) };
     let hasPositions = false;
     for (const [flatKey, posKey] of Object.entries(posMap)) {
@@ -283,17 +368,50 @@ class PulseCardEditor extends LitElement {
       delete newConfig.positions;
     }
 
-    // Animation effect — flat key to nested object
+    // Animation — flat keys to nested object; omit if all defaults
     const animEffect = formData.anim_effect;
+    const animSpeed = formData.anim_speed;
+    const anim = { ...(newConfig.animation || {}) };
     if (animEffect && animEffect !== 'none') {
-      newConfig.animation = { ...(newConfig.animation || {}), effect: animEffect };
+      anim.effect = animEffect;
     } else {
-      if (newConfig.animation) {
-        delete newConfig.animation.effect;
-        if (Object.keys(newConfig.animation).length === 0) {
-          delete newConfig.animation;
-        }
-      }
+      delete anim.effect;
+    }
+    if (animSpeed !== undefined && animSpeed !== null && animSpeed !== '') {
+      anim.speed = animSpeed;
+    } else {
+      delete anim.speed;
+    }
+    if (Object.keys(anim).length > 0) {
+      newConfig.animation = anim;
+    } else {
+      delete newConfig.animation;
+    }
+
+    // Indicator — derive show from position dropdown (single source of truth)
+    const posIndicatorVal = formData.pos_indicator;
+    const indicatorPeriod = formData.indicator_period;
+    const showDelta = formData.show_delta;
+    const indicator = { ...(newConfig.indicator || {}) };
+    if (posIndicatorVal && posIndicatorVal !== 'off') {
+      indicator.show = true;
+    } else {
+      delete indicator.show;
+    }
+    if (indicatorPeriod !== undefined && indicatorPeriod !== null && indicatorPeriod !== '') {
+      indicator.period = indicatorPeriod;
+    } else {
+      delete indicator.period;
+    }
+    if (showDelta === true) {
+      indicator.show_delta = true;
+    } else {
+      delete indicator.show_delta;
+    }
+    if (Object.keys(indicator).length > 0) {
+      newConfig.indicator = indicator;
+    } else {
+      delete newConfig.indicator;
     }
 
     this._fireConfigChanged(newConfig);
@@ -316,19 +434,36 @@ class PulseCardEditor extends LitElement {
     }
 
     const entities = this._getEntities();
+    // Resolve target value for the form — supports number, string (entity ID), or object
+    const rawTarget = this._config.target;
+    let targetFormValue = '';
+    if (rawTarget !== undefined && rawTarget !== null) {
+      if (typeof rawTarget === 'object' && rawTarget.value !== undefined) {
+        targetFormValue = String(rawTarget.value);
+      } else {
+        targetFormValue = String(rawTarget);
+      }
+    }
+
     const formData = {
       title: this._config.title || '',
       height: this._config.height || '',
       border_radius: this._config.border_radius || '',
       color: this._config.color || '',
+      decimal: this._config.decimal ?? '',
       columns: this._config.columns || 1,
       gap: this._config.gap || '',
+      target_value: targetFormValue,
       min: this._config.min ?? '',
       max: this._config.max ?? '',
       pos_name: this._config.positions?.name ?? 'outside',
       pos_value: this._config.positions?.value ?? 'outside',
       pos_icon: this._config.positions?.icon ?? 'off',
+      pos_indicator: this._config.positions?.indicator ?? 'off',
+      indicator_period: this._config.indicator?.period ?? '',
+      show_delta: this._config.indicator?.show_delta || false,
       anim_effect: this._config.animation?.effect ?? 'none',
+      anim_speed: this._config.animation?.speed ?? '',
     };
 
     return html`
@@ -364,7 +499,23 @@ class PulseCardEditor extends LitElement {
         <ha-form
           .hass=${hass}
           .data=${formData}
-          .schema=${SETTINGS_SCHEMA}
+          .schema=${SCHEMA_APPEARANCE}
+          .computeLabel=${this._computeLabel}
+          @value-changed=${this._settingsChanged}
+        ></ha-form>
+        <h3>Layout</h3>
+        <ha-form
+          .hass=${hass}
+          .data=${formData}
+          .schema=${SCHEMA_LAYOUT}
+          .computeLabel=${this._computeLabel}
+          @value-changed=${this._settingsChanged}
+        ></ha-form>
+        <h3>Display</h3>
+        <ha-form
+          .hass=${hass}
+          .data=${formData}
+          .schema=${SCHEMA_DISPLAY}
           .computeLabel=${this._computeLabel}
           @value-changed=${this._settingsChanged}
         ></ha-form>
@@ -412,6 +563,8 @@ class PulseCardEditor extends LitElement {
   }
 }
 
-customElements.define('pulse-card-editor', PulseCardEditor);
+if (!customElements.get('pulse-card-editor')) {
+  customElements.define('pulse-card-editor', PulseCardEditor);
+}
 
 export { PulseCardEditor };

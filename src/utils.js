@@ -189,7 +189,22 @@ export function warn(msg, ...args) {
  * @returns {Promise<number|null>} The oldest numeric value in the period, or null.
  */
 export async function fetchPreviousValue(hass, entityId, minutesAgo = 60) {
-  if (!hass?.callWS) return null;
+  const result = await fetchPreviousValues(hass, [entityId], minutesAgo);
+  return result[entityId] ?? null;
+}
+
+/**
+ * Batch-fetch previous values for multiple entities in a single WS call. [US-16]
+ * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
+ * @param {string[]} entityIds - Entity IDs to query.
+ * @param {number} minutesAgo - How far back to look (default 60).
+ * @returns {Promise<Record<string, number|null>>} Map of entity ID → oldest numeric value, or null.
+ */
+export async function fetchPreviousValues(hass, entityIds, minutesAgo = 60) {
+  /** @type {Record<string, number|null>} */
+  const results = {};
+  if (!hass?.callWS || entityIds.length === 0) return results;
+
   const now = new Date();
   const start = new Date(now.getTime() - minutesAgo * 60 * 1000);
   try {
@@ -197,18 +212,24 @@ export async function fetchPreviousValue(hass, entityId, minutesAgo = 60) {
       type: 'history/history_during_period',
       start_time: start.toISOString(),
       end_time: now.toISOString(),
-      entity_ids: [entityId],
+      entity_ids: entityIds,
       minimal_response: true,
       significant_changes_only: true,
     });
-    const states = history?.[entityId];
-    if (!states || states.length === 0) return null;
-    const val = parseFloat(states[0].s);
-    return isNaN(val) ? null : val;
+    for (const eid of entityIds) {
+      const states = history?.[eid];
+      if (!states || states.length === 0) {
+        results[eid] = null;
+        continue;
+      }
+      const val = parseFloat(states[0].s);
+      results[eid] = isNaN(val) ? null : val;
+    }
   } catch (e) {
-    warn('Failed to fetch history for %s: %O', entityId, e);
-    return null;
+    warn('Failed to fetch history for %s: %O', entityIds.join(', '), e);
+    for (const eid of entityIds) results[eid] = null;
   }
+  return results;
 }
 
 /**

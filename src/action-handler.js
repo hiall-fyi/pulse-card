@@ -51,7 +51,7 @@ function executeAction(element, hass, actionConfig, entityId) {
       break;
     }
     case 'url':
-      if (actionConfig.url_path) window.open(actionConfig.url_path, '_blank');
+      if (actionConfig.url_path) window.open(actionConfig.url_path, '_blank', 'noopener,noreferrer');
       break;
   }
 }
@@ -90,7 +90,18 @@ export function handleAction(element, hass, cardConfig, entityConfig, actionType
 }
 
 /**
+ * Clean up action listeners previously bound to a bar row element.
+ * Clears pending timers and removes all event listeners via AbortController.
+ * @param {HTMLElement} rowEl - The .bar-row element.
+ */
+export function cleanupActionListeners(rowEl) {
+  const cleanup = /** @type {*} */ (rowEl).__pulseCleanup;
+  if (typeof cleanup === 'function') cleanup();
+}
+
+/**
  * Bind tap, hold, and double-tap listeners to a bar row element.
+ * Stores a cleanup function on the element for disconnectedCallback.
  * @param {HTMLElement} rowEl - The .bar-row element.
  * @param {HTMLElement} cardEl - Card root element (for event dispatch).
  * @param {import('./types.js').Hass|null} hass - Home Assistant instance.
@@ -98,12 +109,25 @@ export function handleAction(element, hass, cardConfig, entityConfig, actionType
  * @param {import('./types.js').EntityConfig} entityConfig - Per-entity config.
  */
 export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfig) {
+  // Clean up any previous listeners on this element
+  cleanupActionListeners(rowEl);
+
+  const controller = new AbortController();
+  const { signal } = controller;
   let clickCount = 0;
   /** @type {ReturnType<typeof setTimeout>|null} */
   let clickTimer = null;
   /** @type {ReturnType<typeof setTimeout>|null} */
   let holdTimer = null;
   let held = false;
+
+  // Store cleanup function on element for disconnectedCallback
+  /** @type {*} */ (rowEl).__pulseCleanup = () => {
+    controller.abort();
+    if (clickTimer) clearTimeout(clickTimer);
+    if (holdTimer) clearTimeout(holdTimer);
+    delete /** @type {*} */ (rowEl).__pulseCleanup;
+  };
 
   // Make bar rows keyboard-focusable and accessible
   rowEl.setAttribute('tabindex', '0');
@@ -114,7 +138,7 @@ export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfi
       ev.preventDefault();
       if (hass) handleAction(cardEl, hass, cardConfig, entityConfig, 'tap_action');
     }
-  });
+  }, { signal });
 
   // Tap / double-tap via click
   rowEl.addEventListener('click', (ev) => {
@@ -131,7 +155,7 @@ export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfi
       clickCount = 0;
       if (hass) handleAction(cardEl, hass, cardConfig, entityConfig, 'double_tap_action');
     }
-  });
+  }, { signal });
 
   // Hold via pointerdown/pointerup
   rowEl.addEventListener('pointerdown', () => {
@@ -140,12 +164,12 @@ export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfi
       held = true;
       if (hass) handleAction(cardEl, hass, cardConfig, entityConfig, 'hold_action');
     }, HOLD_THRESHOLD);
-  });
+  }, { signal });
 
   const cancelHold = () => { if (holdTimer) clearTimeout(holdTimer); };
-  rowEl.addEventListener('pointerup', cancelHold);
-  rowEl.addEventListener('pointercancel', cancelHold);
+  rowEl.addEventListener('pointerup', cancelHold, { signal });
+  rowEl.addEventListener('pointercancel', cancelHold, { signal });
 
   // Prevent context menu on long press
-  rowEl.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  rowEl.addEventListener('contextmenu', (ev) => ev.preventDefault(), { signal });
 }

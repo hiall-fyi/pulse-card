@@ -5,17 +5,18 @@
  */
 
 import { STYLES } from './styles.js';
-import { DEFAULTS } from './constants.js';
-import { bindActionListeners } from './action-handler.js';
+import { DEFAULTS, VERSION } from './constants.js';
+import { bindActionListeners, cleanupActionListeners } from './action-handler.js';
 import './editor.js';
 import {
   clamp,
   computeIndicator,
   cssValue,
   escapeHtml,
-  fetchPreviousValue,
+  fetchPreviousValues,
   resolveBarState,
   normalizeConfig,
+  warn,
 } from './utils.js';
 
 /** @typedef {import('./types.js').PulseCardConfig & {entities: import('./types.js').EntityConfig[]}} NormalizedConfig */
@@ -66,11 +67,16 @@ class PulseCard extends HTMLElement {
     return /** @type {NormalizedConfig} */ (this._config);
   }
 
-  /** Clean up timers when element is removed from DOM. */
+  /** Clean up timers and action listeners when element is removed from DOM. */
   disconnectedCallback() {
     if (this._indicatorTimer) {
       clearTimeout(this._indicatorTimer);
       this._indicatorTimer = null;
+    }
+    // Clean up action listener timers on all bar rows
+    const rows = this._shadow.querySelectorAll('.bar-row');
+    for (const row of rows) {
+      cleanupActionListeners(/** @type {HTMLElement} */ (row));
     }
   }
 
@@ -136,8 +142,7 @@ class PulseCard extends HTMLElement {
       const parts = [];
       if (columns > 1) parts.push(`--pulse-columns:${columns}`);
       if (gap !== undefined) {
-        const g = typeof gap === 'number' || /^\d+(\.\d+)?$/.test(String(gap)) ? `${gap}px` : gap;
-        parts.push(`--pulse-gap:${g}`);
+        parts.push(`--pulse-gap:${cssValue(gap)}`);
       }
       inlineStyle = ` style="${parts.join(';')}"`;
     }
@@ -209,7 +214,7 @@ class PulseCard extends HTMLElement {
     const barHtml = `
       <div class="bar-container" style="height:${height};border-radius:${borderRadius};--pulse-animation-speed:${animSpeed}s;">
         <div class="bar-track"></div>
-        <div class="bar-fill${chargeClass}" data-entity="${ec.entity}" style="${fillDim}"></div>
+        <div class="bar-fill${chargeClass}" data-entity="${escapeHtml(ec.entity)}" style="${fillDim}"></div>
         ${targetHtml}
         ${contentHtml}
       </div>`;
@@ -220,7 +225,7 @@ class PulseCard extends HTMLElement {
       : `role="progressbar" aria-valuenow="${bs.numValue}" aria-valuemin="${bs.min}" aria-valuemax="${bs.max}" aria-label="${escapeHtml(bs.name)}: ${escapeHtml(bs.displayValue)}"`;
 
     const unavailClass = bs.isUnavailable ? ' unavailable' : '';
-    return `<div class="bar-row${unavailClass}" data-entity="${ec.entity}" ${ariaAttrs}>${labelsHtml}${barHtml}</div>`;
+    return `<div class="bar-row${unavailClass}" data-entity="${escapeHtml(ec.entity)}" ${ariaAttrs}>${labelsHtml}${barHtml}</div>`;
   }
 
   /**
@@ -336,7 +341,7 @@ class PulseCard extends HTMLElement {
 
         // Update icon if severity has icon override
         const iconEl = row.querySelector('.bar-icon');
-        if (iconEl) iconEl.setAttribute('icon', bs.resolvedIcon);
+        if (iconEl && bs.resolvedIcon) iconEl.setAttribute('icon', bs.resolvedIcon);
       }
 
       // Update name + value text
@@ -389,34 +394,57 @@ class PulseCard extends HTMLElement {
 
   /**
    * Fetch history data and update indicator elements. [US-16, AC-16.1–16.5]
+   * Uses a single batch WS call for all indicator entities.
    */
   async _fetchIndicators() {
     const cfg = this._cfg;
     if (!cfg) return;
-    for (const ec of cfg.entities) {
-      const icfg = ec.indicator ?? cfg.indicator;
-      if (!icfg?.show) continue;
 
-      const period = icfg.period ?? 60;
-      const prev = await fetchPreviousValue(this._hass, ec.entity, period);
-      const state = this._hass?.states[ec.entity];
-      const rawValue = ec.attribute
-        ? state?.attributes?.[ec.attribute]
-        : state?.state;
-      const result = computeIndicator(rawValue, prev);
-      this._indicators[ec.entity] = result;
-
-      // Update DOM
-      const row = this._elements.rows?.[ec.entity];
-      if (!row) continue;
-      const indEl = row.querySelector('.bar-indicator');
-      if (indEl) {
-        const arrow = result.direction === 'up' ? '▲' : result.direction === 'down' ? '▼' : '▶';
-        const showDelta = icfg.show_delta === true;
-        const deltaStr = showDelta ? ` ${result.delta > 0 ? '+' : ''}${result.delta}` : '';
-        indEl.textContent = `${arrow}${deltaStr}`;
-        indEl.className = `bar-indicator ${result.direction}`;
+    try {
+      // Collect entities that need indicator data, grouped by period
+      /** @type {Map<number, {entity: string, icfg: import('./types.js').IndicatorConfig}[]>} */
+      const byPeriod = new Map();
+      for (const ec of cfg.entities) {
+        const icfg = ec.indicator ?? cfg.indicator;
+        if (!icfg?.show) continue;
+        const period = icfg.period ?? 60;
+        if (!byPeriod.has(period)) byPeriod.set(period, []);
+        /** @type {{entity: string, icfg: import('./types.js').IndicatorConfig}[]} */
+        const group = /** @type {{entity: string, icfg: import('./types.js').IndicatorConfig}[]} */ (byPeriod.get(period));
+        group.push({ entity: ec.entity, icfg });
       }
+
+      // Batch fetch per period group
+      for (const [period, entries] of byPeriod) {
+        const entityIds = entries.map((e) => e.entity);
+        const prevValues = await fetchPreviousValues(this._hass, entityIds, period);
+
+        for (const { entity, icfg } of entries) {
+          const ec = cfg.entities.find(
+            /** @param {EntityConfig} e */ (e) => e.entity === entity,
+          );
+          const state = this._hass?.states[entity];
+          const rawValue = ec?.attribute
+            ? state?.attributes?.[ec.attribute]
+            : state?.state;
+          const result = computeIndicator(rawValue, prevValues[entity]);
+          this._indicators[entity] = result;
+
+          // Update DOM
+          const row = this._elements.rows?.[entity];
+          if (!row) continue;
+          const indEl = row.querySelector('.bar-indicator');
+          if (indEl) {
+            const arrow = result.direction === 'up' ? '▲' : result.direction === 'down' ? '▼' : '▶';
+            const showDelta = icfg.show_delta === true;
+            const deltaStr = showDelta ? ` ${result.delta > 0 ? '+' : ''}${result.delta}` : '';
+            indEl.textContent = `${arrow}${deltaStr}`;
+            indEl.className = `bar-indicator ${result.direction}`;
+          }
+        }
+      }
+    } catch (e) {
+      warn('Indicator fetch failed: %O', e);
     }
   }
 
@@ -540,7 +568,9 @@ class PulseCard extends HTMLElement {
 }
 
 // Register custom element [AC-12.12]
-customElements.define('pulse-card', PulseCard);
+if (!customElements.get('pulse-card')) {
+  customElements.define('pulse-card', PulseCard);
+}
 
 // Register in card picker [AC-12.12, AC-12.13]
 window.customCards = window.customCards || [];
@@ -551,5 +581,11 @@ window.customCards.push({
   preview: true,
   documentationURL: 'https://github.com/hiall-fyi/pulse-card',
 });
+
+console.info(
+  `%c PULSE-CARD %c v${VERSION} `,
+  'background:#03A9F4;color:white;font-weight:bold',
+  'background:#333;color:white',
+);
 
 export default PulseCard;
