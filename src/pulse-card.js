@@ -286,14 +286,15 @@ class PulseCard extends HTMLElement {
   _buildContentHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml) {
     if (posName !== 'inside' && posValue !== 'inside' && posIcon !== 'inside' && posIndicator !== 'inside') return '';
 
-    let html = '<div class="bar-content">';
+    let html = '<div class="bar-content"><div class="bar-label-left">';
     if (posIcon === 'inside' && bs.resolvedIcon) {
       html += `<ha-icon class="bar-icon" icon="${escapeHtml(bs.resolvedIcon)}"></ha-icon>`;
     }
     if (posName === 'inside') html += `<span class="bar-name">${escapeHtml(bs.name)}</span>`;
+    html += '</div><div class="bar-label-right">';
     if (posValue === 'inside') html += `<span class="bar-value">${escapeHtml(bs.displayValue)}</span>`;
     if (posIndicator === 'inside' && indicatorHtml) html += indicatorHtml;
-    html += '</div>';
+    html += '</div></div>';
     return html;
   }
 

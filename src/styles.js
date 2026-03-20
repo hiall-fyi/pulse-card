@@ -50,6 +50,12 @@ export const STYLES = `
     gap: 6px;
   }
 
+  .bar-label-left {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .bar-name {
     font-size: 14px;
     color: var(--primary-text-color);
