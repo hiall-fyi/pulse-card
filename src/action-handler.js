@@ -16,7 +16,7 @@ const HOLD_THRESHOLD = 500;
  * @param {string} type - Event type.
  * @param {Record<string, *>} detail - Event detail payload.
  */
-export function fireEvent(element, type, detail) {
+function fireEvent(element, type, detail) {
   element.dispatchEvent(
     new CustomEvent(type, { bubbles: true, composed: true, detail })
   );

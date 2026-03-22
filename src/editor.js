@@ -8,6 +8,7 @@
  */
 
 import { LitElement, html, css, nothing } from 'lit';
+import { DEFAULTS } from './constants.js';
 
 /**
  * ha-form schema for card-level settings.
@@ -159,11 +160,13 @@ const SCHEMA_DISPLAY = [
  * LitElement-based, following HA Core + Mushroom patterns.
  */
 class PulseCardEditor extends LitElement {
+  /** @type {boolean} Whether HA card helpers have been loaded (prevents re-loading). */
+  _helpersLoaded = false;
+
   static get properties() {
     return {
       hass: { attribute: false },
       _config: { state: true },
-      _helpers: { state: true },
     };
   }
 
@@ -177,18 +180,18 @@ class PulseCardEditor extends LitElement {
    */
   async connectedCallback() {
     super.connectedCallback();
-    if (this._helpers) return;
+    if (this._helpersLoaded) return;
     if (!window.loadCardHelpers) return;
     try {
       const helpers = await window.loadCardHelpers();
-      this._helpers = helpers;
+      this._helpersLoaded = true;
       const entitiesCard = await helpers.createCardElement({
         type: 'entities',
         entities: [],
       });
       entitiesCard.constructor.getConfigElement();
-    } catch {
-      // Helper loading failed — editor still works, just without lazy-loaded components
+    } catch (err) {
+      console.warn('Pulse Card: failed to load card helpers:', err);
     }
   }
 
@@ -248,6 +251,23 @@ class PulseCardEditor extends LitElement {
   }
 
   /**
+   * Handle per-entity field change (name, color).
+   * @param {number} index
+   * @param {string} field
+   * @param {Event} ev
+   */
+  _entityFieldChanged(index, field, ev) {
+    const value = /** @type {HTMLInputElement} */ (ev.target).value ?? '';
+    const entities = this._getEntities();
+    if (value === '' || value === undefined) {
+      delete entities[index][field];
+    } else {
+      entities[index] = { ...entities[index], [field]: value };
+    }
+    this._updateEntities(entities);
+  }
+
+  /**
    * Remove entity at index.
    * @param {number} index
    */
@@ -301,8 +321,8 @@ class PulseCardEditor extends LitElement {
     const formData = ev.detail.value;
     const newConfig = { ...this._config };
 
-    // Simple flat keys
-    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max'];
+    // --- Simple flat keys: empty → delete, else → set ---
+    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max', 'decimal'];
     for (const key of simpleKeys) {
       const val = formData[key];
       if (val === undefined || val === null || val === '') {
@@ -312,15 +332,7 @@ class PulseCardEditor extends LitElement {
       }
     }
 
-    // Decimal — number field, null means auto
-    const decimalVal = formData.decimal;
-    if (decimalVal !== undefined && decimalVal !== null && decimalVal !== '') {
-      newConfig.decimal = decimalVal;
-    } else {
-      delete newConfig.decimal;
-    }
-
-    // Boolean toggles — only store when true (false = default = omit)
+    // --- Boolean toggles: true → set, false → delete, absent → skip ---
     // Note: complementary, limit_value, entity_row are YAML-only (not in editor schema)
     // but if they somehow appear in formData, handle them gracefully
     const boolKeys = ['complementary', 'limit_value', 'entity_row'];
@@ -330,91 +342,67 @@ class PulseCardEditor extends LitElement {
       } else if (formData[key] === false) {
         delete newConfig[key];
       }
-      // If key not in formData at all, leave existing config untouched
     }
 
-    // Target — flat key to top-level config; preserve object properties (e.g. show_label)
-    const targetVal = formData.target_value;
-    if (targetVal !== undefined && targetVal !== null && targetVal !== '') {
-      const num = parseFloat(targetVal);
-      const resolvedValue = isNaN(num) ? targetVal : num;
-      // If existing config uses object format, preserve extra properties like show_label
-      const existingTarget = this._config?.target;
-      if (typeof existingTarget === 'object' && existingTarget !== null) {
-        newConfig.target = { ...existingTarget, value: resolvedValue };
-      } else {
-        newConfig.target = resolvedValue;
+    // --- Target: parse number, preserve object format (e.g. show_label) ---
+    this._applyTarget(newConfig, formData.target_value);
+
+    // --- Nested objects: flat form keys → nested config objects ---
+    // Each entry: [configKey, keyMap, filterFn?]
+    // keyMap: { formKey: nestedKey } — empty values are deleted
+    // filterFn: optional per-key filter (return undefined to delete)
+    /** @type {[string, Record<string, string>, ((k: string, v: *) => *)?][]} */
+    const nestedMaps = [
+      ['positions', { pos_name: 'name', pos_value: 'value', pos_icon: 'icon', pos_indicator: 'indicator' }],
+      ['animation', { anim_effect: 'effect', anim_speed: 'speed' },
+        (k, v) => k === 'effect' && v === 'none' ? undefined : v],
+      ['indicator', { pos_indicator: 'show', indicator_period: 'period', show_delta: 'show_delta' },
+        (k, v) => {
+          if (k === 'show') return v && v !== 'off' ? true : undefined;
+          if (k === 'show_delta') return v === true ? true : undefined;
+          return v;
+        }],
+    ];
+    for (const [configKey, keyMap, filterFn] of nestedMaps) {
+      const nested = { ...(newConfig[configKey] || {}) };
+      for (const [formKey, nestedKey] of Object.entries(keyMap)) {
+        let val = formData[formKey];
+        if (filterFn) val = filterFn(nestedKey, val);
+        if (val === undefined || val === null || val === '') {
+          delete nested[nestedKey];
+        } else {
+          nested[nestedKey] = val;
+        }
       }
-    } else {
-      delete newConfig.target;
-    }
-
-    // Positions — flat keys to nested object
-    const posMap = { pos_name: 'name', pos_value: 'value', pos_icon: 'icon', pos_indicator: 'indicator' };
-    const positions = { ...(newConfig.positions || {}) };
-    let hasPositions = false;
-    for (const [flatKey, posKey] of Object.entries(posMap)) {
-      const val = formData[flatKey];
-      if (val && val !== '') {
-        positions[posKey] = val;
-        hasPositions = true;
+      if (Object.keys(nested).length > 0) {
+        newConfig[configKey] = nested;
       } else {
-        delete positions[posKey];
+        delete newConfig[configKey];
       }
-    }
-    if (hasPositions && Object.keys(positions).length > 0) {
-      newConfig.positions = positions;
-    } else {
-      delete newConfig.positions;
-    }
-
-    // Animation — flat keys to nested object; omit if all defaults
-    const animEffect = formData.anim_effect;
-    const animSpeed = formData.anim_speed;
-    const anim = { ...(newConfig.animation || {}) };
-    if (animEffect && animEffect !== 'none') {
-      anim.effect = animEffect;
-    } else {
-      delete anim.effect;
-    }
-    if (animSpeed !== undefined && animSpeed !== null && animSpeed !== '') {
-      anim.speed = animSpeed;
-    } else {
-      delete anim.speed;
-    }
-    if (Object.keys(anim).length > 0) {
-      newConfig.animation = anim;
-    } else {
-      delete newConfig.animation;
-    }
-
-    // Indicator — derive show from position dropdown (single source of truth)
-    const posIndicatorVal = formData.pos_indicator;
-    const indicatorPeriod = formData.indicator_period;
-    const showDelta = formData.show_delta;
-    const indicator = { ...(newConfig.indicator || {}) };
-    if (posIndicatorVal && posIndicatorVal !== 'off') {
-      indicator.show = true;
-    } else {
-      delete indicator.show;
-    }
-    if (indicatorPeriod !== undefined && indicatorPeriod !== null && indicatorPeriod !== '') {
-      indicator.period = indicatorPeriod;
-    } else {
-      delete indicator.period;
-    }
-    if (showDelta === true) {
-      indicator.show_delta = true;
-    } else {
-      delete indicator.show_delta;
-    }
-    if (Object.keys(indicator).length > 0) {
-      newConfig.indicator = indicator;
-    } else {
-      delete newConfig.indicator;
     }
 
     this._fireConfigChanged(newConfig);
+  }
+
+  /**
+   * Apply target value from form data to config.
+   * Parses numeric strings, preserves object format (e.g. show_label).
+   * @param {Record<string, *>} config - Config object to mutate.
+   * @param {*} targetVal - Raw target value from form.
+   */
+  _applyTarget(config, targetVal) {
+    if (targetVal === undefined || targetVal === null || targetVal === '') {
+      delete config.target;
+      return;
+    }
+    const num = parseFloat(targetVal);
+    const resolvedValue = isNaN(num) ? targetVal : num;
+    const existingTarget = this._config?.target;
+    if (typeof existingTarget === 'object' && existingTarget !== null) {
+      config.target = { ...existingTarget, value: resolvedValue };
+    } else {
+      config.target = resolvedValue;
+    }
   }
 
   /**
@@ -451,18 +439,18 @@ class PulseCardEditor extends LitElement {
       border_radius: this._config.border_radius || '',
       color: this._config.color || '',
       decimal: this._config.decimal ?? '',
-      columns: this._config.columns || 1,
+      columns: this._config.columns || DEFAULTS.columns,
       gap: this._config.gap || '',
       target_value: targetFormValue,
       min: this._config.min ?? '',
       max: this._config.max ?? '',
-      pos_name: this._config.positions?.name ?? 'outside',
-      pos_value: this._config.positions?.value ?? 'outside',
-      pos_icon: this._config.positions?.icon ?? 'off',
-      pos_indicator: this._config.positions?.indicator ?? 'off',
+      pos_name: this._config.positions?.name ?? DEFAULTS.positions.name,
+      pos_value: this._config.positions?.value ?? DEFAULTS.positions.value,
+      pos_icon: this._config.positions?.icon ?? DEFAULTS.positions.icon,
+      pos_indicator: this._config.positions?.indicator ?? DEFAULTS.positions.indicator,
       indicator_period: this._config.indicator?.period ?? '',
       show_delta: this._config.indicator?.show_delta || false,
-      anim_effect: this._config.animation?.effect ?? 'none',
+      anim_effect: this._config.animation?.effect ?? DEFAULTS.animation.effect,
       anim_speed: this._config.animation?.speed ?? '',
     };
 
@@ -473,19 +461,33 @@ class PulseCardEditor extends LitElement {
           ${entities.map(
             (/** @type {EditorEntityEntry} */ ec, /** @type {number} */ i) => html`
               <div class="entity-row">
-                <ha-entity-picker
-                  .hass=${hass}
-                  .value=${ec.entity}
-                  .index=${i}
-                  allow-custom-entity
-                  @value-changed=${(/** @type {CustomEvent} */ ev) => this._entityChanged(i, ev)}
-                ></ha-entity-picker>
-                <ha-icon-button
-                  .label=${'Remove'}
-                  .path=${'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z'}
-                  class="remove-icon"
-                  @click=${() => this._removeEntity(i)}
-                ></ha-icon-button>
+                <div class="entity-row-main">
+                  <ha-entity-picker
+                    .hass=${hass}
+                    .value=${ec.entity}
+                    .index=${i}
+                    allow-custom-entity
+                    @value-changed=${(/** @type {CustomEvent} */ ev) => this._entityChanged(i, ev)}
+                  ></ha-entity-picker>
+                  <ha-icon-button
+                    .label=${'Remove'}
+                    .path=${'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z'}
+                    class="remove-icon"
+                    @click=${() => this._removeEntity(i)}
+                  ></ha-icon-button>
+                </div>
+                <div class="entity-row-fields">
+                  <ha-textfield
+                    .label=${'Name'}
+                    .value=${ec.name || ''}
+                    @change=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'name', ev)}
+                  ></ha-textfield>
+                  <ha-textfield
+                    .label=${'Color'}
+                    .value=${ec.color || ''}
+                    @change=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'color', ev)}
+                  ></ha-textfield>
+                </div>
               </div>
             `,
           )}
@@ -545,11 +547,24 @@ class PulseCardEditor extends LitElement {
       }
       .entity-row {
         display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px;
+        border: 1px solid var(--divider-color, #e0e0e0);
+        border-radius: 8px;
+      }
+      .entity-row-main {
+        display: flex;
         align-items: center;
       }
-      .entity-row ha-entity-picker {
+      .entity-row-main ha-entity-picker {
         flex: 1;
         min-width: 0;
+      }
+      .entity-row-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
       }
       .remove-icon {
         color: var(--secondary-text-color);

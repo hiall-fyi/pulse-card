@@ -5,7 +5,7 @@
  */
 
 import { STYLES } from './styles.js';
-import { DEFAULTS, VERSION } from './constants.js';
+import { VERSION, DEFAULTS } from './constants.js';
 import { bindActionListeners, cleanupActionListeners } from './action-handler.js';
 import './editor.js';
 import {
@@ -14,8 +14,11 @@ import {
   cssValue,
   escapeHtml,
   fetchPreviousValues,
+  formatIndicator,
   resolveBarState,
+  resolveTarget,
   normalizeConfig,
+  sanitizeCssValue,
   warn,
 } from './utils.js';
 
@@ -142,7 +145,7 @@ class PulseCard extends HTMLElement {
       const parts = [];
       if (columns > 1) parts.push(`--pulse-columns:${columns}`);
       if (gap !== undefined) {
-        parts.push(`--pulse-gap:${cssValue(gap)}`);
+        parts.push(`--pulse-gap:${sanitizeCssValue(cssValue(gap))}`);
       }
       inlineStyle = ` style="${parts.join(';')}"`;
     }
@@ -177,33 +180,33 @@ class PulseCard extends HTMLElement {
     const bs = resolveBarState(ec, cfg, this._hass);
 
     // Positions
-    const posName = ec.positions?.name ?? cfg.positions?.name ?? 'outside';
-    const posValue = ec.positions?.value ?? cfg.positions?.value ?? 'outside';
-    const posIcon = ec.positions?.icon ?? cfg.positions?.icon ?? 'off';
-    const posIndicatorRaw = ec.positions?.indicator ?? cfg.positions?.indicator ?? 'off';
+    const posName = ec.positions?.name ?? cfg.positions?.name ?? DEFAULTS.positions.name;
+    const posValue = ec.positions?.value ?? cfg.positions?.value ?? DEFAULTS.positions.value;
+    const posIcon = ec.positions?.icon ?? cfg.positions?.icon ?? DEFAULTS.positions.icon;
+    const posIndicatorRaw = ec.positions?.indicator ?? cfg.positions?.indicator ?? DEFAULTS.positions.indicator;
     // Auto-promote indicator position when indicator.show is true but position is default 'off'
     const indicatorCfg = ec.indicator ?? cfg.indicator;
     const posIndicator = indicatorCfg?.show === true && posIndicatorRaw === 'off' ? 'outside' : posIndicatorRaw;
 
-    // Animation
+    // Animation — cfg.animation is guaranteed populated by normalizeConfig
     const ecAnim = ec.animation ?? {};
-    const animSpeed = ecAnim.speed ?? cfg.animation?.speed ?? DEFAULTS.animation.speed;
-    const animEffect = ecAnim.effect ?? cfg.animation?.effect ?? DEFAULTS.animation.effect;
-    const animState = ecAnim.state ?? cfg.animation?.state ?? DEFAULTS.animation.state;
+    const animSpeed = ecAnim.speed ?? /** @type {NonNullable<typeof cfg.animation>} */ (cfg.animation).speed;
+    const animEffect = ecAnim.effect ?? /** @type {NonNullable<typeof cfg.animation>} */ (cfg.animation).effect;
+    const animState = ecAnim.state ?? /** @type {NonNullable<typeof cfg.animation>} */ (cfg.animation).state;
 
     // Indicator
     const indicatorHtml = this._buildIndicatorHtml(ec, cfg, posIndicator);
 
     // Labels (outside)
-    const labelsHtml = this._buildLabelsHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml);
+    const labelsHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'outside');
 
     // Content (inside/classic mode)
-    const contentHtml = this._buildContentHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml);
+    const contentHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'inside');
 
     // Bar fill
-    const height = cssValue(ec.height ?? cfg.height ?? DEFAULTS.height);
-    const borderRadius = cssValue(ec.border_radius ?? cfg.border_radius ?? DEFAULTS.border_radius);
-    const fillStyle = bs.color ? `background-color:${bs.color};` : '';
+    const height = sanitizeCssValue(cssValue(ec.height ?? cfg.height));
+    const borderRadius = sanitizeCssValue(cssValue(ec.border_radius ?? cfg.border_radius));
+    const fillStyle = bs.color ? `background-color:${sanitizeCssValue(bs.color)};` : '';
     const chargeClass = animEffect === 'charge' && !bs.isUnavailable ? ' charge' : '';
     const transitionStyle = animState === 'off' ? 'transition:none;' : '';
     const fillDim = `width:${bs.fill}%;${transitionStyle}${fillStyle}`;
@@ -242,58 +245,34 @@ class PulseCard extends HTMLElement {
 
     const data = this._indicators[ec.entity];
     const dir = data?.direction ?? 'neutral';
-    const arrow = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '▶';
-    const showDelta = indicatorCfg?.show_delta === true;
-    const deltaStr = showDelta && data ? ` ${data.delta > 0 ? '+' : ''}${data.delta}` : '';
-    return `<span class="bar-indicator ${dir}">${arrow}${deltaStr}</span>`;
+    const showDelta = indicatorCfg?.show_delta === true && !!data;
+    const { text } = formatIndicator(dir, data?.delta ?? 0, showDelta);
+    return `<span class="bar-indicator ${dir}">${text}</span>`;
   }
 
   /**
-   * Build outside labels HTML.
+   * Build position-based HTML (outside labels or inside content).
    * @param {BarState} bs
    * @param {string} posName
    * @param {string} posValue
    * @param {string} posIcon
    * @param {string} posIndicator
    * @param {string} indicatorHtml
+   * @param {'outside'|'inside'} mode - Position mode to render.
    * @returns {string}
    */
-  _buildLabelsHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml) {
-    if (posName !== 'outside' && posValue !== 'outside' && posIcon !== 'outside' && posIndicator !== 'outside') return '';
+  _buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, mode) {
+    if (posName !== mode && posValue !== mode && posIcon !== mode && posIndicator !== mode) return '';
 
-    let html = '<div class="bar-labels"><div class="bar-label-left">';
-    if (posIcon === 'outside' && bs.resolvedIcon) {
+    const wrapperClass = mode === 'outside' ? 'bar-labels' : 'bar-content';
+    let html = `<div class="${wrapperClass}"><div class="bar-label-left">`;
+    if (posIcon === mode && bs.resolvedIcon) {
       html += `<ha-icon class="bar-icon" icon="${escapeHtml(bs.resolvedIcon)}"></ha-icon>`;
     }
-    if (posName === 'outside') html += `<span class="bar-name">${escapeHtml(bs.name)}</span>`;
+    if (posName === mode) html += `<span class="bar-name">${escapeHtml(bs.name)}</span>`;
     html += '</div><div class="bar-label-right">';
-    if (posValue === 'outside') html += `<span class="bar-value">${escapeHtml(bs.displayValue)}</span>`;
-    if (posIndicator === 'outside' && indicatorHtml) html += indicatorHtml;
-    html += '</div></div>';
-    return html;
-  }
-
-  /**
-   * Build inside content HTML (classic mode).
-   * @param {BarState} bs
-   * @param {string} posName
-   * @param {string} posValue
-   * @param {string} posIcon
-   * @param {string} posIndicator
-   * @param {string} indicatorHtml
-   * @returns {string}
-   */
-  _buildContentHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml) {
-    if (posName !== 'inside' && posValue !== 'inside' && posIcon !== 'inside' && posIndicator !== 'inside') return '';
-
-    let html = '<div class="bar-content"><div class="bar-label-left">';
-    if (posIcon === 'inside' && bs.resolvedIcon) {
-      html += `<ha-icon class="bar-icon" icon="${escapeHtml(bs.resolvedIcon)}"></ha-icon>`;
-    }
-    if (posName === 'inside') html += `<span class="bar-name">${escapeHtml(bs.name)}</span>`;
-    html += '</div><div class="bar-label-right">';
-    if (posValue === 'inside') html += `<span class="bar-value">${escapeHtml(bs.displayValue)}</span>`;
-    if (posIndicator === 'inside' && indicatorHtml) html += indicatorHtml;
+    if (posValue === mode) html += `<span class="bar-value">${escapeHtml(bs.displayValue)}</span>`;
+    if (posIndicator === mode && indicatorHtml) html += indicatorHtml;
     html += '</div></div>';
     return html;
   }
@@ -308,12 +287,11 @@ class PulseCard extends HTMLElement {
    */
   _buildTargetHtml(ec, cfg, min, max) {
     const targetCfg = ec.target ?? cfg.target;
-    const targetNum = this._resolveTargetValue(targetCfg);
+    const { value: targetNum, showLabel } = resolveTarget(targetCfg, this._hass);
     if (targetNum === null) return '';
 
     const targetPct = clamp((targetNum - min) / (max - min), 0, 1) * 100;
     const targetPos = `left:${targetPct}%`;
-    const showLabel = this._shouldShowTargetLabel(targetCfg);
     const labelHtml = showLabel
       ? `<span class="bar-target-label">${escapeHtml(targetNum)}</span>`
       : '';
@@ -361,7 +339,7 @@ class PulseCard extends HTMLElement {
       /** @type {HTMLElement|null} */
       const targetEl = /** @type {HTMLElement|null} */ (row.querySelector('.bar-target'));
       const targetCfg = ec.target ?? cfg.target;
-      const targetNum = this._resolveTargetValue(targetCfg);
+      const { value: targetNum } = resolveTarget(targetCfg, this._hass);
       if (targetNum !== null) {
         const targetPct = clamp((targetNum - bs.min) / (bs.max - bs.min), 0, 1) * 100;
         if (targetEl) {
@@ -402,6 +380,11 @@ class PulseCard extends HTMLElement {
     if (!cfg) return;
 
     try {
+      // Build entity ID → EntityConfig map for O(1) lookup
+      /** @type {Map<string, EntityConfig>} */
+      const entityMap = new Map();
+      for (const ec of cfg.entities) entityMap.set(ec.entity, ec);
+
       // Collect entities that need indicator data, grouped by period
       /** @type {Map<number, {entity: string, icfg: import('./types.js').IndicatorConfig}[]>} */
       const byPeriod = new Map();
@@ -421,9 +404,7 @@ class PulseCard extends HTMLElement {
         const prevValues = await fetchPreviousValues(this._hass, entityIds, period);
 
         for (const { entity, icfg } of entries) {
-          const ec = cfg.entities.find(
-            /** @param {EntityConfig} e */ (e) => e.entity === entity,
-          );
+          const ec = entityMap.get(entity);
           const state = this._hass?.states[entity];
           const rawValue = ec?.attribute
             ? state?.attributes?.[ec.attribute]
@@ -436,10 +417,8 @@ class PulseCard extends HTMLElement {
           if (!row) continue;
           const indEl = row.querySelector('.bar-indicator');
           if (indEl) {
-            const arrow = result.direction === 'up' ? '▲' : result.direction === 'down' ? '▼' : '▶';
-            const showDelta = icfg.show_delta === true;
-            const deltaStr = showDelta ? ` ${result.delta > 0 ? '+' : ''}${result.delta}` : '';
-            indEl.textContent = `${arrow}${deltaStr}`;
+            const { text } = formatIndicator(result.direction, result.delta, icfg.show_delta === true);
+            indEl.textContent = text;
             indEl.className = `bar-indicator ${result.direction}`;
           }
         }
@@ -447,38 +426,6 @@ class PulseCard extends HTMLElement {
     } catch (e) {
       warn('Indicator fetch failed: %O', e);
     }
-  }
-
-  /**
-   * Resolve target config to a numeric value.
-   * @param {number|string|import('./types.js').TargetObjectConfig|undefined|null} target
-   * @returns {number|null}
-   */
-  _resolveTargetValue(target) {
-    if (target === undefined || target === null) return null;
-    if (typeof target === 'number') return isNaN(target) ? null : target;
-    if (typeof target === 'string') {
-      const state = this._hass?.states[target];
-      if (!state) return null;
-      const num = parseFloat(state.state);
-      return isNaN(num) ? null : num;
-    }
-    if (typeof target === 'object' && target.value !== undefined) {
-      return this._resolveTargetValue(target.value);
-    }
-    return null;
-  }
-
-  /**
-   * Check if target label should be shown.
-   * @param {number|string|import('./types.js').TargetObjectConfig|undefined|null} target
-   * @returns {boolean}
-   */
-  _shouldShowTargetLabel(target) {
-    if (typeof target === 'object' && target !== null) {
-      return target.show_label === true;
-    }
-    return false;
   }
 
   /** Cache previous entity states for change detection. */
@@ -510,15 +457,16 @@ class PulseCard extends HTMLElement {
   _cacheBarElements() {
     const cfg = this._cfg;
     this._elements.rows = {};
+    /** @type {Map<string, EntityConfig>} */
+    const entityMap = new Map();
+    for (const ec of cfg.entities) entityMap.set(ec.entity, ec);
     /** @type {NodeListOf<HTMLElement>} */
     const rows = this._shadow.querySelectorAll('.bar-row');
     for (const row of rows) {
       const entity = row.dataset.entity;
       if (entity) {
         this._elements.rows[entity] = row;
-        const ec = cfg.entities.find(
-          /** @param {EntityConfig} e */ (e) => e.entity === entity,
-        );
+        const ec = entityMap.get(entity);
         if (ec) bindActionListeners(row, this, this._hass, cfg, ec);
       }
     }

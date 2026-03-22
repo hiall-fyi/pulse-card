@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.5] - 2026-03-22
+
+### Added
+
+- Visual editor now shows Name and Color fields for each entity — you can set per-entity display names and colors without switching to YAML
+
+### Improved
+
+- Color values, bar heights, border radius, and gap settings in your config are now sanitized before rendering — prevents potential style injection from malicious config values
+- Internal code is cleaner — duplicate indicator formatting logic consolidated into a single helper, two near-identical label rendering functions merged into one, and unused legacy function removed
+- Editor default values now reference a single source of truth instead of hardcoded strings — less chance of defaults drifting out of sync
+- Internal utility functions are now explicitly marked as internal in the documentation
+
 ## [0.1.4] - 2026-03-20
 
 ### Fixed

@@ -10,7 +10,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.1.4-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.5-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -571,7 +571,7 @@ severity:
 
 ## Known Limitations
 
-- Per-entity settings (like different colors or severity per sensor) are YAML-only — the visual editor applies settings to all bars
+- Per-entity severity ranges are YAML-only — the visual editor supports per-entity name and color, but severity still needs YAML
 - `width`, `saturation`, `hue`, and `entity_config` from bar-card are not supported
 - The trend indicator needs the HA recorder component to be enabled (it is by default)
 

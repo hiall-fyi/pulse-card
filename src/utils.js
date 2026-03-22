@@ -19,6 +19,7 @@ export function clamp(value, min, max) {
 
 /**
  * Compute bar fill percentage. [CP-1]
+ * @internal Exported for testing only — not part of public API.
  * @param {*} value - Raw state value (will be parsed).
  * @param {number} min
  * @param {number} max
@@ -36,6 +37,7 @@ export function computeFill(value, min, max, complementary = false) {
 
 /**
  * Resolve the first matching severity entry. [CP-2]
+ * @internal Exported for testing only — not part of public API.
  * @param {*} value
  * @param {import('./types.js').SeverityEntry[]} severityArray
  * @returns {import('./types.js').SeverityEntry|null}
@@ -52,6 +54,7 @@ export function resolveSeverity(value, severityArray) {
 
 /**
  * Parse a hex color string to RGB components.
+ * @internal Exported for testing only — not part of public API.
  * @param {string} hex - e.g. "#FF9800" or "#fff"
  * @returns {{r:number,g:number,b:number}}
  */
@@ -67,6 +70,7 @@ export function parseColor(hex) {
 
 /**
  * Linearly interpolate between two hex colors.
+ * @internal Exported for testing only — not part of public API.
  * @param {string} color1 - Hex color.
  * @param {string} color2 - Hex color.
  * @param {number} t - Interpolation factor 0–1.
@@ -83,6 +87,7 @@ export function interpolateColor(color1, color2, t) {
 
 /**
  * Resolve gradient color by interpolating between severity stops.
+ * @internal Exported for testing only — not part of public API.
  * @param {*} value
  * @param {import('./types.js').SeverityEntry[]} severityArray
  * @returns {string|null} CSS color string or null.
@@ -115,6 +120,7 @@ export function resolveGradientColor(value, severityArray) {
 /**
  * Resolve min/max from entity config and entity state attributes. [US-14]
  * Explicit config always overrides entity attributes.
+ * @internal Exported for testing only — not part of public API.
  * @param {import('./types.js').EntityConfig} entityConfig
  * @param {import('./types.js').HassEntityState|null|undefined} entityState - HA entity state object.
  * @returns {{min:number, max:number}}
@@ -135,6 +141,7 @@ export function resolveMinMax(entityConfig, entityState) {
 
 /**
  * Format a numeric value with optional decimals and unit.
+ * @internal Exported for testing only — not part of public API.
  * @param {*} value
  * @param {number|null} decimal
  * @param {string} [unit]
@@ -173,24 +180,42 @@ export function computeIndicator(currentValue, previousValue) {
 }
 
 /**
+ * Format indicator arrow and delta text from direction and delta value.
+ * Consolidates duplicate arrow/delta logic used in both initial render
+ * and differential DOM update paths.
+ * @param {'up'|'down'|'neutral'} direction
+ * @param {number} delta
+ * @param {boolean} showDelta
+ * @returns {{arrow: string, text: string}}
+ */
+export function formatIndicator(direction, delta, showDelta) {
+  const arrow = direction === 'up' ? '▲' : direction === 'down' ? '▼' : '▶';
+  const deltaStr = showDelta ? ` ${delta > 0 ? '+' : ''}${delta}` : '';
+  return { arrow, text: `${arrow}${deltaStr}` };
+}
+
+/**
+ * Sanitize a CSS value to prevent style injection via user-controlled config.
+ * Strips characters that could break out of a CSS property value context
+ * (semicolons, braces) and dangerous url() functions.
+ * Legitimate values (hex colors, rgb(), named colors, px/em/rem/% units)
+ * pass through unchanged.
+ * @param {*} value - CSS value to sanitize (coerced to string).
+ * @returns {string} Sanitized CSS value.
+ */
+export function sanitizeCssValue(value) {
+  if (value === undefined || value === null || value === '') return '';
+  const str = String(value);
+  return str.replace(/[;{}]/g, '').replace(/url\s*\(/gi, '');
+}
+
+/**
  * Log a warning with the Pulse Card prefix.
  * @param {string} msg
  * @param {...*} args
  */
 export function warn(msg, ...args) {
   console.warn(`${LOG_PREFIX} ${msg}`, ...args);
-}
-
-/**
- * Fetch the previous value of an entity from HA history API. [US-16]
- * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
- * @param {string} entityId - Entity ID to query.
- * @param {number} minutesAgo - How far back to look (default 60).
- * @returns {Promise<number|null>} The oldest numeric value in the period, or null.
- */
-export async function fetchPreviousValue(hass, entityId, minutesAgo = 60) {
-  const result = await fetchPreviousValues(hass, [entityId], minutesAgo);
-  return result[entityId] ?? null;
 }
 
 /**
@@ -316,6 +341,29 @@ export function normalizeConfig(config) {
   }
 
   return merged;
+}
+
+/**
+ * Resolve target config to a numeric value and label visibility. [US-7]
+ * Supports number, entity ID string, or object with value + show_label.
+ * @param {number|string|import('./types.js').TargetObjectConfig|undefined|null} target
+ * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance for entity lookups.
+ * @returns {{value: number|null, showLabel: boolean}}
+ */
+export function resolveTarget(target, hass) {
+  if (target === undefined || target === null) return { value: null, showLabel: false };
+  if (typeof target === 'number') return { value: isNaN(target) ? null : target, showLabel: false };
+  if (typeof target === 'string') {
+    const state = hass?.states[target];
+    if (!state) return { value: null, showLabel: false };
+    const num = parseFloat(state.state);
+    return { value: isNaN(num) ? null : num, showLabel: false };
+  }
+  if (typeof target === 'object' && target.value !== undefined) {
+    const resolved = resolveTarget(target.value, hass);
+    return { value: resolved.value, showLabel: target.show_label === true };
+  }
+  return { value: null, showLabel: false };
 }
 
 /**
