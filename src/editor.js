@@ -76,7 +76,18 @@ const SCHEMA_LAYOUT = [
       },
     ],
   },
-  { name: 'target_value', label: 'Target', selector: { text: {} } },
+  {
+    name: '',
+    type: 'grid',
+    schema: [
+      { name: 'target_value', label: 'Target', selector: { text: {} } },
+      {
+        name: 'bar_width',
+        label: 'Bar Width (%)',
+        selector: { number: { min: 1, max: 100, mode: 'box' } },
+      },
+    ],
+  },
 ];
 
 /** Schema: Display section — positions, animation, indicator. */
@@ -278,6 +289,20 @@ class PulseCardEditor extends LitElement {
   }
 
   /**
+   * Move entity at index by direction (-1 = up, +1 = down).
+   * Boundary moves (first up, last down) are no-ops.
+   * @param {number} index
+   * @param {number} direction - -1 or +1
+   */
+  _moveEntity(index, direction) {
+    const entities = this._getEntities();
+    const target = index + direction;
+    if (target < 0 || target >= entities.length) return;
+    [entities[index], entities[target]] = [entities[target], entities[index]];
+    this._updateEntities(entities);
+  }
+
+  /**
    * Add a new empty entity row.
    * @param {CustomEvent} ev
    */
@@ -322,7 +347,7 @@ class PulseCardEditor extends LitElement {
     const newConfig = { ...this._config };
 
     // --- Simple flat keys: empty → delete, else → set ---
-    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max', 'decimal'];
+    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max', 'decimal', 'bar_width'];
     for (const key of simpleKeys) {
       const val = formData[key];
       if (val === undefined || val === null || val === '') {
@@ -442,6 +467,7 @@ class PulseCardEditor extends LitElement {
       columns: this._config.columns || DEFAULTS.columns,
       gap: this._config.gap || '',
       target_value: targetFormValue,
+      bar_width: this._config.bar_width ?? '',
       min: this._config.min ?? '',
       max: this._config.max ?? '',
       pos_name: this._config.positions?.name ?? DEFAULTS.positions.name,
@@ -469,6 +495,22 @@ class PulseCardEditor extends LitElement {
                     allow-custom-entity
                     @value-changed=${(/** @type {CustomEvent} */ ev) => this._entityChanged(i, ev)}
                   ></ha-entity-picker>
+                  ${entities.length > 1 ? html`
+                    <ha-icon-button
+                      .label=${'Move up'}
+                      .path=${'M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z'}
+                      class="move-icon"
+                      .disabled=${i === 0}
+                      @click=${() => this._moveEntity(i, -1)}
+                    ></ha-icon-button>
+                    <ha-icon-button
+                      .label=${'Move down'}
+                      .path=${'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z'}
+                      class="move-icon"
+                      .disabled=${i === entities.length - 1}
+                      @click=${() => this._moveEntity(i, 1)}
+                    ></ha-icon-button>
+                  ` : nothing}
                   <ha-icon-button
                     .label=${'Remove'}
                     .path=${'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z'}
@@ -480,12 +522,12 @@ class PulseCardEditor extends LitElement {
                   <ha-textfield
                     .label=${'Name'}
                     .value=${ec.name || ''}
-                    @change=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'name', ev)}
+                    @input=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'name', ev)}
                   ></ha-textfield>
                   <ha-textfield
                     .label=${'Color'}
                     .value=${ec.color || ''}
-                    @change=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'color', ev)}
+                    @input=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'color', ev)}
                   ></ha-textfield>
                 </div>
               </div>
@@ -569,6 +611,14 @@ class PulseCardEditor extends LitElement {
       .remove-icon {
         color: var(--secondary-text-color);
         --mdc-icon-button-size: 36px;
+      }
+      .move-icon {
+        color: var(--secondary-text-color);
+        --mdc-icon-button-size: 36px;
+      }
+      .move-icon[disabled] {
+        opacity: 0.3;
+        pointer-events: none;
       }
       .add-entity {
         display: block;

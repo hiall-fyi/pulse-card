@@ -10,7 +10,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.1.5-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.6-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -53,6 +53,7 @@ The original `bar-card` was delisted from HACS in 2025 after years without maint
 
 - 📊 Horizontal bar for any numeric sensor — temperature, battery, CPU, anything with a number
 - 📋 Multiple sensors in one card with individual settings per sensor
+- 🔀 Reorder entities in the visual editor — move bars up and down without touching YAML
 - 🎨 Auto-color by value range (severity) with smooth gradient option
 - 🖱️ Visual editor — most settings configurable without touching YAML
 - 🎯 Target marker — show a goal line on the bar
@@ -167,6 +168,7 @@ positions:
 |---|---|---|---|
 | `columns` | number | `1` | Arrange bars in a grid — e.g. `2` for two bars side by side |
 | `gap` | string/number | — | Space between bars (e.g. `8` or `8px`) |
+| `bar_width` | number | `100` | How much of the bar track the fill can use (1–100). Set to `70` to keep the fill from overlapping inside labels at high values |
 | `entity_row` | boolean | `false` | Embed mode — removes the card border so the bar can sit inside an `entities` card as a row |
 
 ### Target Marker

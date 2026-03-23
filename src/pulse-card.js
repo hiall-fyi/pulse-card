@@ -209,7 +209,11 @@ class PulseCard extends HTMLElement {
     const fillStyle = bs.color ? `background-color:${sanitizeCssValue(bs.color)};` : '';
     const chargeClass = animEffect === 'charge' && !bs.isUnavailable ? ' charge' : '';
     const transitionStyle = animState === 'off' ? 'transition:none;' : '';
-    const fillDim = `width:${bs.fill}%;${transitionStyle}${fillStyle}`;
+    const barWidthRaw = ec.bar_width ?? cfg.bar_width;
+    // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
+    const barWidthScale = barWidthRaw != null ? Math.max(1, Math.min(100, barWidthRaw)) / 100 : 1;
+    const scaledFill = bs.fill * barWidthScale;
+    const fillDim = `width:${scaledFill}%;${transitionStyle}${fillStyle}`;
 
     // Target marker [US-7]
     const targetHtml = this._buildTargetHtml(ec, cfg, bs.min, bs.max);
@@ -291,7 +295,10 @@ class PulseCard extends HTMLElement {
     if (targetNum === null) return '';
 
     const targetPct = clamp((targetNum - min) / (max - min), 0, 1) * 100;
-    const targetPos = `left:${targetPct}%`;
+    const barWidthRaw = ec.bar_width ?? cfg.bar_width;
+    // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
+    const barWidthScale = barWidthRaw != null ? Math.max(1, Math.min(100, barWidthRaw)) / 100 : 1;
+    const targetPos = `left:${targetPct * barWidthScale}%`;
     const labelHtml = showLabel
       ? `<span class="bar-target-label">${escapeHtml(targetNum)}</span>`
       : '';
@@ -315,7 +322,10 @@ class PulseCard extends HTMLElement {
       /** @type {HTMLElement|null} */
       const fillEl = /** @type {HTMLElement|null} */ (row.querySelector('.bar-fill'));
       if (fillEl) {
-        fillEl.style.width = `${bs.fill}%`;
+        const barWidthRaw = ec.bar_width ?? cfg.bar_width;
+        // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
+        const barWidthScale = barWidthRaw != null ? Math.max(1, Math.min(100, barWidthRaw)) / 100 : 1;
+        fillEl.style.width = `${bs.fill * barWidthScale}%`;
         fillEl.style.backgroundColor = bs.color || '';
 
         // Update icon if severity has icon override
@@ -342,8 +352,11 @@ class PulseCard extends HTMLElement {
       const { value: targetNum } = resolveTarget(targetCfg, this._hass);
       if (targetNum !== null) {
         const targetPct = clamp((targetNum - bs.min) / (bs.max - bs.min), 0, 1) * 100;
+        const barWidthRawT = ec.bar_width ?? cfg.bar_width;
+        // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
+        const barWidthScaleT = barWidthRawT != null ? Math.max(1, Math.min(100, barWidthRawT)) / 100 : 1;
         if (targetEl) {
-          targetEl.style.left = `${targetPct}%`;
+          targetEl.style.left = `${targetPct * barWidthScaleT}%`;
           targetEl.style.display = '';
           const labelEl = targetEl.querySelector('.bar-target-label');
           if (labelEl) labelEl.textContent = String(targetNum);
