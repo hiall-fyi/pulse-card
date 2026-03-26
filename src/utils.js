@@ -206,7 +206,11 @@ export function formatIndicator(direction, delta, showDelta) {
 export function sanitizeCssValue(value) {
   if (value === undefined || value === null || value === '') return '';
   const str = String(value);
-  return str.replace(/[;{}]/g, '').replace(/url\s*\(/gi, '');
+  return str
+    .replace(/[;{}]/g, '')
+    .replace(/url\s*\(/gi, '')
+    .replace(/expression\s*\(/gi, '')
+    .replace(/-moz-binding\s*:/gi, '');
 }
 
 /**
@@ -333,11 +337,20 @@ export function normalizeConfig(config) {
         if (ec.severity) ec.severity = preSortSeverity(ec.severity);
         return ec;
       })
-    : [{ entity: config.entity, ...config }];
+    : [{ entity: config.entity }];
 
   // Pre-sort severity on single-entity normalized config too
   if (merged.entities.length === 1 && merged.entities[0].severity) {
     merged.entities[0].severity = preSortSeverity(merged.entities[0].severity);
+  }
+
+  // Warn on duplicate entity IDs — second row would shadow the first in DOM cache
+  const seen = new Set();
+  for (const ec of merged.entities) {
+    if (seen.has(ec.entity)) {
+      warn('Duplicate entity "%s" in config — only the last bar will update dynamically', ec.entity);
+    }
+    seen.add(ec.entity);
   }
 
   return merged;
@@ -377,7 +390,10 @@ export function resolveTarget(target, hass) {
 export function resolveBarState(ec, cfg, hass) {
   const state = hass?.states[ec.entity];
   const isUnavailable =
-    !state || state.state === 'unavailable' || state.state === 'unknown';
+    !state ||
+    state.state === 'unavailable' ||
+    state.state === 'unknown' ||
+    state.state === 'error';
 
   const { min, max } = resolveMinMax(ec, state);
   const rawValue = ec.attribute
@@ -387,7 +403,8 @@ export function resolveBarState(ec, cfg, hass) {
   const complementary = ec.complementary ?? cfg.complementary;
   const fill = isUnavailable ? 0 : computeFill(rawValue, min, max, complementary);
   const unit = ec.unit_of_measurement ?? state?.attributes?.unit_of_measurement ?? '';
-  const decimal = ec.decimal ?? cfg.decimal ?? null;
+  const decimal = ec.decimal ?? cfg.decimal
+    ?? hass?.entities?.[ec.entity]?.display_precision ?? null;
   const limitValue = ec.limit_value ?? cfg.limit_value;
   const displayRaw = limitValue && !isNaN(numValue) ? clamp(numValue, min, max) : rawValue;
   const displayValue = isUnavailable
@@ -430,4 +447,18 @@ export function resolveBarState(ec, cfg, hass) {
     color,
     resolvedIcon,
   };
+}
+
+/**
+ * Compute the bar width scale factor from entity/card config.
+ * Clamps the raw bar_width (1–100) to a 0.01–1.0 multiplier.
+ * Returns 1 (full width) when bar_width is not configured.
+ * @param {import('./types.js').EntityConfig} ec - Entity config.
+ * @param {import('./types.js').PulseCardConfig} cfg - Card config.
+ * @returns {number} Scale factor 0.01–1.0.
+ */
+export function computeBarWidthScale(ec, cfg) {
+  const raw = ec.bar_width ?? cfg.bar_width;
+  // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
+  return raw != null ? Math.max(1, Math.min(100, raw)) / 100 : 1;
 }

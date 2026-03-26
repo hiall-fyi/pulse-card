@@ -1,6 +1,6 @@
 {
   "name": "pulse-card",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Compact horizontal bar chart card for Home Assistant sensor data visualization",
   "author": "hiall-fyi",
@@ -11,8 +11,8 @@
   },
   "type": "module",
   "scripts": {
-    "build": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify",
-    "dev": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --watch",
+    "build": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify --external:./editor.js && esbuild src/editor.js --bundle --outfile=dist/editor.js --format=esm --minify",
+    "dev": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --watch --external:./editor.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

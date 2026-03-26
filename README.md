@@ -10,7 +10,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.1.6-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.7-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -149,7 +149,7 @@ positions:
 | `color` | string | theme color | Bar color (e.g. `red`, `#4CAF50`, `rgb(0,150,0)`) |
 | `height` | string | `8px` | How tall the bar is (e.g. `40px` for a chunky bar) |
 | `border_radius` | string | `4px` | Corner rounding (e.g. `0px` for sharp corners, `20px` for pill shape) |
-| `decimal` | number | auto | How many decimal places to show (e.g. `1` → "23.5°C") |
+| `decimal` | number | auto | How many decimal places to show (e.g. `1` → "23.5°C"). When not set, the card uses Home Assistant's display precision for the sensor. If HA has no precision configured either, the raw value is shown as-is |
 | `unit_of_measurement` | string | auto | Override the unit shown after the value |
 
 ### Value Range

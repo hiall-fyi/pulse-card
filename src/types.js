@@ -120,8 +120,17 @@ export {};
  */
 
 /**
+ * Entity registry entry exposed via hass.entities (subset of fields).
+ * @typedef {object} HassEntityRegistryEntry
+ * @property {string} entity_id
+ * @property {number|null} [display_precision]
+ * @property {string|null} [platform]
+ */
+
+/**
  * @typedef {object} Hass
  * @property {Record<string, HassEntityState>} states
+ * @property {Record<string, HassEntityRegistryEntry>} [entities]
  * @property {function(string, string, Record<string, *>=): Promise<void>} callService
  * @property {function(Record<string, *>): Promise<*>} callWS
  */

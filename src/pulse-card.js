@@ -7,9 +7,9 @@
 import { STYLES } from './styles.js';
 import { VERSION, DEFAULTS } from './constants.js';
 import { bindActionListeners, cleanupActionListeners } from './action-handler.js';
-import './editor.js';
 import {
   clamp,
+  computeBarWidthScale,
   computeIndicator,
   cssValue,
   escapeHtml,
@@ -209,9 +209,7 @@ class PulseCard extends HTMLElement {
     const fillStyle = bs.color ? `background-color:${sanitizeCssValue(bs.color)};` : '';
     const chargeClass = animEffect === 'charge' && !bs.isUnavailable ? ' charge' : '';
     const transitionStyle = animState === 'off' ? 'transition:none;' : '';
-    const barWidthRaw = ec.bar_width ?? cfg.bar_width;
-    // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
-    const barWidthScale = barWidthRaw != null ? Math.max(1, Math.min(100, barWidthRaw)) / 100 : 1;
+    const barWidthScale = computeBarWidthScale(ec, cfg);
     const scaledFill = bs.fill * barWidthScale;
     const fillDim = `width:${scaledFill}%;${transitionStyle}${fillStyle}`;
 
@@ -295,9 +293,7 @@ class PulseCard extends HTMLElement {
     if (targetNum === null) return '';
 
     const targetPct = clamp((targetNum - min) / (max - min), 0, 1) * 100;
-    const barWidthRaw = ec.bar_width ?? cfg.bar_width;
-    // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
-    const barWidthScale = barWidthRaw != null ? Math.max(1, Math.min(100, barWidthRaw)) / 100 : 1;
+    const barWidthScale = computeBarWidthScale(ec, cfg);
     const targetPos = `left:${targetPct * barWidthScale}%`;
     const labelHtml = showLabel
       ? `<span class="bar-target-label">${escapeHtml(targetNum)}</span>`
@@ -322,9 +318,7 @@ class PulseCard extends HTMLElement {
       /** @type {HTMLElement|null} */
       const fillEl = /** @type {HTMLElement|null} */ (row.querySelector('.bar-fill'));
       if (fillEl) {
-        const barWidthRaw = ec.bar_width ?? cfg.bar_width;
-        // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
-        const barWidthScale = barWidthRaw != null ? Math.max(1, Math.min(100, barWidthRaw)) / 100 : 1;
+        const barWidthScale = computeBarWidthScale(ec, cfg);
         fillEl.style.width = `${bs.fill * barWidthScale}%`;
         fillEl.style.backgroundColor = bs.color || '';
 
@@ -352,11 +346,9 @@ class PulseCard extends HTMLElement {
       const { value: targetNum } = resolveTarget(targetCfg, this._hass);
       if (targetNum !== null) {
         const targetPct = clamp((targetNum - bs.min) / (bs.max - bs.min), 0, 1) * 100;
-        const barWidthRawT = ec.bar_width ?? cfg.bar_width;
-        // eslint-disable-next-line eqeqeq -- loose equality catches both null and undefined
-        const barWidthScaleT = barWidthRawT != null ? Math.max(1, Math.min(100, barWidthRawT)) / 100 : 1;
+        const barWidthScale = computeBarWidthScale(ec, cfg);
         if (targetEl) {
-          targetEl.style.left = `${targetPct * barWidthScaleT}%`;
+          targetEl.style.left = `${targetPct * barWidthScale}%`;
           targetEl.style.display = '';
           const labelEl = targetEl.querySelector('.bar-target-label');
           if (labelEl) labelEl.textContent = String(targetNum);
@@ -509,9 +501,11 @@ class PulseCard extends HTMLElement {
 
   /**
    * Return editor custom element for visual editor. [US-4, AC-4.1]
-   * @returns {HTMLElement}
+   * Lazy-loads editor.js (and lit dependency) on first editor open.
+   * @returns {Promise<HTMLElement>}
    */
-  static getConfigElement() {
+  static async getConfigElement() {
+    await import('./editor.js');
     return document.createElement('pulse-card-editor');
   }
 

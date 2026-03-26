@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -12,9 +15,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm run build
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/pulse-card.js
+          files: |
+            dist/pulse-card.js
+            dist/editor.js
