@@ -12,6 +12,7 @@ export const STYLES = `
   ha-card {
     overflow: hidden;
     padding: 16px;
+    background: var(--pulse-card-background, var(--ha-card-background, var(--card-background-color)));
   }
 
   .pulse-card {
@@ -58,7 +59,7 @@ export const STYLES = `
 
   .bar-name {
     font-size: 14px;
-    color: var(--primary-text-color);
+    color: var(--pulse-name-color, var(--primary-text-color));
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -67,7 +68,7 @@ export const STYLES = `
   .bar-value {
     font-size: 14px;
     font-weight: 500;
-    color: var(--primary-text-color);
+    color: var(--pulse-value-color, var(--primary-text-color));
     white-space: nowrap;
   }
 
@@ -83,7 +84,7 @@ export const STYLES = `
     position: absolute;
     inset: 0;
     background: var(--primary-color, #03A9F4);
-    opacity: 0.12;
+    opacity: var(--pulse-track-opacity, 0.12);
     border-radius: inherit;
   }
 
@@ -142,15 +143,20 @@ export const STYLES = `
   .bar-indicator {
     font-size: 12px;
     font-weight: 500;
+    color: var(--pulse-indicator-color);
   }
-  .bar-indicator.up { color: var(--label-badge-green, #4CAF50); }
-  .bar-indicator.down { color: var(--label-badge-red, #F44336); }
-  .bar-indicator.neutral { color: var(--secondary-text-color); }
+  .bar-indicator.up { color: var(--pulse-indicator-color, var(--label-badge-green, #4CAF50)); }
+  .bar-indicator.down { color: var(--pulse-indicator-color, var(--label-badge-red, #F44336)); }
+  .bar-indicator.neutral { color: var(--pulse-indicator-color, var(--secondary-text-color)); }
+
+  /* Inverted indicator — up is bad, down is good (CPU, memory, disk usage) */
+  .bar-indicator.inverted.up { color: var(--pulse-indicator-color, var(--label-badge-red, #F44336)); }
+  .bar-indicator.inverted.down { color: var(--pulse-indicator-color, var(--label-badge-green, #4CAF50)); }
 
   /* Icon */
   .bar-icon {
     --mdc-icon-size: 18px;
-    color: var(--secondary-text-color);
+    color: var(--pulse-icon-color, var(--secondary-text-color));
     flex-shrink: 0;
   }
 

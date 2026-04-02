@@ -140,6 +140,29 @@ export function resolveMinMax(entityConfig, entityState) {
 }
 
 /**
+ * Resolve decimal precision from entity config, card config, and HA entity registry.
+ * Fallback chain: per-entity → card-level → HA display_precision → null (raw).
+ * @param {import('./types.js').EntityConfig} ec - Entity config.
+ * @param {import('./types.js').PulseCardConfig} cfg - Card config.
+ * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
+ * @returns {number|null}
+ */
+export function resolveDecimal(ec, cfg, hass) {
+  return ec.decimal ?? cfg.decimal
+    ?? hass?.entities?.[ec.entity]?.display_precision ?? null;
+}
+
+/**
+ * Resolve unit of measurement from entity config and state attributes.
+ * @param {import('./types.js').EntityConfig} ec - Entity config.
+ * @param {import('./types.js').HassEntityState|null|undefined} state - HA entity state.
+ * @returns {string}
+ */
+export function resolveUnit(ec, state) {
+  return ec.unit_of_measurement ?? state?.attributes?.unit_of_measurement ?? '';
+}
+
+/**
  * Format a numeric value with optional decimals and unit.
  * @internal Exported for testing only — not part of public API.
  * @param {*} value
@@ -172,6 +195,16 @@ export function computeIndicator(currentValue, previousValue) {
   if (isNaN(current) || isNaN(previous)) {
     return { direction: 'neutral', delta: 0 };
   }
+  // Guard against garbage history values (e.g. unit conversion mismatch in recorder)
+  // A delta > 1000× the current absolute value is almost certainly bad data.
+  if (!isFinite(current) || !isFinite(previous)) {
+    return { direction: 'neutral', delta: 0 };
+  }
+  const absDiff = Math.abs(current - previous);
+  const absRef = Math.max(Math.abs(current), 1);
+  if (absDiff > absRef * 1000) {
+    return { direction: 'neutral', delta: 0 };
+  }
   const delta = Math.round((current - previous) * 100) / 100;
   return {
     direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral',
@@ -186,12 +219,20 @@ export function computeIndicator(currentValue, previousValue) {
  * @param {'up'|'down'|'neutral'} direction
  * @param {number} delta
  * @param {boolean} showDelta
+ * @param {number|null} [decimal] - Decimal places for delta rounding.
+ * @param {string} [unit] - Unit of measurement to append.
  * @returns {{arrow: string, text: string}}
  */
-export function formatIndicator(direction, delta, showDelta) {
+export function formatIndicator(direction, delta, showDelta, decimal, unit) {
   const arrow = direction === 'up' ? '▲' : direction === 'down' ? '▼' : '▶';
-  const deltaStr = showDelta ? ` ${delta > 0 ? '+' : ''}${delta}` : '';
-  return { arrow, text: `${arrow}${deltaStr}` };
+  if (!showDelta) return { arrow, text: arrow };
+  const rounded =
+    decimal !== null && decimal !== undefined
+      ? delta.toFixed(decimal)
+      : String(Math.round(delta * 100) / 100);
+  const sign = delta > 0 ? '+' : '';
+  const unitStr = unit || '';
+  return { arrow, text: `${arrow} ${sign}${rounded}${unitStr}` };
 }
 
 /**
@@ -402,9 +443,8 @@ export function resolveBarState(ec, cfg, hass) {
   const numValue = parseFloat(rawValue);
   const complementary = ec.complementary ?? cfg.complementary;
   const fill = isUnavailable ? 0 : computeFill(rawValue, min, max, complementary);
-  const unit = ec.unit_of_measurement ?? state?.attributes?.unit_of_measurement ?? '';
-  const decimal = ec.decimal ?? cfg.decimal
-    ?? hass?.entities?.[ec.entity]?.display_precision ?? null;
+  const unit = resolveUnit(ec, state);
+  const decimal = resolveDecimal(ec, cfg, hass);
   const limitValue = ec.limit_value ?? cfg.limit_value;
   const displayRaw = limitValue && !isNaN(numValue) ? clamp(numValue, min, max) : rawValue;
   const displayValue = isUnavailable

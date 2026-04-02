@@ -5,7 +5,7 @@
  */
 
 /** Pulse Card version string. */
-export const VERSION = '0.1.7';
+export const VERSION = '0.1.8';
 
 /** Console log prefix. */
 export const LOG_PREFIX = 'Pulse Card:';

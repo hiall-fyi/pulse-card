@@ -40,6 +40,7 @@ export {};
  * @property {boolean} [show]
  * @property {boolean} [show_delta]
  * @property {number} [period]
+ * @property {boolean} [inverted] - Flip indicator colors: up=red, down=green (for "less is better" sensors like CPU/memory usage)
  */
 
 /**

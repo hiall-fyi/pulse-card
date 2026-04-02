@@ -10,7 +10,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.1.7-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.8-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -195,13 +195,15 @@ Shows an arrow (▲ up / ▼ down) by comparing the current value to what it was
 |---|---|---|---|
 | `indicator.show` | boolean | `false` | Turn on the trend arrow |
 | `indicator.period` | number | `60` | How many minutes to look back (e.g. `30` = compare to 30 min ago) |
-| `indicator.show_delta` | boolean | `false` | Show the actual change next to the arrow (e.g. ▲ +5) |
+| `indicator.show_delta` | boolean | `false` | Show the actual change next to the arrow (e.g. ▲ +0.3%) |
+| `indicator.inverted` | boolean | `false` | Flip arrow colors — up shows red, down shows green. Use for sensors where rising is bad (CPU, memory, disk usage) |
 
 ```yaml
 indicator:
   show: true
   period: 60
   show_delta: true
+  inverted: true    # CPU going up = bad (red), going down = good (green)
 ```
 
 Don't forget to set the indicator position so it's visible:
@@ -539,6 +541,58 @@ positions:
   indicator: outside
 ```
 
+### Inverted Indicator — "Less is Better"
+
+For sensors where rising values are bad (CPU, memory, disk usage), flip the indicator colors so up = red and down = green.
+
+```yaml
+type: custom:pulse-card
+title: System Monitor
+columns: 3
+height: "30px"
+positions:
+  name: inside
+  value: inside
+  indicator: inside
+indicator:
+  show: true
+  show_delta: true
+  inverted: true
+severity:
+  - from: 0
+    to: 50
+    color: "#7E57C2"
+    mode: gradient
+  - from: 50
+    to: 75
+    color: "#AB47BC"
+    mode: gradient
+  - from: 75
+    to: 100
+    color: "#E91E63"
+    mode: gradient
+entities:
+  - entity: sensor.cpu_usage
+    name: CPU
+  - entity: sensor.memory_usage
+    name: Memory
+  - entity: sensor.disk_usage
+    name: Disk
+```
+
+Per-entity override — mix inverted and normal indicators in one card:
+
+```yaml
+entities:
+  - entity: sensor.cpu_usage
+    name: CPU
+    # inherits inverted: true from card level
+  - entity: sensor.battery_level
+    name: Battery
+    indicator:
+      inverted: false   # battery up = good, override card default
+```
+
 ---
 
 ## bar-card Migration
@@ -568,6 +622,34 @@ severity:
 - Default positions: name/value `outside`, icon `off`
 - `rounding` is renamed to `border_radius`
 - `width`, `saturation`, `hue`, `entity_config` are not supported
+
+---
+
+## CSS Custom Properties
+
+Fine-tune the card's appearance using CSS custom properties. Set them via `card-mod` or in your HA theme.
+
+| Variable | Controls | Default |
+|---|---|---|
+| `--pulse-card-background` | Card background color | HA theme card background |
+| `--pulse-icon-color` | Icon color | `--secondary-text-color` |
+| `--pulse-name-color` | Name label color | `--primary-text-color` |
+| `--pulse-value-color` | Value label color | `--primary-text-color` |
+| `--pulse-indicator-color` | Indicator arrow color (overrides directional colors) | Auto (green/red by direction) |
+| `--pulse-track-opacity` | Bar track background opacity | `0.12` |
+
+```yaml
+type: custom:pulse-card
+entity: sensor.cpu_usage
+card_mod:
+  style: |
+    :host {
+      --pulse-card-background: rgba(139, 92, 222, 0.15);
+      --pulse-icon-color: #fff;
+      --pulse-name-color: rgba(255, 255, 255, 0.9);
+      --pulse-track-opacity: 0.08;
+    }
+```
 
 ---
 

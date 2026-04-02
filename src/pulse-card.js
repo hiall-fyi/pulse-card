@@ -16,6 +16,8 @@ import {
   fetchPreviousValues,
   formatIndicator,
   resolveBarState,
+  resolveDecimal,
+  resolveUnit,
   resolveTarget,
   normalizeConfig,
   sanitizeCssValue,
@@ -248,8 +250,12 @@ class PulseCard extends HTMLElement {
     const data = this._indicators[ec.entity];
     const dir = data?.direction ?? 'neutral';
     const showDelta = indicatorCfg?.show_delta === true && !!data;
-    const { text } = formatIndicator(dir, data?.delta ?? 0, showDelta);
-    return `<span class="bar-indicator ${dir}">${text}</span>`;
+    const state = this._hass?.states[ec.entity];
+    const unit = resolveUnit(ec, state);
+    const decimal = resolveDecimal(ec, cfg, this._hass);
+    const { text } = formatIndicator(dir, data?.delta ?? 0, showDelta, decimal, unit);
+    const inverted = indicatorCfg?.inverted === true ? ' inverted' : '';
+    return `<span class="bar-indicator ${dir}${inverted}">${text}</span>`;
   }
 
   /**
@@ -421,10 +427,14 @@ class PulseCard extends HTMLElement {
           const row = this._elements.rows?.[entity];
           if (!row) continue;
           const indEl = row.querySelector('.bar-indicator');
-          if (indEl) {
-            const { text } = formatIndicator(result.direction, result.delta, icfg.show_delta === true);
+          if (indEl && ec) {
+            const entityState = this._hass?.states[entity];
+            const unit = resolveUnit(ec, entityState);
+            const decimal = resolveDecimal(ec, cfg, this._hass);
+            const { text } = formatIndicator(result.direction, result.delta, icfg.show_delta === true, decimal, unit);
+            const inverted = icfg.inverted === true ? ' inverted' : '';
             indEl.textContent = text;
-            indEl.className = `bar-indicator ${result.direction}`;
+            indEl.className = `bar-indicator ${result.direction}${inverted}`;
           }
         }
       }
