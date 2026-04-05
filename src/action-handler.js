@@ -4,6 +4,8 @@
  * resolves action config and dispatches HA events.
  */
 
+import { warn } from './utils.js';
+
 /** Double-tap detection window in ms. */
 const DOUBLE_TAP_WINDOW = 250;
 
@@ -47,7 +49,8 @@ function executeAction(element, hass, actionConfig, entityId) {
       const svc = actionConfig.service || actionConfig.perform_action;
       if (!svc) break;
       const [domain, service] = svc.split('.');
-      hass.callService(domain, service, actionConfig.service_data || actionConfig.data);
+      hass.callService(domain, service, actionConfig.service_data || actionConfig.data)
+        .catch((/** @type {*} */ err) => warn('Service call %s failed: %O', svc, err));
       break;
     }
     case 'url':

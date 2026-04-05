@@ -44,6 +44,41 @@ export {};
  */
 
 /**
+ * @typedef {object} SparklineConfig
+ * @property {boolean} [show] - Enable sparkline.
+ * @property {number} [hours_to_show] - History lookback in hours (default 24).
+ * @property {number} [points_per_hour] - Data points per hour for smoothing (default 1). Higher = more detail.
+ * @property {string} [aggregate_func] - 'avg' | 'min' | 'max' | 'median' | 'first' | 'last' | 'sum' | 'delta' | 'diff' (default 'avg').
+ * @property {boolean} [smoothing] - Enable quadratic Bezier smoothing (default true). Set false for raw line.
+ * @property {string} [color] - Override sparkline color.
+ * @property {number} [stroke_width] - SVG stroke width (default 1.5). Alias: line_width.
+ * @property {number} [line_width] - SVG line width (default 1.5). Same as stroke_width, matches mini-graph-card naming.
+ * @property {number} [update_interval] - Refresh interval in seconds (default 300).
+ */
+
+/**
+ * Fully-resolved sparkline config with all defaults applied.
+ * Returned by PulseCard._resolveSparklineConfig().
+ * @typedef {object} ResolvedSparklineConfig
+ * @property {number} hours - Hours of history to show (default 24).
+ * @property {number} pointsPerHour - Data points per hour (default 1).
+ * @property {number} slots - Computed: Math.max(hours * pointsPerHour, 2).
+ * @property {string} aggregateFunc - Aggregation function name (default 'avg').
+ * @property {boolean} smoothing - Enable Bezier smoothing (default true).
+ * @property {number} strokeWidth - SVG stroke width (default 1.5).
+ * @property {string|null} color - Override color or null.
+ * @property {number} updateInterval - Refresh interval in seconds (default 300).
+ */
+
+/**
+ * @typedef {object} VisibilityConfig
+ * @property {number} [state_above] - Show when value > threshold.
+ * @property {number} [state_below] - Show when value < threshold.
+ * @property {string} [state_equal] - Show when state equals string.
+ * @property {string} [state_not_equal] - Show when state does not equal string.
+ */
+
+/**
  * @typedef {object} SeverityEntry
  * @property {number} from
  * @property {number} to
@@ -83,6 +118,8 @@ export {};
  * @property {ActionConfig} [tap_action]
  * @property {ActionConfig} [hold_action]
  * @property {ActionConfig} [double_tap_action]
+ * @property {boolean|SparklineConfig} [sparkline]
+ * @property {VisibilityConfig} [visibility]
  */
 
 /**
@@ -110,6 +147,9 @@ export {};
  * @property {ActionConfig} [tap_action]
  * @property {ActionConfig} [hold_action]
  * @property {ActionConfig} [double_tap_action]
+ * @property {boolean|SparklineConfig} [sparkline]
+ * @property {string} [layout] - 'default' | 'compact'
+ * @property {number|string} [font_size] - Base font size for name, value, icon (e.g. 10, '10px')
  */
 
 /**

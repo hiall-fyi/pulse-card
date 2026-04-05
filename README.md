@@ -10,7 +10,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.1.8-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.2.0-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -53,6 +53,7 @@ The original `bar-card` was delisted from HACS in 2025 after years without maint
 
 - 📊 Horizontal bar for any numeric sensor — temperature, battery, CPU, anything with a number
 - 📋 Multiple sensors in one card with individual settings per sensor
+- 📉 Sparkline trend line — see recent history behind the bar, no extra card needed
 - 🔀 Reorder entities in the visual editor — move bars up and down without touching YAML
 - 🎨 Auto-color by value range (severity) with smooth gradient option
 - 🖱️ Visual editor — most settings configurable without touching YAML
@@ -61,6 +62,8 @@ The original `bar-card` was delisted from HACS in 2025 after years without maint
 - 👆 Tap actions — tap, hold, or double-tap to open details, navigate, or trigger services
 - ⚡ Charge animation effect
 - 📐 Multi-column grid layout
+- 👁️ Conditional visibility — show bars only when they meet a condition (e.g. CPU > 80%)
+- 📦 Compact mode — tighter spacing for dense dashboards
 - 🔲 Works in Sections view, Masonry view, and inside entities cards
 
 ---
@@ -170,6 +173,7 @@ positions:
 | `gap` | string/number | — | Space between bars (e.g. `8` or `8px`) |
 | `bar_width` | number | `100` | How much of the bar track the fill can use (1–100). Set to `70` to keep the fill from overlapping inside labels at high values |
 | `entity_row` | boolean | `false` | Embed mode — removes the card border so the bar can sit inside an `entities` card as a row |
+| `font_size` | number/string | auto | Base font size for name, value, and icon (e.g. `12` or `12px`). Inside bars auto-scale to the bar height when not set |
 
 ### Target Marker
 
@@ -255,6 +259,121 @@ severity:
 ```
 
 For smooth color blending between ranges, add `mode: gradient` to each entry.
+
+### Sparkline
+
+A mini trend line rendered behind the bar, showing recent history at a glance. Replaces the need for a separate mini-graph-card.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `sparkline` | boolean/object | `false` | `true` to enable with defaults, or an object for fine control |
+| `sparkline.show` | boolean | `false` | Enable sparkline |
+| `sparkline.hours_to_show` | number | `24` | How many hours of history to display |
+| `sparkline.points_per_hour` | number | `1` | How many data points per hour. Higher = more detail, lower = smoother. Default 1 matches mini-graph-card |
+| `sparkline.aggregate_func` | string | `avg` | How to combine values in each time slot: `avg`, `min`, `max`, `median`, `first`, `last`, `sum`, `delta`, `diff` |
+| `sparkline.smoothing` | boolean | `true` | Smooth curves (true) or raw straight lines (false) |
+| `sparkline.color` | string | text color | Override sparkline color (e.g. `"rgba(255,255,255,0.4)"`) |
+| `sparkline.line_width` | number | `1.5` | Line thickness |
+| `sparkline.update_interval` | number | `300` | How often to refresh history data, in seconds. Set higher for slow-changing sensors like battery |
+
+```yaml
+# Simple — just turn it on
+type: custom:pulse-card
+entity: sensor.temperature
+sparkline: true
+
+# Advanced — custom lookback and refresh
+type: custom:pulse-card
+entity: sensor.battery_level
+sparkline:
+  show: true
+  hours_to_show: 48
+  points_per_hour: 0.5
+  aggregate_func: max
+  update_interval: 1800    # 30 min — battery doesn't change fast
+  line_width: 2
+  color: "rgba(255, 255, 255, 0.4)"
+```
+
+Per-entity sparkline overrides work too:
+
+```yaml
+type: custom:pulse-card
+sparkline: true
+entities:
+  - entity: sensor.cpu_usage
+    sparkline:
+      hours_to_show: 6
+      update_interval: 120    # CPU changes fast — refresh every 2 min
+  - entity: sensor.battery_level
+    sparkline:
+      hours_to_show: 48
+      update_interval: 1800   # battery is slow — refresh every 30 min
+```
+
+### Conditional Visibility
+
+Show or hide individual bars based on their current value. Only bars that meet the condition are displayed — the card shrinks automatically.
+
+| Option | Type | Description |
+|---|---|---|
+| `visibility.state_above` | number | Show only when value > threshold |
+| `visibility.state_below` | number | Show only when value < threshold |
+| `visibility.state_equal` | string | Show only when state equals this string |
+| `visibility.state_not_equal` | string | Show only when state does not equal this string |
+
+Multiple conditions are AND-ed — all must be true. Unavailable/unknown entities are hidden by default.
+
+```yaml
+# Alert dashboard — only show sensors above 80%
+type: custom:pulse-card
+title: Alerts
+entities:
+  - entity: sensor.cpu_usage
+    name: CPU
+    visibility:
+      state_above: 80
+  - entity: sensor.memory_usage
+    name: Memory
+    visibility:
+      state_above: 80
+  - entity: sensor.disk_usage
+    name: Disk
+    visibility:
+      state_above: 90
+severity:
+  - from: 80
+    to: 90
+    color: "#FF9800"
+  - from: 90
+    to: 100
+    color: "#F44336"
+```
+
+When all sensors are healthy (below threshold), the card shows empty — just the title.
+
+### Layout Mode
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `layout` | string | `default` | `compact` reduces padding, gaps, and font sizes for dense dashboards |
+
+```yaml
+# Compact mode — fits more data in less space
+type: custom:pulse-card
+title: Room Sensors
+layout: compact
+columns: 2
+entities:
+  - entity: sensor.temperature
+    name: Temp
+  - entity: sensor.humidity
+    name: Humidity
+  - entity: sensor.co2
+    name: CO₂
+  - entity: sensor.pm25
+    name: PM2.5
+```
 
 ### Tap Actions
 
@@ -593,6 +712,67 @@ entities:
       inverted: false   # battery up = good, override card default
 ```
 
+### Sparkline — See the Trend
+
+Add a mini history line behind the bar. No extra card needed.
+
+```yaml
+type: custom:pulse-card
+title: Temperature Trend
+entity: sensor.temperature
+sparkline: true
+height: "30px"
+```
+
+### Alert Dashboard — Conditional Visibility
+
+Only show sensors that need attention. The card stays clean when everything is healthy.
+
+```yaml
+type: custom:pulse-card
+title: System Alerts
+entities:
+  - entity: sensor.cpu_usage
+    name: CPU
+    visibility:
+      state_above: 80
+  - entity: sensor.memory_usage
+    name: Memory
+    visibility:
+      state_above: 80
+  - entity: sensor.disk_usage
+    name: Disk
+    visibility:
+      state_above: 90
+severity:
+  - from: 80
+    to: 90
+    color: "#FF9800"
+  - from: 90
+    to: 100
+    color: "#F44336"
+```
+
+### Compact Tile — Dense Dashboard
+
+Pack more data into a small card. Works well in sections view at narrow column widths.
+
+```yaml
+type: custom:pulse-card
+title: Room Sensors
+layout: compact
+columns: 2
+entities:
+  - entity: sensor.temperature
+    name: Temp
+  - entity: sensor.humidity
+    name: Humidity
+  - entity: sensor.co2
+    name: CO₂
+  - entity: sensor.pm25
+    name: PM2.5
+```
+
 ---
 
 ## bar-card Migration
@@ -637,6 +817,8 @@ Fine-tune the card's appearance using CSS custom properties. Set them via `card-
 | `--pulse-value-color` | Value label color | `--primary-text-color` |
 | `--pulse-indicator-color` | Indicator arrow color (overrides directional colors) | Auto (green/red by direction) |
 | `--pulse-track-opacity` | Bar track background opacity | `0.12` |
+| `--pulse-sparkline-color` | Sparkline line color | `--primary-text-color` |
+| `--pulse-font-size` | Base font size for name, value, icon | `14px` (auto-scales inside bars) |
 
 ```yaml
 type: custom:pulse-card
@@ -656,8 +838,10 @@ card_mod:
 ## Known Limitations
 
 - Per-entity severity ranges are YAML-only — the visual editor supports per-entity name and color, but severity still needs YAML
+- Conditional visibility is YAML-only — conditions are per-entity and better expressed in YAML
+- Sparkline needs the HA recorder component to be enabled (it is by default)
+- The trend indicator also needs the HA recorder
 - `width`, `saturation`, `hue`, and `entity_config` from bar-card are not supported
-- The trend indicator needs the HA recorder component to be enabled (it is by default)
 
 ---
 

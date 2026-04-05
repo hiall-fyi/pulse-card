@@ -13,7 +13,10 @@ import {
   computeIndicator,
   cssValue,
   escapeHtml,
+  evaluateVisibility,
   fetchPreviousValues,
+  fetchSparklineData,
+  buildSparklinePath,
   formatIndicator,
   resolveBarState,
   resolveDecimal,
@@ -52,6 +55,15 @@ class PulseCard extends HTMLElement {
   /** @type {ReturnType<typeof setTimeout>|null} Indicator fetch debounce timer. */
   _indicatorTimer = null;
 
+  /** @type {Record<string, {t:number, v:number}[]>} Cached sparkline history data per entity. */
+  _sparklineData = {};
+
+  /** @type {ReturnType<typeof setTimeout>|null} Sparkline refresh timer. */
+  _sparklineTimer = null;
+
+  /** @type {number} Timestamp of last sparkline fetch. */
+  _sparklineLastFetch = 0;
+
   /** @type {ShadowRoot} */
   _shadow;
 
@@ -77,6 +89,10 @@ class PulseCard extends HTMLElement {
     if (this._indicatorTimer) {
       clearTimeout(this._indicatorTimer);
       this._indicatorTimer = null;
+    }
+    if (this._sparklineTimer) {
+      clearTimeout(this._sparklineTimer);
+      this._sparklineTimer = null;
     }
     // Clean up action listener timers on all bar rows
     const rows = this._shadow.querySelectorAll('.bar-row');
@@ -131,6 +147,7 @@ class PulseCard extends HTMLElement {
       }
       this._cacheStates();
       this._scheduleIndicatorFetch();
+      this._scheduleSparklineFetch();
     }
   }
 
@@ -141,21 +158,20 @@ class PulseCard extends HTMLElement {
     const columns = cfg.columns ?? 1;
     const columnsClass = columns > 1 ? ` columns-${columns}` : '';
     const entityRowClass = cfg.entity_row ? ' entity-row' : '';
-    const gap = cfg.gap;
-    let inlineStyle = '';
-    if (columns > 1 || gap !== undefined) {
-      const parts = [];
-      if (columns > 1) parts.push(`--pulse-columns:${columns}`);
-      if (gap !== undefined) {
-        parts.push(`--pulse-gap:${sanitizeCssValue(cssValue(gap))}`);
-      }
-      inlineStyle = ` style="${parts.join(';')}"`;
+    const compactClass = cfg.layout === 'compact' ? ' compact' : '';
+    const parts = [];
+    if (columns > 1) parts.push(`--pulse-columns:${columns}`);
+    if (cfg.gap !== undefined) {
+      parts.push(`--pulse-gap:${sanitizeCssValue(cssValue(cfg.gap))}`);
     }
-    const columnsStyle = inlineStyle;
+    if (cfg.font_size !== undefined) {
+      parts.push(`--pulse-font-size:${sanitizeCssValue(cssValue(cfg.font_size))}`);
+    }
+    const columnsStyle = parts.length > 0 ? ` style="${parts.join(';')}"` : '';
 
     let inner = '';
     if (cfg.title) inner += `<div class="pulse-title">${escapeHtml(cfg.title)}</div>`;
-    inner += `<div class="pulse-card${columnsClass}${entityRowClass}"${columnsStyle}>`;
+    inner += `<div class="pulse-card${columnsClass}${entityRowClass}${compactClass}"${columnsStyle}>`;
     for (const ec of cfg.entities) inner += this._renderBarRow(ec);
     inner += '</div>';
 
@@ -170,6 +186,12 @@ class PulseCard extends HTMLElement {
 
     this._elements.container = this._shadow.querySelector('.pulse-card');
     this._cacheBarElements();
+
+    // Apply initial visibility [US-2]
+    for (const ec of cfg.entities) {
+      const row = /** @type {HTMLElement|undefined} */ (this._elements.rows?.[ec.entity]);
+      if (row) row.style.display = evaluateVisibility(ec, this._hass) ? '' : 'none';
+    }
   }
 
   /**
@@ -218,9 +240,13 @@ class PulseCard extends HTMLElement {
     // Target marker [US-7]
     const targetHtml = this._buildTargetHtml(ec, cfg, bs.min, bs.max);
 
+    // Sparkline [US-1]
+    const sparklineHtml = this._buildSparklineHtml(ec, cfg);
+
     const barHtml = `
       <div class="bar-container" style="height:${height};border-radius:${borderRadius};--pulse-animation-speed:${animSpeed}s;">
         <div class="bar-track"></div>
+        ${sparklineHtml}
         <div class="bar-fill${chargeClass}" data-entity="${escapeHtml(ec.entity)}" style="${fillDim}"></div>
         ${targetHtml}
         ${contentHtml}
@@ -316,6 +342,11 @@ class PulseCard extends HTMLElement {
       const bs = resolveBarState(ec, cfg, this._hass);
       const row = this._elements.rows?.[ec.entity];
       if (!row) continue;
+
+      // Visibility toggle [US-2]
+      const visible = evaluateVisibility(ec, this._hass);
+      /** @type {HTMLElement} */ (row).style.display = visible ? '' : 'none';
+      if (!visible) continue;
 
       // Update unavailable class
       row.classList.toggle('unavailable', bs.isUnavailable);
@@ -440,6 +471,150 @@ class PulseCard extends HTMLElement {
       }
     } catch (e) {
       warn('Indicator fetch failed: %O', e);
+    }
+  }
+
+  /**
+   * Resolve sparkline config for an entity. [US-1]
+   * Returns a fully-resolved config with all defaults applied, or null if disabled.
+   * @param {EntityConfig} ec
+   * @param {NormalizedConfig} cfg
+   * @returns {import('./types.js').ResolvedSparklineConfig|null}
+   */
+  _resolveSparklineConfig(ec, cfg) {
+    const raw = ec.sparkline ?? cfg.sparkline;
+    if (!raw) return null;
+    const scfg = raw === true ? /** @type {import('./types.js').SparklineConfig} */ ({}) : (raw.show ? raw : null);
+    if (!scfg) return null;
+    const hours = scfg.hours_to_show ?? 24;
+    const pph = scfg.points_per_hour ?? 1;
+    return {
+      hours,
+      pointsPerHour: pph,
+      slots: Math.max(hours * pph, 2),
+      aggregateFunc: scfg.aggregate_func ?? 'avg',
+      smoothing: scfg.smoothing !== false,
+      strokeWidth: scfg.line_width ?? scfg.stroke_width ?? 1.5,
+      color: scfg.color ?? null,
+      updateInterval: scfg.update_interval ?? 300,
+    };
+  }
+
+  /**
+   * Build sparkline SVG HTML for a bar row. [US-1, AC-1.4]
+   * @param {EntityConfig} ec
+   * @param {NormalizedConfig} cfg
+   * @returns {string}
+   */
+  _buildSparklineHtml(ec, cfg) {
+    const scfg = this._resolveSparklineConfig(ec, cfg);
+    if (!scfg) return '';
+    const data = this._sparklineData[ec.entity];
+    if (!data || data.length < 2) return '';
+    const path = buildSparklinePath(data, 200, 50, scfg.slots, scfg.aggregateFunc, scfg.smoothing);
+    if (!path) return '';
+    const colorStyle = scfg.color ? `color:${sanitizeCssValue(scfg.color)}` : '';
+    return `<svg class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" width="100%" height="100%"${colorStyle ? ` style="${colorStyle}"` : ''}><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
+  }
+
+  /**
+   * Schedule sparkline data fetch with interval gating. [US-1, AC-1.11]
+   */
+  _scheduleSparklineFetch() {
+    const cfg = this._cfg;
+    if (!cfg) return;
+    const hasSparkline = cfg.entities.some(
+      /** @param {EntityConfig} ec */ (ec) => !!this._resolveSparklineConfig(ec, cfg),
+    );
+    if (!hasSparkline) return;
+
+    // Find the minimum update_interval across all sparkline configs
+    let minInterval = 300;
+    for (const ec of cfg.entities) {
+      const scfg = this._resolveSparklineConfig(ec, cfg);
+      if (scfg && scfg.updateInterval < minInterval) {
+        minInterval = scfg.updateInterval;
+      }
+    }
+
+    const elapsed = (Date.now() - this._sparklineLastFetch) / 1000;
+    if (elapsed < minInterval && this._sparklineLastFetch > 0) return;
+
+    if (this._sparklineTimer) clearTimeout(this._sparklineTimer);
+    this._sparklineTimer = setTimeout(() => this._fetchSparklines(), 1000);
+  }
+
+  /**
+   * Fetch sparkline history data and update SVG paths. [US-1, AC-1.2]
+   */
+  async _fetchSparklines() {
+    const cfg = this._cfg;
+    if (!cfg) return;
+
+    try {
+      /** @type {Map<number, string[]>} */
+      const byHours = new Map();
+      for (const ec of cfg.entities) {
+        const scfg = this._resolveSparklineConfig(ec, cfg);
+        if (!scfg) continue;
+        const hours = scfg.hours;
+        if (!byHours.has(hours)) byHours.set(hours, []);
+        /** @type {string[]} */ (byHours.get(hours)).push(ec.entity);
+      }
+
+      for (const [hours, entityIds] of byHours) {
+        const data = await fetchSparklineData(this._hass, entityIds, hours);
+        for (const eid of entityIds) {
+          this._sparklineData[eid] = data[eid] || [];
+        }
+      }
+
+      this._sparklineLastFetch = Date.now();
+      this._updateSparklines();
+    } catch (e) {
+      warn('Sparkline fetch failed: %O', e);
+    }
+  }
+
+  /**
+   * Update sparkline SVG path elements in the DOM. [US-1, AC-1.8]
+   * Creates SVG elements if they don't exist yet (first fetch after render).
+   */
+  _updateSparklines() {
+    const cfg = this._cfg;
+    if (!cfg) return;
+    for (const ec of cfg.entities) {
+      const scfg = this._resolveSparklineConfig(ec, cfg);
+      if (!scfg) continue;
+      const row = this._elements.rows?.[ec.entity];
+      if (!row) continue;
+      const data = this._sparklineData[ec.entity];
+      if (!data || data.length < 2) continue;
+
+      const path = buildSparklinePath(data, 200, 50, scfg.slots, scfg.aggregateFunc, scfg.smoothing);
+      if (!path) continue;
+
+      const svg = row.querySelector('.bar-sparkline');
+      if (!svg) {
+        // SVG doesn't exist yet — inject it into bar-container between track and fill.
+        // Must use DOMParser to create proper SVG namespace elements (innerHTML creates HTMLUnknownElement).
+        const container = row.querySelector('.bar-container');
+        if (!container) continue;
+        const colorAttr = scfg.color ? ` style="color:${sanitizeCssValue(scfg.color)}"` : '';
+        const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" width="100%" height="100%"${colorAttr}><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
+        const parsed = new DOMParser().parseFromString(svgMarkup, 'image/svg+xml');
+        const svgEl = document.importNode(parsed.documentElement, true);
+        const track = container.querySelector('.bar-track');
+        if (track && track.nextSibling) {
+          container.insertBefore(svgEl, track.nextSibling);
+        } else {
+          container.appendChild(svgEl);
+        }
+      } else {
+        // SVG exists — update path
+        const pathEl = svg.querySelector('path');
+        if (pathEl) pathEl.setAttribute('d', path);
+      }
     }
   }
 

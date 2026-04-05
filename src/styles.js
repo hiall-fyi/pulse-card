@@ -58,7 +58,7 @@ export const STYLES = `
   }
 
   .bar-name {
-    font-size: 14px;
+    font-size: var(--pulse-font-size, 14px);
     color: var(--pulse-name-color, var(--primary-text-color));
     white-space: nowrap;
     overflow: hidden;
@@ -66,7 +66,7 @@ export const STYLES = `
   }
 
   .bar-value {
-    font-size: 14px;
+    font-size: var(--pulse-font-size, 14px);
     font-weight: 500;
     color: var(--pulse-value-color, var(--primary-text-color));
     white-space: nowrap;
@@ -77,6 +77,7 @@ export const STYLES = `
     position: relative;
     width: 100%;
     overflow: hidden;
+    container-type: size;
   }
 
   /* Track (background) */
@@ -108,7 +109,9 @@ export const STYLES = `
     align-items: center;
     padding: 0 12px;
     height: 100%;
-    z-index: 1;
+    z-index: 3;
+    /* Auto-scale font to bar height: 30% of container, clamped 10px–16px */
+    font-size: var(--pulse-font-size, clamp(10px, 40cqh, 16px));
   }
 
   /* Target marker — visually distinct from fill [AC-7.3] */
@@ -155,9 +158,13 @@ export const STYLES = `
 
   /* Icon */
   .bar-icon {
-    --mdc-icon-size: 18px;
+    --mdc-icon-size: 1.3em;
+    font-size: var(--pulse-font-size, 14px);
     color: var(--pulse-icon-color, var(--secondary-text-color));
     flex-shrink: 0;
+  }
+  .bar-content .bar-icon {
+    color: var(--pulse-icon-color, var(--pulse-name-color, var(--primary-text-color)));
   }
 
   /* Unavailable state */
@@ -208,5 +215,46 @@ export const STYLES = `
     outline: 2px solid var(--primary-color, #03A9F4);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  /* Sparkline overlay [US-1] */
+  .bar-sparkline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 50%;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.45;
+    color: var(--pulse-sparkline-color, var(--primary-text-color, #333));
+  }
+  .bar-sparkline path {
+    vector-effect: non-scaling-stroke;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Compact mode [US-3] */
+  ha-card:has(.compact) {
+    padding: 10px;
+  }
+  .pulse-card.compact {
+    gap: var(--pulse-gap, 6px);
+  }
+  .compact .bar-row {
+    gap: 3px;
+  }
+  .compact .bar-labels {
+    padding: 0;
+  }
+  .compact .bar-name {
+    font-size: var(--pulse-font-size, 12px);
+  }
+  .compact .bar-value {
+    font-size: var(--pulse-font-size, 12px);
+  }
+  .compact .bar-indicator {
+    font-size: 10px;
   }
 `;

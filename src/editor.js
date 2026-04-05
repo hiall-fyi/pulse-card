@@ -23,25 +23,36 @@ const POSITION_OPTIONS = [
 
 /** Schema: Appearance section. */
 const SCHEMA_APPEARANCE = [
-  { name: 'title', label: 'Title', selector: { text: {} } },
   {
     name: '',
     type: 'grid',
+    column_min_width: '120px',
     schema: [
-      { name: 'height', label: 'Height', selector: { text: {} } },
-      { name: 'border_radius', label: 'Border Radius', selector: { text: {} } },
+      { name: 'title', label: 'Title', selector: { text: {} } },
+      {
+        name: 'layout',
+        label: 'Layout',
+        selector: {
+          select: {
+            options: [
+              { value: 'default', label: 'Default' },
+              { value: 'compact', label: 'Compact' },
+            ],
+            mode: 'dropdown',
+          },
+        },
+      },
+      { name: 'sparkline_show', label: 'Sparkline', selector: { boolean: {} } },
     ],
   },
   {
     name: '',
     type: 'grid',
+    column_min_width: '120px',
     schema: [
+      { name: 'height', label: 'Height', selector: { text: {} } },
+      { name: 'border_radius', label: 'Radius', selector: { text: {} } },
       { name: 'color', label: 'Color', selector: { text: {} } },
-      {
-        name: 'decimal',
-        label: 'Decimals',
-        selector: { number: { min: 0, max: 6, mode: 'box' } },
-      },
     ],
   },
 ];
@@ -51,6 +62,7 @@ const SCHEMA_LAYOUT = [
   {
     name: '',
     type: 'grid',
+    column_min_width: '120px',
     schema: [
       {
         name: 'columns',
@@ -58,11 +70,17 @@ const SCHEMA_LAYOUT = [
         selector: { number: { min: 1, max: 6, mode: 'box' } },
       },
       { name: 'gap', label: 'Gap', selector: { text: {} } },
+      {
+        name: 'decimal',
+        label: 'Decimals',
+        selector: { number: { min: 0, max: 6, mode: 'box' } },
+      },
     ],
   },
   {
     name: '',
     type: 'grid',
+    column_min_width: '120px',
     schema: [
       {
         name: 'min',
@@ -74,18 +92,21 @@ const SCHEMA_LAYOUT = [
         label: 'Max',
         selector: { number: { mode: 'box' } },
       },
+      { name: 'target_value', label: 'Target', selector: { text: {} } },
     ],
   },
   {
     name: '',
     type: 'grid',
+    column_min_width: '120px',
     schema: [
-      { name: 'target_value', label: 'Target', selector: { text: {} } },
       {
         name: 'bar_width',
         label: 'Bar Width (%)',
         selector: { number: { min: 1, max: 100, mode: 'box' } },
       },
+      { name: 'font_size', label: 'Font Size', selector: { text: {} } },
+      { name: 'complementary', label: 'Invert Fill', selector: { boolean: {} } },
     ],
   },
 ];
@@ -95,6 +116,7 @@ const SCHEMA_DISPLAY = [
   {
     name: '',
     type: 'grid',
+    column_min_width: '120px',
     schema: [
       {
         name: 'pos_name',
@@ -106,39 +128,35 @@ const SCHEMA_DISPLAY = [
         label: 'Value',
         selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
       },
-    ],
-  },
-  {
-    name: '',
-    type: 'grid',
-    schema: [
       {
         name: 'pos_icon',
         label: 'Icon',
         selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
       },
+    ],
+  },
+  {
+    name: '',
+    type: 'grid',
+    column_min_width: '120px',
+    schema: [
       {
         name: 'pos_indicator',
         label: 'Indicator',
         selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
       },
-    ],
-  },
-  {
-    name: '',
-    type: 'grid',
-    schema: [
       {
         name: 'indicator_period',
         label: 'Lookback (min)',
         selector: { number: { min: 1, max: 1440, mode: 'box' } },
       },
-      { name: 'show_delta', label: 'Show Change Amount', selector: { boolean: {} } },
+      { name: 'show_delta', label: 'Show Delta', selector: { boolean: {} } },
     ],
   },
   {
     name: '',
     type: 'grid',
+    column_min_width: '120px',
     schema: [
       {
         name: 'anim_effect',
@@ -158,6 +176,7 @@ const SCHEMA_DISPLAY = [
         label: 'Speed (s)',
         selector: { number: { min: 0, max: 5, step: 0.1, mode: 'box' } },
       },
+      { name: 'limit_value', label: 'Clamp Value', selector: { boolean: {} } },
     ],
   },
 ];
@@ -347,7 +366,7 @@ class PulseCardEditor extends LitElement {
     const newConfig = { ...this._config };
 
     // --- Simple flat keys: empty → delete, else → set ---
-    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max', 'decimal', 'bar_width'];
+    const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max', 'decimal', 'bar_width', 'font_size'];
     for (const key of simpleKeys) {
       const val = formData[key];
       if (val === undefined || val === null || val === '') {
@@ -404,6 +423,22 @@ class PulseCardEditor extends LitElement {
       } else {
         delete newConfig[configKey];
       }
+    }
+
+    // --- Sparkline: boolean toggle → sparkline object ---
+    if (formData.sparkline_show === true) {
+      const existing = typeof newConfig.sparkline === 'object' && newConfig.sparkline !== null
+        ? newConfig.sparkline : {};
+      newConfig.sparkline = { ...existing, show: true };
+    } else if (formData.sparkline_show === false) {
+      delete newConfig.sparkline;
+    }
+
+    // --- Layout: 'default' → delete, else → set ---
+    if (formData.layout && formData.layout !== 'default') {
+      newConfig.layout = formData.layout;
+    } else {
+      delete newConfig.layout;
     }
 
     this._fireConfigChanged(newConfig);
@@ -468,6 +503,9 @@ class PulseCardEditor extends LitElement {
       gap: this._config.gap || '',
       target_value: targetFormValue,
       bar_width: this._config.bar_width ?? '',
+      font_size: this._config.font_size || '',
+      complementary: this._config.complementary || false,
+      limit_value: this._config.limit_value || false,
       min: this._config.min ?? '',
       max: this._config.max ?? '',
       pos_name: this._config.positions?.name ?? DEFAULTS.positions.name,
@@ -478,6 +516,10 @@ class PulseCardEditor extends LitElement {
       show_delta: this._config.indicator?.show_delta || false,
       anim_effect: this._config.animation?.effect ?? DEFAULTS.animation.effect,
       anim_speed: this._config.animation?.speed ?? '',
+      sparkline_show: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.show || false)
+        : (this._config.sparkline === true),
+      layout: this._config.layout || 'default',
     };
 
     return html`
