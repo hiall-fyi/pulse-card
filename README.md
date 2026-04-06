@@ -10,7 +10,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.2.0-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.2.1-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)

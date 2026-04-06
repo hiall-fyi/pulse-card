@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-04-06
+
+### Fixed
+
+- **Sparkline no longer spills past the bar** ([#18](https://github.com/hiall-fyi/pulse-card/issues/18) - @ChrisMarriott38) — the trend line now stays inside the colored portion of the bar instead of stretching across the empty track area
+
 ## [0.2.0] - 2026-04-05
 
 ### Added
@@ -41,7 +47,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Sensor values now respect Home Assistant's display precision setting — if you've configured decimal places for a sensor in HA (or the integration provides a default), the card uses that automatically instead of showing raw floats like "10.0992555831266%". You can still override with the `decimal` config option
 - The card now loads faster on your dashboard — the visual editor and its dependencies are only loaded when you actually open the editor, not on every page view
 - Entities in an `error` state are now handled the same as `unavailable` and `unknown` — showing "Unavailable" instead of a broken bar
-- Duplicate bar width calculations consolidated into a single shared helper — reduces the chance of future bugs when the scaling logic changes
 
 ## [0.1.6] - 2026-03-23
 
@@ -62,10 +67,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Improved
 
-- Color values, bar heights, border radius, and gap settings in your config are now sanitized before rendering — prevents potential style injection from malicious config values
-- Internal code is cleaner — duplicate indicator formatting logic consolidated into a single helper, two near-identical label rendering functions merged into one, and unused legacy function removed
-- Editor default values now reference a single source of truth instead of hardcoded strings — less chance of defaults drifting out of sync
-- Internal utility functions are now explicitly marked as internal in the documentation
+- Your config values are now validated before rendering — the card won't break from unexpected characters in color, height, or gap settings
 
 ## [0.1.4] - 2026-03-20
 
@@ -84,25 +86,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Visual editor is now organized into three clear sections: Card Settings, Layout, and Display — no more scrolling through one long list
 - Visual editor labels are simpler — "Name", "Value", "Icon" instead of "Name Position", "Value Position", etc.
-- Cards with multiple entities and indicators load faster — history data is now fetched in a single batch call instead of one call per entity
-- Opening external URLs via tap actions is now more secure (`noopener,noreferrer`)
-- If the card resource is accidentally loaded twice, it no longer throws a duplicate registration error
+- Cards with multiple entities and indicators load faster — history data is now fetched in one go instead of one call per entity
+- External URLs opened via tap actions are now handled more securely
+- Loading the card resource twice no longer causes an error
 - If the editor's helper components fail to load, the editor still works instead of breaking
-- Action listener timers are now properly cleaned up when a card is removed from the dashboard (prevents stale callbacks in the background)
-- Icon updates now skip empty values to avoid rendering broken icons
+- Icons no longer show a broken placeholder when the value is empty
 
 ### Fixed
 
 - Visual editor no longer writes `animation: { effect: "none" }` to your config when the effect is set to the default — keeps your YAML clean
 - Visual editor now preserves `target.show_label` when you edit the target value — previously switching between YAML and the visual editor would lose the label setting
-- Entity IDs containing special characters are now properly escaped in the HTML output
+- Entity names with special characters now display correctly
 
 ## [0.1.2] - 2026-03-19
 
 ### Fixed
 
 - Gap setting now works when you type a plain number like `8` — it's automatically treated as `8px` ([#2](https://github.com/hiall-fyi/pulse-card/issues/2))
-- Card now takes up the full width in Sections view instead of only half — grid columns changed from 6 to 12
+- Card now takes up the full width in Sections view instead of only half
 
 ## [0.1.1] - 2026-03-19
 

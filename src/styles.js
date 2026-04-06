@@ -221,8 +221,8 @@ export const STYLES = `
   .bar-sparkline {
     position: absolute;
     left: 0;
-    right: 0;
     bottom: 0;
+    width: 100%;
     height: 50%;
     z-index: 1;
     pointer-events: none;

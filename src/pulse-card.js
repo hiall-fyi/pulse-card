@@ -359,6 +359,11 @@ class PulseCard extends HTMLElement {
         fillEl.style.width = `${bs.fill * barWidthScale}%`;
         fillEl.style.backgroundColor = bs.color || '';
 
+        // Sync sparkline width to match fill [Issue #18]
+        /** @type {HTMLElement|null} */
+        const sparkSvg = /** @type {HTMLElement|null} */ (row.querySelector('.bar-sparkline'));
+        if (sparkSvg) sparkSvg.style.width = `${bs.fill * barWidthScale}%`;
+
         // Update icon if severity has icon override
         const iconEl = row.querySelector('.bar-icon');
         if (iconEl && bs.resolvedIcon) iconEl.setAttribute('icon', bs.resolvedIcon);
@@ -513,8 +518,12 @@ class PulseCard extends HTMLElement {
     if (!data || data.length < 2) return '';
     const path = buildSparklinePath(data, 200, 50, scfg.slots, scfg.aggregateFunc, scfg.smoothing);
     if (!path) return '';
-    const colorStyle = scfg.color ? `color:${sanitizeCssValue(scfg.color)}` : '';
-    return `<svg class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" width="100%" height="100%"${colorStyle ? ` style="${colorStyle}"` : ''}><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
+    const bs = resolveBarState(ec, cfg, this._hass);
+    const barWidthScale = computeBarWidthScale(ec, cfg);
+    const sparkWidth = bs.fill * barWidthScale;
+    const colorStyle = scfg.color ? `color:${sanitizeCssValue(scfg.color)};` : '';
+    const widthStyle = `width:${sparkWidth}%;${colorStyle}`;
+    return `<svg class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" height="100%" style="${widthStyle}"><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
   }
 
   /**
@@ -600,8 +609,11 @@ class PulseCard extends HTMLElement {
         // Must use DOMParser to create proper SVG namespace elements (innerHTML creates HTMLUnknownElement).
         const container = row.querySelector('.bar-container');
         if (!container) continue;
-        const colorAttr = scfg.color ? ` style="color:${sanitizeCssValue(scfg.color)}"` : '';
-        const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" width="100%" height="100%"${colorAttr}><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
+        const bs = resolveBarState(ec, cfg, this._hass);
+        const barWidthScale = computeBarWidthScale(ec, cfg);
+        const sparkWidth = bs.fill * barWidthScale;
+        const colorStyle = scfg.color ? `color:${sanitizeCssValue(scfg.color)};` : '';
+        const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" height="100%" style="width:${sparkWidth}%;${colorStyle}"><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
         const parsed = new DOMParser().parseFromString(svgMarkup, 'image/svg+xml');
         const svgEl = document.importNode(parsed.documentElement, true);
         const track = container.querySelector('.bar-track');
@@ -611,9 +623,12 @@ class PulseCard extends HTMLElement {
           container.appendChild(svgEl);
         }
       } else {
-        // SVG exists — update path
+        // SVG exists — update path and width
         const pathEl = svg.querySelector('path');
         if (pathEl) pathEl.setAttribute('d', path);
+        const bs = resolveBarState(ec, cfg, this._hass);
+        const barWidthScale = computeBarWidthScale(ec, cfg);
+        /** @type {HTMLElement} */ (svg).style.width = `${bs.fill * barWidthScale}%`;
       }
     }
   }
