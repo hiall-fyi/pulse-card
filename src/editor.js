@@ -10,6 +10,71 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { DEFAULTS } from './constants.js';
 
+/** Default swatch color — resolves HA theme primary text color, falls back to HA blue. */
+function getDefaultSwatch() {
+  if (typeof document === 'undefined') return '#44739e';
+  const resolved = getComputedStyle(document.documentElement).getPropertyValue('--primary-text-color').trim();
+  return toHex6(resolved) || '#44739e';
+}
+
+/** Default swatch for bar color — resolves HA theme primary color. */
+function getBarDefaultSwatch() {
+  if (typeof document === 'undefined') return '#03a9f4';
+  const resolved = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+  return toHex6(resolved) || '#03a9f4';
+}
+
+/** Cache for named color → hex resolution to avoid repeated DOM reflows. */
+const _colorCache = new Map();
+
+/**
+ * Convert any CSS color string to #rrggbb for `<input type="color">`.
+ * Returns empty string if the value cannot be resolved.
+ * @param {string} color - CSS color value (hex, rgb, named, etc.)
+ * @returns {string} 6-digit hex string or empty string
+ */
+export function toHex6(color) {
+  if (!color || typeof color !== 'string') return '';
+  const c = color.trim();
+  if (!c) return '';
+  if (_colorCache.has(c)) return _colorCache.get(c);
+  const result = _resolveToHex6(c);
+  _colorCache.set(c, result);
+  return result;
+}
+
+/** @param {string} c */
+function _resolveToHex6(c) {
+  // Already #rrggbb
+  if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
+  // Shorthand #rgb → #rrggbb
+  if (/^#[0-9a-f]{3}$/i.test(c)) {
+    return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`.toLowerCase();
+  }
+  // rgb() or rgba() — extract r,g,b
+  const rgbMatch = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbMatch) {
+    const hex = (/** @type {string} */ n) => parseInt(n, 10).toString(16).padStart(2, '0');
+    return `#${hex(rgbMatch[1])}${hex(rgbMatch[2])}${hex(rgbMatch[3])}`;
+  }
+  // CSS variable or other unresolvable — skip
+  if (c.startsWith('var(')) return '';
+  // Named color — resolve via temporary element
+  if (typeof document !== 'undefined') {
+    const tmp = document.createElement('span');
+    tmp.style.color = c;
+    document.body.appendChild(tmp);
+    const computed = getComputedStyle(tmp).color;
+    tmp.remove();
+    const m = computed.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (m) {
+      const hex = (/** @type {string} */ n) => parseInt(n, 10).toString(16).padStart(2, '0');
+      return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`;
+    }
+  }
+  return '';
+}
+
 /**
  * ha-form schema for card-level settings.
  * Positions use flat keys (pos_name, pos_value, pos_icon) mapped to
@@ -21,163 +86,109 @@ const POSITION_OPTIONS = [
   { value: 'off', label: 'Off' },
 ];
 
-/** Schema: Appearance section. */
-const SCHEMA_APPEARANCE = [
-  {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
-    schema: [
-      { name: 'title', label: 'Title', selector: { text: {} } },
-      {
-        name: 'layout',
-        label: 'Layout',
-        selector: {
-          select: {
-            options: [
-              { value: 'default', label: 'Default' },
-              { value: 'compact', label: 'Compact' },
-            ],
-            mode: 'dropdown',
-          },
-        },
-      },
-      { name: 'sparkline_show', label: 'Sparkline', selector: { boolean: {} } },
-    ],
-  },
-  {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
-    schema: [
-      { name: 'height', label: 'Height', selector: { text: {} } },
-      { name: 'border_radius', label: 'Radius', selector: { text: {} } },
-      { name: 'color', label: 'Color', selector: { text: {} } },
-    ],
-  },
+const AGGREGATE_OPTIONS = [
+  { value: 'avg', label: 'Average' },
+  { value: 'min', label: 'Min' },
+  { value: 'max', label: 'Max' },
+  { value: 'median', label: 'Median' },
+  { value: 'first', label: 'First' },
+  { value: 'last', label: 'Last' },
+  { value: 'sum', label: 'Sum' },
+  { value: 'delta', label: 'Delta' },
+  { value: 'diff', label: 'Diff' },
 ];
 
-/** Schema: Layout section. */
-const SCHEMA_LAYOUT = [
-  {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
-    schema: [
-      {
-        name: 'columns',
-        label: 'Columns',
-        selector: { number: { min: 1, max: 6, mode: 'box' } },
-      },
-      { name: 'gap', label: 'Gap', selector: { text: {} } },
-      {
-        name: 'decimal',
-        label: 'Decimals',
-        selector: { number: { min: 0, max: 6, mode: 'box' } },
-      },
-    ],
-  },
-  {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
-    schema: [
-      {
-        name: 'min',
-        label: 'Min',
-        selector: { number: { mode: 'box' } },
-      },
-      {
-        name: 'max',
-        label: 'Max',
-        selector: { number: { mode: 'box' } },
-      },
-      { name: 'target_value', label: 'Target', selector: { text: {} } },
-    ],
-  },
-  {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
-    schema: [
-      {
-        name: 'bar_width',
-        label: 'Bar Width (%)',
-        selector: { number: { min: 1, max: 100, mode: 'box' } },
-      },
-      { name: 'font_size', label: 'Font Size', selector: { text: {} } },
-      { name: 'complementary', label: 'Invert Fill', selector: { boolean: {} } },
-    ],
-  },
-];
+/**
+ * Build the full editor schema. Uses expandable panels for advanced settings.
+ * @param {Record<string, *>} formData
+ * @returns {object[]}
+ */
+function buildSchemaTop(formData) {
+  return [
+    {
+      name: '', type: 'grid', column_min_width: '120px',
+      schema: [
+        { name: 'title', label: 'Title', selector: { text: {} } },
+        { name: 'layout', label: 'Layout', selector: { select: { options: [{ value: 'default', label: 'Default' }, { value: 'compact', label: 'Compact' }], mode: 'dropdown' } } },
+        { name: 'color', label: 'Color', selector: { text: {} } },
+      ],
+    },
+    {
+      name: '', type: 'grid', column_min_width: '120px',
+      schema: [
+        { name: 'height', label: 'Height', selector: { text: {} } },
+        { name: 'border_radius', label: 'Radius', selector: { text: {} } },
+        { name: 'font_size', label: 'Font Size', selector: { text: {} } },
+      ],
+    },
+    {
+      name: '', type: 'grid', column_min_width: '120px',
+      schema: [
+        { name: 'pos_name', label: 'Name', selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } } },
+        { name: 'pos_value', label: 'Value', selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } } },
+        { name: 'pos_icon', label: 'Icon', selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } } },
+      ],
+    },
+    { name: 'sparkline_show', label: 'Sparkline', selector: { boolean: {} } },
+    ...(formData.sparkline_show ? [{
+      name: '', type: 'grid', column_min_width: '120px',
+      schema: [
+        { name: 'sparkline_hours', label: 'Hours', selector: { number: { min: 1, max: 168, mode: 'box' } } },
+        { name: 'sparkline_line_width', label: 'Line Width', selector: { number: { min: 0.5, max: 5, step: 0.5, mode: 'box' } } },
+        { name: 'sparkline_points', label: 'Points/Hour', selector: { number: { min: 0.25, max: 12, step: 0.25, mode: 'box' } } },
+      ],
+    }, {
+      name: '', type: 'grid', column_min_width: '120px',
+      schema: [
+        { name: 'sparkline_smoothing', label: 'Smoothing', selector: { boolean: {} } },
+        { name: 'sparkline_aggregate', label: 'Aggregate', selector: { select: { options: AGGREGATE_OPTIONS, mode: 'dropdown' } } },
+        { name: 'sparkline_interval', label: 'Refresh (s)', selector: { number: { min: 30, max: 3600, mode: 'box' } } },
+      ],
+    }] : []),
+  ];
+}
 
-/** Schema: Display section — positions, animation, indicator. */
-const SCHEMA_DISPLAY = [
+/** Schema: expandable panels for advanced settings. */
+const SCHEMA_ADVANCED = [
   {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
+    type: 'expandable', name: '', flatten: true, title: 'Bar Limits',
     schema: [
-      {
-        name: 'pos_name',
-        label: 'Name',
-        selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
-      },
-      {
-        name: 'pos_value',
-        label: 'Value',
-        selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
-      },
-      {
-        name: 'pos_icon',
-        label: 'Icon',
-        selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
-      },
+      { name: '', type: 'grid', column_min_width: '120px', schema: [
+        { name: 'min', label: 'Min', selector: { number: { mode: 'box' } } },
+        { name: 'max', label: 'Max', selector: { number: { mode: 'box' } } },
+        { name: 'target_value', label: 'Target', selector: { text: {} } },
+      ]},
+      { name: '', type: 'grid', column_min_width: '120px', schema: [
+        { name: 'bar_width', label: 'Bar Width (%)', selector: { number: { min: 1, max: 100, mode: 'box' } } },
+        { name: 'columns', label: 'Columns', selector: { number: { min: 1, max: 6, mode: 'box' } } },
+        { name: 'gap', label: 'Gap', selector: { text: {} } },
+      ]},
+      { name: '', type: 'grid', column_min_width: '120px', schema: [
+        { name: 'decimal', label: 'Decimals', selector: { number: { min: 0, max: 6, mode: 'box' } } },
+        { name: 'complementary', label: 'Invert Fill', selector: { boolean: {} } },
+        { name: 'limit_value', label: 'Clamp Value', selector: { boolean: {} } },
+      ]},
     ],
   },
   {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
+    type: 'expandable', name: '', flatten: true, title: 'Indicator',
     schema: [
-      {
-        name: 'pos_indicator',
-        label: 'Indicator',
-        selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } },
-      },
-      {
-        name: 'indicator_period',
-        label: 'Lookback (min)',
-        selector: { number: { min: 1, max: 1440, mode: 'box' } },
-      },
-      { name: 'show_delta', label: 'Show Delta', selector: { boolean: {} } },
+      { name: '', type: 'grid', column_min_width: '120px', schema: [
+        { name: 'pos_indicator', label: 'Position', selector: { select: { options: POSITION_OPTIONS, mode: 'dropdown' } } },
+        { name: 'indicator_period', label: 'Lookback (min)', selector: { number: { min: 1, max: 1440, mode: 'box' } } },
+      ]},
+      { name: '', type: 'grid', column_min_width: '120px', schema: [
+        { name: 'show_delta', label: 'Show Delta', selector: { boolean: {} } },
+        { name: 'indicator_inverted', label: 'Inverted', selector: { boolean: {} } },
+      ]},
     ],
   },
   {
-    name: '',
-    type: 'grid',
-    column_min_width: '120px',
-    schema: [
-      {
-        name: 'anim_effect',
-        label: 'Effect',
-        selector: {
-          select: {
-            options: [
-              { value: 'none', label: 'None' },
-              { value: 'charge', label: 'Charge' },
-            ],
-            mode: 'dropdown',
-          },
-        },
-      },
-      {
-        name: 'anim_speed',
-        label: 'Speed (s)',
-        selector: { number: { min: 0, max: 5, step: 0.1, mode: 'box' } },
-      },
-      { name: 'limit_value', label: 'Clamp Value', selector: { boolean: {} } },
-    ],
+    type: 'expandable', name: '', flatten: true, title: 'Animation',
+    schema: [{ name: '', type: 'grid', column_min_width: '120px', schema: [
+      { name: 'anim_effect', label: 'Effect', selector: { select: { options: [{ value: 'none', label: 'None' }, { value: 'charge', label: 'Charge' }], mode: 'dropdown' } } },
+      { name: 'anim_speed', label: 'Speed (s)', selector: { number: { min: 0, max: 5, step: 0.1, mode: 'box' } } },
+    ]}],
   },
 ];
 
@@ -231,6 +242,46 @@ class PulseCardEditor extends LitElement {
    */
   setConfig(config) {
     this._config = config;
+    this._needsSwatchInject = true;
+  }
+
+  /**
+   * Inject color swatches only when config changes, not on every Lit update.
+   */
+  updated() {
+    if (this._needsSwatchInject) {
+      this._needsSwatchInject = false;
+      this._injectColorSwatches();
+    }
+  }
+
+  /** Inject color picker swatches next to all "Color" text fields in our shadow DOM. */
+  _injectColorSwatches() {
+    const root = this.shadowRoot;
+    if (!root) return;
+    for (const tf of root.querySelectorAll('ha-textfield')) {
+      if (/** @type {*} */ (tf).label !== 'Color') continue;
+      // Skip if already wrapped (entity template color fields have inline swatches)
+      if (tf.closest('.color-field')) continue;
+      const parent = tf.parentElement;
+      if (!parent || parent.querySelector('input[type="color"]')) continue;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'color-field';
+      parent.insertBefore(wrapper, tf);
+      wrapper.appendChild(tf);
+      const swatch = document.createElement('input');
+      swatch.type = 'color';
+      swatch.title = 'Pick color';
+      swatch.value = toHex6(/** @type {*} */ (tf).value) || getBarDefaultSwatch();
+      wrapper.appendChild(swatch);
+      swatch.addEventListener('input', () => {
+        /** @type {*} */ (tf).value = swatch.value;
+        tf.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      tf.addEventListener('input', () => {
+        swatch.value = toHex6(/** @type {*} */ (tf).value) || getBarDefaultSwatch();
+      });
+    }
   }
 
   /**
@@ -256,6 +307,7 @@ class PulseCardEditor extends LitElement {
    */
   _fireConfigChanged(config) {
     this._config = config;
+    this._needsSwatchInject = true;
     const event = new CustomEvent('config-changed', {
       detail: { config },
       bubbles: true,
@@ -400,10 +452,11 @@ class PulseCardEditor extends LitElement {
       ['positions', { pos_name: 'name', pos_value: 'value', pos_icon: 'icon', pos_indicator: 'indicator' }],
       ['animation', { anim_effect: 'effect', anim_speed: 'speed' },
         (k, v) => k === 'effect' && v === 'none' ? undefined : v],
-      ['indicator', { pos_indicator: 'show', indicator_period: 'period', show_delta: 'show_delta' },
+      ['indicator', { pos_indicator: 'show', indicator_period: 'period', show_delta: 'show_delta', indicator_inverted: 'inverted' },
         (k, v) => {
           if (k === 'show') return v && v !== 'off' ? true : undefined;
           if (k === 'show_delta') return v === true ? true : undefined;
+          if (k === 'inverted') return v === true ? true : undefined;
           return v;
         }],
     ];
@@ -425,11 +478,37 @@ class PulseCardEditor extends LitElement {
       }
     }
 
-    // --- Sparkline: boolean toggle → sparkline object ---
+    // --- Sparkline: boolean toggle + detail fields → sparkline object ---
     if (formData.sparkline_show === true) {
       const existing = typeof newConfig.sparkline === 'object' && newConfig.sparkline !== null
         ? newConfig.sparkline : {};
-      newConfig.sparkline = { ...existing, show: true };
+      const sparkline = { ...existing, show: true };
+      // Apply sparkline detail fields (only when present in formData — absent means form didn't render them)
+      const sparkFields = {
+        sparkline_hours: 'hours_to_show',
+        sparkline_line_width: 'line_width',
+        sparkline_points: 'points_per_hour',
+        sparkline_aggregate: 'aggregate_func',
+        sparkline_interval: 'update_interval',
+      };
+      for (const [formKey, cfgKey] of Object.entries(sparkFields)) {
+        if (!(formKey in formData)) continue;
+        const val = formData[formKey];
+        if (val === undefined || val === null || val === '' || (cfgKey === 'aggregate_func' && val === 'avg')) {
+          delete sparkline[cfgKey];
+        } else {
+          sparkline[cfgKey] = val;
+        }
+      }
+      // Smoothing: true is default, only store false
+      if ('sparkline_smoothing' in formData) {
+        if (formData.sparkline_smoothing === false) {
+          sparkline.smoothing = false;
+        } else {
+          delete sparkline.smoothing;
+        }
+      }
+      newConfig.sparkline = sparkline;
     } else if (formData.sparkline_show === false) {
       delete newConfig.sparkline;
     }
@@ -519,6 +598,28 @@ class PulseCardEditor extends LitElement {
       sparkline_show: typeof this._config.sparkline === 'object'
         ? (this._config.sparkline?.show || false)
         : (this._config.sparkline === true),
+      sparkline_hours: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.hours_to_show ?? '')
+        : '',
+      sparkline_line_width: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.line_width ?? this._config.sparkline?.stroke_width ?? '')
+        : '',
+      sparkline_points: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.points_per_hour ?? '')
+        : '',
+      sparkline_smoothing: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.smoothing !== false)
+        : true,
+      sparkline_aggregate: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.aggregate_func ?? 'avg')
+        : 'avg',
+      sparkline_interval: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.update_interval ?? '')
+        : '',
+      sparkline_color: typeof this._config.sparkline === 'object'
+        ? (this._config.sparkline?.color ?? '')
+        : '',
+      indicator_inverted: this._config.indicator?.inverted || false,
       layout: this._config.layout || 'default',
     };
 
@@ -566,11 +667,18 @@ class PulseCardEditor extends LitElement {
                     .value=${ec.name || ''}
                     @input=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'name', ev)}
                   ></ha-textfield>
-                  <ha-textfield
-                    .label=${'Color'}
-                    .value=${ec.color || ''}
-                    @input=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'color', ev)}
-                  ></ha-textfield>
+                  <div class="color-field">
+                    <ha-textfield
+                      .label=${'Color'}
+                      .value=${ec.color || ''}
+                      @input=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'color', ev)}
+                    ></ha-textfield>
+                    <input type="color"
+                      .value=${toHex6(ec.color) || getBarDefaultSwatch()}
+                      @input=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'color', ev)}
+                      title="Pick color"
+                    />
+                  </div>
                 </div>
               </div>
             `,
@@ -585,23 +693,44 @@ class PulseCardEditor extends LitElement {
         <ha-form
           .hass=${hass}
           .data=${formData}
-          .schema=${SCHEMA_APPEARANCE}
+          .schema=${buildSchemaTop(formData)}
           .computeLabel=${this._computeLabel}
           @value-changed=${this._settingsChanged}
         ></ha-form>
-        <h3>Layout</h3>
+        ${formData.sparkline_show ? html`
+          <div class="color-field sparkline-color">
+            <ha-textfield
+              .label=${'Sparkline Color'}
+              .value=${formData.sparkline_color || ''}
+              @input=${(/** @type {Event} */ ev) => {
+                const val = /** @type {HTMLInputElement} */ (ev.target).value ?? '';
+                const cfg = { ...this._config };
+                const sp = typeof cfg.sparkline === 'object' && cfg.sparkline !== null ? { ...cfg.sparkline } : { show: true };
+                if (val === '') { delete sp.color; } else { sp.color = val; }
+                cfg.sparkline = sp;
+                this._fireConfigChanged(cfg);
+              }}
+            ></ha-textfield>
+            <input type="color"
+              .value=${toHex6(formData.sparkline_color) || getDefaultSwatch()}
+              @input=${(/** @type {Event} */ ev) => {
+                const val = /** @type {HTMLInputElement} */ (ev.target).value;
+                const cfg = { ...this._config };
+                const sp = typeof cfg.sparkline === 'object' && cfg.sparkline !== null ? { ...cfg.sparkline } : { show: true };
+                sp.color = val;
+                cfg.sparkline = sp;
+                this._fireConfigChanged(cfg);
+                const tf = /** @type {HTMLElement} */ (ev.target).parentElement?.querySelector('ha-textfield');
+                if (tf) /** @type {*} */ (tf).value = val;
+              }}
+              title="Pick color"
+            />
+          </div>
+        ` : nothing}
         <ha-form
           .hass=${hass}
           .data=${formData}
-          .schema=${SCHEMA_LAYOUT}
-          .computeLabel=${this._computeLabel}
-          @value-changed=${this._settingsChanged}
-        ></ha-form>
-        <h3>Display</h3>
-        <ha-form
-          .hass=${hass}
-          .data=${formData}
-          .schema=${SCHEMA_DISPLAY}
+          .schema=${SCHEMA_ADVANCED}
           .computeLabel=${this._computeLabel}
           @value-changed=${this._settingsChanged}
         ></ha-form>
@@ -665,6 +794,38 @@ class PulseCardEditor extends LitElement {
       .add-entity {
         display: block;
         margin-top: 8px;
+      }
+      .color-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .color-field ha-textfield {
+        flex: 1;
+        min-width: 0;
+      }
+      .color-field input[type="color"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: 2px solid var(--divider-color, #e0e0e0);
+        border-radius: 6px;
+        cursor: pointer;
+        background: none;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .color-field input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 2px;
+      }
+      .color-field input[type="color"]::-webkit-color-swatch {
+        border: none;
+        border-radius: 3px;
+      }
+      .sparkline-color {
+        margin: 4px 0 16px;
       }
     `;
   }

@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-04-08
+
+### Added
+
+- **Color Picker** ([#8](https://github.com/hiall-fyi/pulse-card/issues/8), [Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @ChrisMarriott38) — pick bar colors visually instead of typing hex codes. A color swatch sits next to every color field — click it to open your browser's color picker, or keep typing values directly
+- **Sparkline in the Editor** — the visual editor now has all the most common sparkline settings: on/off, hours to show, line width, points per hour, smoothing, aggregation function, refresh interval, and color. Toggle Sparkline on and the fields appear right below
+- **More Settings in the Editor** — indicator inverted mode, clamp value, and invert fill are now in the visual editor. Previously these were YAML-only
+- **State Data Attribute** — each bar row now carries a `data-state` attribute with the current numeric value (or `"unavailable"`), so you can target specific states with card-mod
+
+### Improved
+
+- **Sparkline fills to bar width** ([#21](https://github.com/hiall-fyi/pulse-card/issues/21) - @ChrisMarriott38) — the sparkline trend line now stretches to your `bar_width` setting instead of shrinking with the current value. A sensor at 10% still shows the full trend across the bar track area
+- **Editor redesigned** — settings are now organized with expandable panels for Bar Limits, Indicator, and Animation. Common settings (title, layout, color, height, positions, sparkline) stay visible at the top, advanced options are tucked away until you need them
+- **Fewer redundant calculations** — bar width scaling and bar state are now computed once per entity instead of multiple times per update cycle
+- **New brand identity** — refreshed icon and logo with a richer, layered design. Dark mode variants included
+
 ## [0.2.1] - 2026-04-06
 
 ### Fixed

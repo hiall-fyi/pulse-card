@@ -1,8 +1,13 @@
-# Pulse Card
-
 <div align="center">
 
-<img src="brand/logo@2x.png" alt="Pulse Card" width="400">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/dark_logo@2x.png" />
+  <img src="brand/logo@2x.png" alt="Pulse Card" width="400" />
+</picture>
+
+<br />
+
+<em>Compact Horizontal Bar Chart Card for Home Assistant</em>
 
 <!-- Platform Badges -->
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue?style=for-the-badge&logo=home-assistant)
@@ -10,7 +15,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.2.1-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.3.0-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -22,8 +27,6 @@
 
 <!-- Support -->
 [![Buy Me A Coffee](https://img.shields.io/badge/Support-Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hiallfyi)
-
-**Compact horizontal bar chart card for Home Assistant sensor data visualization.**
 
 **A modern replacement for bar-card — minimal, fast, single-file bundle.**
 
@@ -56,7 +59,7 @@ The original `bar-card` was delisted from HACS in 2025 after years without maint
 - 📉 Sparkline trend line — see recent history behind the bar, no extra card needed
 - 🔀 Reorder entities in the visual editor — move bars up and down without touching YAML
 - 🎨 Auto-color by value range (severity) with smooth gradient option
-- 🖱️ Visual editor — most settings configurable without touching YAML
+- 🖱️ Visual editor — most settings configurable without touching YAML, including a color picker for bar colors
 - 🎯 Target marker — show a goal line on the bar
 - 📈 Trend arrow — see if a value is going up or down compared to earlier
 - 👆 Tap actions — tap, hold, or double-tap to open details, navigate, or trigger services
@@ -262,7 +265,9 @@ For smooth color blending between ranges, add `mode: gradient` to each entry.
 
 ### Sparkline
 
-A mini trend line rendered behind the bar, showing recent history at a glance. Replaces the need for a separate mini-graph-card.
+A mini trend line rendered behind the bar, showing recent history at a glance. Replaces the need for a separate mini-graph-card. The sparkline stretches to your `bar_width` setting, so the trend stays visible even when the current value is low.
+
+The on/off toggle, hours, line width, points per hour, smoothing, aggregation function, refresh interval, and color are all in the visual editor.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
@@ -833,14 +838,28 @@ card_mod:
     }
 ```
 
+### Data Attributes for card-mod
+
+Each bar row exposes a `data-state` attribute with the current numeric value (or `"unavailable"`). You can use this with card-mod to style bars based on their state:
+
+```yaml
+type: custom:pulse-card
+entity: sensor.cpu_usage
+card_mod:
+  style: |
+    .bar-row[data-state="unavailable"] {
+      opacity: 0.3;
+    }
+```
+
 ---
 
 ## Known Limitations
 
-- Per-entity severity ranges are YAML-only — the visual editor supports per-entity name and color, but severity still needs YAML
-- Conditional visibility is YAML-only — conditions are per-entity and better expressed in YAML
-- Sparkline needs the HA recorder component to be enabled (it is by default)
-- The trend indicator also needs the HA recorder
+- Per-entity severity ranges are YAML-only — severity involves arrays of value ranges with colors and optional icons, which doesn't map well to a simple editor form. The visual editor handles per-entity name and color
+- Conditional visibility is YAML-only — conditions are per-entity with multiple possible operators (above, below, equal, not equal) that combine with AND logic. Better expressed in YAML than a form
+- The color picker uses your browser's native picker, which only supports solid hex colors. For rgba() with transparency or CSS variables, type the value directly in the text field
+- Sparkline and the trend indicator both need the HA recorder component to be enabled (it is by default)
 - `width`, `saturation`, `hue`, and `entity_config` from bar-card are not supported
 
 ---
