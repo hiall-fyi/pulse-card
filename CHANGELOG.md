@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 2026-04-09
+
+### Fixed
+
+- **HACS download now works correctly** ([#21](https://github.com/hiall-fyi/pulse-card/issues/21) - @ChrisMarriott38) — the v0.3.0 release was missing the built JS files as release assets, so HACS downloaded the raw source instead of the bundled card. This caused 404 errors and the card not loading. The release process is now fixed
+
 ## [0.3.0] - 2026-04-08
 
 ### Added
