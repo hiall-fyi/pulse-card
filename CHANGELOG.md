@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 2026-04-14
+
+### Fixed
+
+- **Sparkline now appears immediately after enabling** — previously you had to refresh the page after toggling sparkline on in the editor. The card now fetches history data as soon as the config changes
+- **Stale data cleared on config change** — switching entities no longer leaves old sparkline or indicator data lingering in memory
+
+### Improved
+
+- **Numeric config values are now coerced** — animation speed, columns, and sparkline line width are guaranteed to be numbers even if your YAML has them as strings, preventing potential rendering issues
+
 ## [0.3.1] - 2026-04-09
 
 ### Fixed

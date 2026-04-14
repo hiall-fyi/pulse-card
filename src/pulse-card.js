@@ -108,7 +108,15 @@ class PulseCard extends HTMLElement {
   setConfig(config) {
     this._config = normalizeConfig(config);
     this._elements = {};
-    if (this._hass) this._fullRender();
+    // Reset async data caches so stale entries from old entities don't linger
+    this._sparklineData = {};
+    this._sparklineLastFetch = 0;
+    this._indicators = {};
+    if (this._hass) {
+      this._fullRender();
+      this._scheduleIndicatorFetch();
+      this._scheduleSparklineFetch();
+    }
   }
 
   /**
@@ -501,7 +509,7 @@ class PulseCard extends HTMLElement {
       slots: Math.max(hours * pph, 2),
       aggregateFunc: scfg.aggregate_func ?? 'avg',
       smoothing: scfg.smoothing !== false,
-      strokeWidth: scfg.line_width ?? scfg.stroke_width ?? 1.5,
+      strokeWidth: Number(scfg.line_width ?? scfg.stroke_width ?? 1.5) || 1.5,
       color: scfg.color ?? null,
       updateInterval: scfg.update_interval ?? 300,
     };

@@ -366,6 +366,10 @@ export function normalizeConfig(config) {
     positions: { ...DEFAULTS.positions, ...config.positions },
   };
 
+  // Coerce numeric config values — YAML may deliver strings for number fields
+  if (merged.columns != null) merged.columns = Number(merged.columns) || 1;
+  if (merged.animation.speed != null) merged.animation.speed = Number(merged.animation.speed) || DEFAULTS.animation.speed;
+
   // Pre-sort card-level severity for gradient interpolation
   if (merged.severity) {
     merged.severity = preSortSeverity(merged.severity);
