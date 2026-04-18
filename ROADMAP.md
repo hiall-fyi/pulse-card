@@ -12,13 +12,7 @@ Ideas and feature requests under consideration. No timelines — this is a "what
 
 - **Slider mode** ([#2](https://github.com/hiall-fyi/pulse-card/issues/2), [Discussion #19](https://github.com/hiall-fyi/pulse-card/discussions/19) - @ChrisMarriott38) — tap or drag the bar to set a value. Works with input numbers, lights, thermostats, covers, and fans. First version will support input numbers, with other types coming later
 - **Collapsible groups** ([#2](https://github.com/hiall-fyi/pulse-card/issues/2) - @ChrisMarriott38) — fold and expand groups of bars to keep dense dashboards tidy
-- **Secondary info** — show a second line below the bar with last changed time, an attribute, or custom text
 - **Entity picture** — use an entity's picture instead of an icon (handy for person entities)
-- **Responsive columns** — automatically use fewer columns on narrow screens so bars don't get squished on phones
-
-### For card-mod users
-
-- **Severity data attribute** — the bar row will carry the current severity level so you can target it with card-mod styles
 
 ## Pulse Family
 

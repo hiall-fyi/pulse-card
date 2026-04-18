@@ -6,6 +6,40 @@
 
 import { DEFAULTS, LOG_PREFIX } from './constants.js';
 
+/** Known HA active/truthy states — O(1) Set lookup. */
+const BINARY_ACTIVE = new Set(['on', 'open', 'home', 'locked', 'playing', 'active']);
+
+/** Known HA inactive/falsy states — O(1) Set lookup. */
+const BINARY_INACTIVE = new Set(['off', 'closed', 'not_home', 'unlocked', 'idle', 'paused', 'standby']);
+
+/**
+ * Map a binary state string to a numeric value for bar fill computation.
+ * Returns null if the value is not a known binary state (caller falls through to parseFloat).
+ * @param {*} value - Raw state value.
+ * @param {number} min - Bar min.
+ * @param {number} max - Bar max.
+ * @returns {number|null} Mapped numeric value, or null if not binary.
+ */
+function resolveBinaryValue(value, min, max) {
+  if (typeof value !== 'string') return null;
+  const lower = value.toLowerCase();
+  if (BINARY_ACTIVE.has(lower)) return max;
+  if (BINARY_INACTIVE.has(lower)) return min;
+  return null;
+}
+
+/**
+ * Format a binary state string for display. Capitalises first letter.
+ * @param {string} value - Raw binary state (e.g. "on", "off", "open").
+ * @param {string} [unit] - Optional unit to append.
+ * @returns {string} Formatted display string (e.g. "On", "Off", "Open").
+ */
+function formatBinaryDisplay(value, unit) {
+  const str = String(value);
+  const capitalised = str.charAt(0).toUpperCase() + str.slice(1);
+  return unit ? `${capitalised}${unit}` : capitalised;
+}
+
 /**
  * Clamp a value between min and max.
  * @param {number} value
@@ -27,7 +61,8 @@ export function clamp(value, min, max) {
  * @returns {number} Percentage 0–100.
  */
 function computeFill(value, min, max, complementary = false) {
-  const num = parseFloat(value);
+  const binaryNum = resolveBinaryValue(value, min, max);
+  const num = binaryNum !== null ? binaryNum : parseFloat(value);
   if (isNaN(num)) return 0;
   const range = max - min;
   if (range <= 0) return 0;
@@ -439,7 +474,9 @@ export function resolveBarState(ec, cfg, hass) {
   const rawValue = ec.attribute
     ? state?.attributes?.[ec.attribute]
     : state?.state;
-  const numValue = parseFloat(rawValue);
+  const binaryNum = !ec.attribute ? resolveBinaryValue(rawValue, min, max) : null;
+  const isBinary = binaryNum !== null;
+  const numValue = isBinary ? binaryNum : parseFloat(rawValue);
   const complementary = ec.complementary ?? cfg.complementary;
   const fill = isUnavailable ? 0 : computeFill(rawValue, min, max, complementary);
   const unit = resolveUnit(ec, state);
@@ -448,7 +485,11 @@ export function resolveBarState(ec, cfg, hass) {
   const displayRaw = limitValue && !isNaN(numValue) ? clamp(numValue, min, max) : rawValue;
   const displayValue = isUnavailable
     ? 'Unavailable'
-    : formatValue(displayRaw, decimal, unit);
+    : ec.state_map?.[rawValue]
+      ? ec.state_map[rawValue]
+      : isBinary
+        ? formatBinaryDisplay(rawValue, unit)
+        : formatValue(displayRaw, decimal, unit);
   const name = ec.name ?? state?.attributes?.friendly_name ?? ec.entity;
 
   // Resolve severity color and icon
@@ -711,6 +752,61 @@ export function evaluateVisibility(ec, hass) {
 }
 
 /**
+ * Format an ISO timestamp as a relative time string (e.g. "5 min ago").
+ * @internal
+ * @param {string|undefined} isoString - ISO 8601 timestamp.
+ * @returns {string} Relative time string, or empty string if invalid.
+ */
+function formatRelativeTime(isoString) {
+  if (!isoString) return '';
+  const then = new Date(isoString).getTime();
+  if (isNaN(then)) return '';
+  const diffMs = Date.now() - then;
+  if (diffMs < 0) return 'just now';
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Resolve secondary info text for an entity bar.
+ * Priority: text > attribute > type.
+ * @param {import('./types.js').EntityConfig} ec - Entity config.
+ * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
+ * @returns {string} Resolved secondary info text, or empty string if none.
+ */
+export function resolveSecondaryInfo(ec, hass) {
+  const si = ec.secondary_info;
+  if (!si) return '';
+
+  // Priority 1: static text
+  if (si.text !== undefined && si.text !== null && si.text !== '') {
+    return String(si.text);
+  }
+
+  const state = hass?.states[ec.entity];
+  if (!state) return '';
+
+  // Priority 2: attribute value
+  if (si.attribute) {
+    const val = state.attributes?.[si.attribute];
+    return val !== undefined && val !== null ? String(val) : '';
+  }
+
+  // Priority 3: type
+  if (si.type === 'last_changed') {
+    return formatRelativeTime(state.last_changed);
+  }
+
+  return '';
+}
+
+/**
  * Internal functions exposed for unit testing only.
  * Do NOT import in production code.
  * @internal
@@ -724,4 +820,7 @@ export const _testExports = {
   resolveMinMax,
   formatValue,
   downsampleData,
+  resolveBinaryValue,
+  formatBinaryDisplay,
+  formatRelativeTime,
 };

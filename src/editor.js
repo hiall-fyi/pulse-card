@@ -350,6 +350,33 @@ class PulseCardEditor extends LitElement {
   }
 
   /**
+   * Handle per-entity secondary_info sub-field change.
+   * @param {number} index
+   * @param {string} subField - 'text' or 'attribute'
+   * @param {Event} ev
+   */
+  _entitySecondaryChanged(index, subField, ev) {
+    const value = /** @type {HTMLInputElement} */ (ev.target).value ?? '';
+    const entities = this._getEntities();
+    const existing = entities[index].secondary_info || {};
+    if (value === '' || value === undefined) {
+      const updated = { ...existing };
+      delete updated[subField];
+      if (Object.keys(updated).length === 0) {
+        delete entities[index].secondary_info;
+      } else {
+        entities[index] = { ...entities[index], secondary_info: updated };
+      }
+    } else {
+      entities[index] = {
+        ...entities[index],
+        secondary_info: { ...existing, [subField]: value },
+      };
+    }
+    this._updateEntities(entities);
+  }
+
+  /**
    * Remove entity at index.
    * @param {number} index
    */
@@ -679,6 +706,18 @@ class PulseCardEditor extends LitElement {
                       title="Pick color"
                     />
                   </div>
+                </div>
+                <div class="entity-row-fields">
+                  <ha-textfield
+                    .label=${'Secondary Text'}
+                    .value=${ec.secondary_info?.text || ''}
+                    @input=${(/** @type {Event} */ ev) => this._entitySecondaryChanged(i, 'text', ev)}
+                  ></ha-textfield>
+                  <ha-textfield
+                    .label=${'Secondary Attr'}
+                    .value=${ec.secondary_info?.attribute || ''}
+                    @input=${(/** @type {Event} */ ev) => this._entitySecondaryChanged(i, 'attribute', ev)}
+                  ></ha-textfield>
                 </div>
               </div>
             `,

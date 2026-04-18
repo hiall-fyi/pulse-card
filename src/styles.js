@@ -13,6 +13,7 @@ export const STYLES = `
     overflow: hidden;
     padding: 16px;
     background: var(--pulse-card-background, var(--ha-card-background, var(--card-background-color)));
+    container-type: inline-size;
   }
 
   .pulse-card {
@@ -21,11 +22,17 @@ export const STYLES = `
     gap: var(--pulse-gap, 12px);
   }
 
-  /* Multi-column grid */
+  /* Multi-column grid — responsive: auto-collapse on narrow screens */
   .pulse-card[class*="columns-"] {
     display: grid;
     grid-template-columns: repeat(var(--pulse-columns, 1), 1fr);
     gap: var(--pulse-gap, 16px);
+  }
+
+  @container (max-width: 300px) {
+    .pulse-card[class*="columns-"] {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* Bar row — each entity */
@@ -215,6 +222,29 @@ export const STYLES = `
     outline: 2px solid var(--primary-color, #03A9F4);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  /* Secondary info group — wraps name + secondary line */
+  .bar-name-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 1px;
+  }
+
+  /* Secondary info text */
+  .bar-secondary {
+    font-size: 0.75em;
+    opacity: 0.85;
+    color: var(--pulse-secondary-color, var(--secondary-text-color));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Inside bar — use white like other inside-bar text */
+  .bar-content .bar-secondary {
+    color: var(--pulse-secondary-color, rgba(255, 255, 255, 0.75));
   }
 
   /* Sparkline overlay [US-1] */

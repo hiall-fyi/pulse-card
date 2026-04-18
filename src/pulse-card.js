@@ -22,6 +22,7 @@ import {
   resolveDecimal,
   resolveUnit,
   resolveTarget,
+  resolveSecondaryInfo,
   normalizeConfig,
   sanitizeCssValue,
   warn,
@@ -229,11 +230,14 @@ class PulseCard extends HTMLElement {
     // Indicator
     const indicatorHtml = this._buildIndicatorHtml(ec, cfg, posIndicator);
 
+    // Secondary info
+    const secondaryText = resolveSecondaryInfo(ec, this._hass);
+
     // Labels (outside)
-    const labelsHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'outside');
+    const labelsHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'outside', secondaryText);
 
     // Content (inside/classic mode)
-    const contentHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'inside');
+    const contentHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'inside', secondaryText);
 
     // Bar fill
     const height = sanitizeCssValue(cssValue(ec.height ?? cfg.height));
@@ -267,7 +271,8 @@ class PulseCard extends HTMLElement {
 
     const unavailClass = bs.isUnavailable ? ' unavailable' : '';
     const stateAttr = bs.isUnavailable ? 'data-state="unavailable"' : `data-state="${escapeHtml(bs.numValue)}"`;
-    return `<div class="bar-row${unavailClass}" data-entity="${escapeHtml(ec.entity)}" ${stateAttr} ${ariaAttrs}>${labelsHtml}${barHtml}</div>`;
+    const severityAttr = bs.color ? ` data-severity-color="${escapeHtml(bs.color)}"` : '';
+    return `<div class="bar-row${unavailClass}" data-entity="${escapeHtml(ec.entity)}" ${stateAttr}${severityAttr} ${ariaAttrs}>${labelsHtml}${barHtml}</div>`;
   }
 
   /**
@@ -302,9 +307,10 @@ class PulseCard extends HTMLElement {
    * @param {string} posIndicator
    * @param {string} indicatorHtml
    * @param {'outside'|'inside'} mode - Position mode to render.
+   * @param {string} [secondaryText] - Optional secondary info text.
    * @returns {string}
    */
-  _buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, mode) {
+  _buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, mode, secondaryText) {
     if (posName !== mode && posValue !== mode && posIcon !== mode && posIndicator !== mode) return '';
 
     const wrapperClass = mode === 'outside' ? 'bar-labels' : 'bar-content';
@@ -312,7 +318,16 @@ class PulseCard extends HTMLElement {
     if (posIcon === mode && bs.resolvedIcon) {
       html += `<ha-icon class="bar-icon" icon="${escapeHtml(bs.resolvedIcon)}"></ha-icon>`;
     }
-    if (posName === mode) html += `<span class="bar-name">${escapeHtml(bs.name)}</span>`;
+    if (posName === mode) {
+      if (secondaryText) {
+        html += `<div class="bar-name-group">`;
+        html += `<span class="bar-name">${escapeHtml(bs.name)}</span>`;
+        html += `<span class="bar-secondary">${escapeHtml(secondaryText)}</span>`;
+        html += `</div>`;
+      } else {
+        html += `<span class="bar-name">${escapeHtml(bs.name)}</span>`;
+      }
+    }
     html += '</div><div class="bar-label-right">';
     if (posValue === mode) html += `<span class="bar-value">${escapeHtml(bs.displayValue)}</span>`;
     if (posIndicator === mode && indicatorHtml) html += indicatorHtml;
@@ -385,12 +400,24 @@ class PulseCard extends HTMLElement {
       const valueEls = row.querySelectorAll('.bar-value');
       for (const el of valueEls) el.textContent = bs.displayValue;
 
+      // Update secondary info text
+      const secondaryEls = row.querySelectorAll('.bar-secondary');
+      if (secondaryEls.length > 0) {
+        const secondaryText = resolveSecondaryInfo(ec, this._hass);
+        for (const el of secondaryEls) el.textContent = secondaryText;
+      }
+
       // Update ARIA + data-state
       row.setAttribute('aria-valuenow', bs.isUnavailable ? '0' : String(bs.numValue));
       row.setAttribute('aria-valuemin', String(bs.min));
       row.setAttribute('aria-valuemax', String(bs.max));
       row.setAttribute('aria-label', `${escapeHtml(bs.name)}: ${escapeHtml(bs.displayValue)}`);
       row.setAttribute('data-state', bs.isUnavailable ? 'unavailable' : String(bs.numValue));
+      if (bs.color) {
+        row.setAttribute('data-severity-color', bs.color);
+      } else {
+        row.removeAttribute('data-severity-color');
+      }
 
       // Update target marker position [US-7]
       /** @type {HTMLElement|null} */

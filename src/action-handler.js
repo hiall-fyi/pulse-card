@@ -56,6 +56,11 @@ function executeAction(element, hass, actionConfig, entityId) {
     case 'url':
       if (actionConfig.url_path) window.open(actionConfig.url_path, '_blank', 'noopener,noreferrer');
       break;
+    case 'toggle':
+      hass.callService('homeassistant', 'toggle', {
+        entity_id: actionConfig.entity || entityId,
+      }).catch((/** @type {*} */ err) => warn('Toggle %s failed: %O', actionConfig.entity || entityId, err));
+      break;
   }
 }
 

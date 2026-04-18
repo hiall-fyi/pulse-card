@@ -95,6 +95,13 @@ export {};
  */
 
 /**
+ * @typedef {object} SecondaryInfoConfig
+ * @property {string} [attribute] - Show this entity attribute's value.
+ * @property {string} [text] - Show static text.
+ * @property {string} [type] - 'last_changed' — show relative time since last state change.
+ */
+
+/**
  * @typedef {object} EntityConfig
  * @property {string} entity
  * @property {string} [name]
@@ -120,6 +127,8 @@ export {};
  * @property {ActionConfig} [double_tap_action]
  * @property {boolean|SparklineConfig} [sparkline]
  * @property {VisibilityConfig} [visibility]
+ * @property {SecondaryInfoConfig} [secondary_info]
+ * @property {Record<string, string>} [state_map]
  */
 
 /**
@@ -158,6 +167,7 @@ export {};
  * @property {string} state
  * @property {Record<string, *>} attributes
  * @property {string} last_updated
+ * @property {string} [last_changed]
  */
 
 /**

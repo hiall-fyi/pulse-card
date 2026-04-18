@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-04-18
+
+**Binary entities, secondary info, and custom state labels**
+
+### Added
+
+- **Binary/switch entity support** — Pulse Card now handles on/off entities natively. Switches, input booleans, locks, covers, and media players display as filled bars with meaningful text ("On", "Off", "Open", "Closed") instead of showing "Unavailable". Severity colors work automatically — set green for on, red for off
+- **Secondary info line** — show extra context below the entity name. Use `secondary_info: { text: "input · drop" }` for static text, `secondary_info: { attribute: "chain" }` to show an entity attribute, or `secondary_info: { type: "last_changed" }` to show when the entity last changed state. Configurable in the visual editor
+- **Custom state labels (`state_map`)** — map state strings to your own display text. Show "Enabled"/"Disabled" instead of "On"/"Off" for firewall rules, or "Armed"/"Disarmed" for alarms
+- **Toggle action** — use `tap_action: { action: toggle }` to toggle switches directly from the card without writing a full `call-service` config
+- **Responsive columns** — multi-column layouts automatically collapse to a single column on narrow screens (under 300px card width), so bars stay readable on phones
+- **Severity data attribute** — each bar row now carries `data-severity-color` with the resolved severity color, so card-mod users can target specific severity states with custom CSS
+
 ## [0.3.2] - 2026-04-14
 
 ### Fixed
