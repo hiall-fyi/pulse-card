@@ -111,12 +111,12 @@ export function cleanupActionListeners(rowEl) {
  * Bind tap, hold, and double-tap listeners to a bar row element.
  * Stores a cleanup function on the element for disconnectedCallback.
  * @param {HTMLElement} rowEl - The .bar-row element.
- * @param {HTMLElement} cardEl - Card root element (for event dispatch).
- * @param {import('./types.js').Hass|null} hass - Home Assistant instance.
+ * @param {{_hass: import('./types.js').Hass|null}} cardEl - Card element with _hass property.
+ * @param {import('./types.js').Hass|null} _hass - Unused (kept for signature compat). Use cardEl._hass instead.
  * @param {import('./types.js').PulseCardConfig} cardConfig - Card-level config.
  * @param {import('./types.js').EntityConfig} entityConfig - Per-entity config.
  */
-export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfig) {
+export function bindActionListeners(rowEl, cardEl, _hass, cardConfig, entityConfig) {
   // Clean up any previous listeners on this element
   cleanupActionListeners(rowEl);
 
@@ -144,7 +144,7 @@ export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfi
   rowEl.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter' || ev.key === ' ') {
       ev.preventDefault();
-      if (hass) handleAction(cardEl, hass, cardConfig, entityConfig, 'tap_action');
+      if (cardEl._hass) handleAction(/** @type {*} */ (cardEl), cardEl._hass, cardConfig, entityConfig, 'tap_action');
     }
   }, { signal });
 
@@ -152,16 +152,17 @@ export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfi
   rowEl.addEventListener('click', (ev) => {
     ev.preventDefault();
     if (held) { held = false; return; }
+    if (/** @type {*} */ (rowEl).__pulseSliding) return;
     clickCount++;
     if (clickCount === 1) {
       clickTimer = setTimeout(() => {
         clickCount = 0;
-        if (hass) handleAction(cardEl, hass, cardConfig, entityConfig, 'tap_action');
+        if (cardEl._hass) handleAction(/** @type {*} */ (cardEl), cardEl._hass, cardConfig, entityConfig, 'tap_action');
       }, DOUBLE_TAP_WINDOW);
     } else if (clickCount === 2) {
       if (clickTimer) clearTimeout(clickTimer);
       clickCount = 0;
-      if (hass) handleAction(cardEl, hass, cardConfig, entityConfig, 'double_tap_action');
+      if (cardEl._hass) handleAction(/** @type {*} */ (cardEl), cardEl._hass, cardConfig, entityConfig, 'double_tap_action');
     }
   }, { signal });
 
@@ -170,7 +171,7 @@ export function bindActionListeners(rowEl, cardEl, hass, cardConfig, entityConfi
     held = false;
     holdTimer = setTimeout(() => {
       held = true;
-      if (hass) handleAction(cardEl, hass, cardConfig, entityConfig, 'hold_action');
+      if (cardEl._hass) handleAction(/** @type {*} */ (cardEl), cardEl._hass, cardConfig, entityConfig, 'hold_action');
     }, HOLD_THRESHOLD);
   }, { signal });
 

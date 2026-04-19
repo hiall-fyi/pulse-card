@@ -165,10 +165,10 @@ function resolveMinMax(entityConfig, entityState) {
   let max = entityConfig.max;
 
   if (min === undefined || min === null) {
-    min = entityState?.attributes?.min ?? DEFAULTS.min;
+    min = entityState?.attributes?.min ?? entityState?.attributes?.min_temp ?? DEFAULTS.min;
   }
   if (max === undefined || max === null) {
-    max = entityState?.attributes?.max ?? DEFAULTS.max;
+    max = entityState?.attributes?.max ?? entityState?.attributes?.max_temp ?? DEFAULTS.max;
   }
 
   return { min: parseFloat(String(min)), max: parseFloat(String(max)) };
@@ -402,8 +402,8 @@ export function normalizeConfig(config) {
   };
 
   // Coerce numeric config values — YAML may deliver strings for number fields
-  if (merged.columns != null) merged.columns = Number(merged.columns) || 1;
-  if (merged.animation.speed != null) merged.animation.speed = Number(merged.animation.speed) || DEFAULTS.animation.speed;
+  if (merged.columns !== null && merged.columns !== undefined) merged.columns = Number(merged.columns) || 1;
+  if (merged.animation.speed !== null && merged.animation.speed !== undefined) merged.animation.speed = Number(merged.animation.speed) || DEFAULTS.animation.speed;
 
   // Pre-sort card-level severity for gradient interpolation
   if (merged.severity) {
@@ -492,21 +492,28 @@ export function resolveBarState(ec, cfg, hass) {
         : formatValue(displayRaw, decimal, unit);
   const name = ec.name ?? state?.attributes?.friendly_name ?? ec.entity;
 
-  // Resolve severity color and icon
+  // Resolve color: state_color (by entity state) → severity (by numeric value) → entity/card color
   let severityColor = '';
   let severityIcon = '';
   if (!isUnavailable) {
-    const sevArray = ec.severity ?? cfg.severity;
-    if (sevArray && sevArray.length > 0) {
-      const isGradient = sevArray.some((s) => s.mode === 'gradient');
-      if (isGradient) {
-        const gradColor = resolveGradientColor(numValue, sevArray);
-        if (gradColor) severityColor = gradColor;
-      } else {
-        const severity = resolveSeverity(numValue, sevArray);
-        if (severity) {
-          severityColor = severity.color;
-          if (severity.icon) severityIcon = severity.icon;
+    // state_color: direct state string → color mapping (takes priority over severity)
+    const stateColorMap = ec.state_color;
+    const entityState = state?.state;
+    if (stateColorMap && entityState && stateColorMap[entityState]) {
+      severityColor = stateColorMap[entityState];
+    } else {
+      const sevArray = ec.severity ?? cfg.severity;
+      if (sevArray && sevArray.length > 0) {
+        const isGradient = sevArray.some((s) => s.mode === 'gradient');
+        if (isGradient) {
+          const gradColor = resolveGradientColor(numValue, sevArray);
+          if (gradColor) severityColor = gradColor;
+        } else {
+          const severity = resolveSeverity(numValue, sevArray);
+          if (severity) {
+            severityColor = severity.color;
+            if (severity.icon) severityIcon = severity.icon;
+          }
         }
       }
     }
@@ -751,6 +758,105 @@ export function evaluateVisibility(ec, hass) {
   return true;
 }
 
+// =====================================================================
+// Slider Mode — utility functions
+// =====================================================================
+
+/**
+ * Slider service mapping per entity domain.
+ * @type {Record<string, {service: string, dataKey: string, transform?: (v: number) => number, fixedRange?: {min: number, max: number, step: number}}>}
+ */
+const SLIDER_SERVICES = {
+  input_number: { service: 'set_value', dataKey: 'value' },
+  number: { service: 'set_value', dataKey: 'value' },
+  light: { service: 'turn_on', dataKey: 'brightness_pct', fixedRange: { min: 0, max: 100, step: 1 } },
+  cover: { service: 'set_cover_position', dataKey: 'position', fixedRange: { min: 0, max: 100, step: 1 } },
+  fan: { service: 'set_percentage', dataKey: 'percentage', fixedRange: { min: 0, max: 100, step: 1 } },
+  media_player: { service: 'volume_set', dataKey: 'volume_level', transform: (v) => v / 100, fixedRange: { min: 0, max: 100, step: 1 } },
+  climate: { service: 'set_temperature', dataKey: 'temperature' },
+};
+
+/**
+ * Snap a value to the nearest valid step increment, clamped to [min, max].
+ * Step is relative to min (e.g. min=5, step=2 → 5, 7, 9, 11...).
+ * @param {number} value - Raw value to snap.
+ * @param {number} min
+ * @param {number} max
+ * @param {number} step - Must be > 0.
+ * @returns {number} Snapped and clamped value.
+ */
+export function snapToStep(value, min, max, step) {
+  if (step <= 0) return clamp(value, min, max);
+  const snapped = Math.round((value - min) / step) * step + min;
+  const decimals = (String(step).split('.')[1] || '').length;
+  const rounded = Number(snapped.toFixed(decimals));
+  return clamp(rounded, min, max);
+}
+
+/**
+ * Resolve the HA service call for a slider value change.
+ * @param {string} entityId
+ * @param {number} value - Snapped slider value.
+ * @param {import('./types.js').InteractiveConfig} [interactiveConfig] - Custom override.
+ * @returns {{domain: string, service: string, data: Record<string, *>}|null}
+ */
+export function resolveSliderService(entityId, value, interactiveConfig) {
+  if (interactiveConfig?.service) {
+    const parts = interactiveConfig.service.split('.');
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    /** @type {Record<string, *>} */
+    const data = { entity_id: entityId };
+    if (interactiveConfig.data) {
+      for (const [k, v] of Object.entries(interactiveConfig.data)) {
+        data[k] = v === '$value' ? value : v;
+      }
+    }
+    return { domain: parts[0], service: parts[1], data };
+  }
+
+  const domain = entityId.split('.')[0];
+  const mapping = SLIDER_SERVICES[domain];
+  if (!mapping) return null;
+
+  const actualValue = mapping.transform ? mapping.transform(value) : value;
+  return {
+    domain,
+    service: mapping.service,
+    data: { entity_id: entityId, [mapping.dataKey]: actualValue },
+  };
+}
+
+/**
+ * Resolve min/max/step for slider interaction from entity state and config.
+ * Fallback chain aligned with resolveMinMax: ec config → entity attributes → domain fixed → defaults.
+ * Supports climate entities (min_temp/max_temp/target_temp_step).
+ * @param {string} entityId
+ * @param {import('./types.js').HassEntityState|null|undefined} state
+ * @param {import('./types.js').InteractiveConfig} [interactiveConfig]
+ * @param {import('./types.js').EntityConfig} [entityConfig] - Entity config for min/max fallback.
+ * @returns {{min: number, max: number, step: number}}
+ */
+export function resolveSliderRange(entityId, state, interactiveConfig, entityConfig) {
+  const domain = entityId.split('.')[0];
+  const mapping = SLIDER_SERVICES[domain];
+  const fixed = mapping?.fixedRange;
+  const attrs = state?.attributes;
+
+  // Min/max: ec config → entity attributes (min, min_temp) → domain fixed → default
+  const min = entityConfig?.min ?? attrs?.min ?? attrs?.min_temp ?? fixed?.min ?? 0;
+  const max = entityConfig?.max ?? attrs?.max ?? attrs?.max_temp ?? fixed?.max ?? 100;
+
+  // Step: interactive config → entity attributes (step, target_temp_step, percentage_step) → domain fixed → default
+  const step = interactiveConfig?.step
+    ?? attrs?.step
+    ?? attrs?.target_temp_step
+    ?? attrs?.percentage_step
+    ?? fixed?.step
+    ?? 1;
+
+  return { min: Number(min), max: Number(max), step: Number(step) || 1 };
+}
+
 /**
  * Format an ISO timestamp as a relative time string (e.g. "5 min ago").
  * @internal
@@ -823,4 +929,5 @@ export const _testExports = {
   resolveBinaryValue,
   formatBinaryDisplay,
   formatRelativeTime,
+  SLIDER_SERVICES,
 };

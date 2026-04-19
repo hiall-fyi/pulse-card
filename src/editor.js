@@ -719,6 +719,24 @@ class PulseCardEditor extends LitElement {
                     @input=${(/** @type {Event} */ ev) => this._entitySecondaryChanged(i, 'attribute', ev)}
                   ></ha-textfield>
                 </div>
+                <div class="entity-row-fields">
+                  <label class="interactive-toggle">
+                    <span>Interactive</span>
+                    <ha-switch
+                      .checked=${!!ec.interactive}
+                      @change=${(/** @type {Event} */ ev) => {
+                        const checked = /** @type {HTMLInputElement} */ (ev.target).checked;
+                        const ents = this._getEntities();
+                        if (checked) {
+                          ents[i] = { ...ents[i], interactive: true };
+                        } else {
+                          delete ents[i].interactive;
+                        }
+                        this._updateEntities(ents);
+                      }}
+                    ></ha-switch>
+                  </label>
+                </div>
               </div>
             `,
           )}
@@ -865,6 +883,15 @@ class PulseCardEditor extends LitElement {
       }
       .sparkline-color {
         margin: 4px 0 16px;
+      }
+      .interactive-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--primary-text-color);
+        cursor: pointer;
+        padding: 4px 0;
       }
     `;
   }

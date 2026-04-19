@@ -242,9 +242,10 @@ export const STYLES = `
     text-overflow: ellipsis;
   }
 
-  /* Inside bar — use white like other inside-bar text */
+  /* Inside bar — inherit text color from parent, reduce opacity */
   .bar-content .bar-secondary {
-    color: var(--pulse-secondary-color, rgba(255, 255, 255, 0.75));
+    color: var(--pulse-secondary-color, inherit);
+    opacity: 0.6;
   }
 
   /* Sparkline overlay [US-1] */
@@ -257,12 +258,60 @@ export const STYLES = `
     z-index: 1;
     pointer-events: none;
     opacity: 0.45;
-    color: var(--pulse-sparkline-color, var(--primary-text-color, #333));
+    color: var(--pulse-sparkline-color, var(--primary-text-color));
   }
   .bar-sparkline path {
     vector-effect: non-scaling-stroke;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+
+  /* Interactive slider bars */
+  .bar-row[data-interactive] .bar-container {
+    touch-action: none;
+    cursor: pointer;
+  }
+  .bar-row[data-interactive].sliding .bar-container {
+    cursor: grabbing;
+  }
+  .bar-row[data-interactive].sliding .bar-fill {
+    transition: none;
+  }
+
+  /* Step buttons for interactive bars */
+  .bar-step-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    min-width: 28px;
+    height: 100%;
+    cursor: pointer;
+    opacity: 0.6;
+    color: var(--primary-text-color);
+    font-size: 18px;
+    font-weight: 500;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+  }
+  .bar-step-btn:hover {
+    opacity: 1;
+  }
+  .bar-step-btn:active {
+    opacity: 0.4;
+  }
+
+  /* Interactive bar row layout — bar-container between step buttons */
+  .bar-row[data-interactive] .bar-interactive-row {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .bar-row[data-interactive] .bar-interactive-row .bar-container {
+    flex: 1;
+    min-width: 0;
   }
 
   /* Compact mode [US-3] */

@@ -102,6 +102,13 @@ export {};
  */
 
 /**
+ * @typedef {object} InteractiveConfig
+ * @property {number} [step] - Override step value.
+ * @property {string} [service] - Custom service (e.g. "climate.set_temperature").
+ * @property {Record<string, *>} [data] - Custom service data. Use "$value" as placeholder for slider value.
+ */
+
+/**
  * @typedef {object} EntityConfig
  * @property {string} entity
  * @property {string} [name]
@@ -129,6 +136,8 @@ export {};
  * @property {VisibilityConfig} [visibility]
  * @property {SecondaryInfoConfig} [secondary_info]
  * @property {Record<string, string>} [state_map]
+ * @property {Record<string, string>} [state_color]
+ * @property {boolean|InteractiveConfig} [interactive]
  */
 
 /**
@@ -157,6 +166,7 @@ export {};
  * @property {ActionConfig} [hold_action]
  * @property {ActionConfig} [double_tap_action]
  * @property {boolean|SparklineConfig} [sparkline]
+ * @property {boolean|InteractiveConfig} [interactive]
  * @property {string} [layout] - 'default' | 'compact'
  * @property {number|string} [font_size] - Base font size for name, value, icon (e.g. 10, '10px')
  */

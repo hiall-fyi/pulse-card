@@ -15,7 +15,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-0.4.0-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.5.0-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 ![Bundle Size](https://img.shields.io/badge/Bundle-%3C50KB-brightgreen?style=for-the-badge)
@@ -55,16 +55,20 @@ The original `bar-card` was delisted from HACS in 2025 after years without maint
 ## Features
 
 - 📊 Horizontal bar for any numeric sensor — temperature, battery, CPU, anything with a number
+- 🔘 Binary entity support — switches, locks, covers, and input booleans display as filled bars with "On"/"Off" text
+- 🎛️ Slider mode — add `interactive: true` and the bar becomes a slider. Tap or drag to set a value. Works with input numbers, lights, covers, fans, media players, and climate entities
 - 📋 Multiple sensors in one card with individual settings per sensor
 - 📉 Sparkline trend line — see recent history behind the bar, no extra card needed
+- 📝 Secondary info — show an attribute, static text, or last-changed time below the entity name
 - 🔀 Reorder entities in the visual editor — move bars up and down without touching YAML
 - 🎨 Auto-color by value range (severity) with smooth gradient option
+- 🏷️ State-based colors — set bar color based on entity state (e.g. grey when off, orange when heating)
 - 🖱️ Visual editor — most settings configurable without touching YAML, including a color picker for bar colors
 - 🎯 Target marker — show a goal line on the bar
 - 📈 Trend arrow — see if a value is going up or down compared to earlier
-- 👆 Tap actions — tap, hold, or double-tap to open details, navigate, or trigger services
+- 👆 Tap actions — tap, hold, double-tap, or toggle to open details, navigate, or trigger services
 - ⚡ Charge animation effect
-- 📐 Multi-column grid layout
+- 📐 Multi-column grid layout with responsive collapse on narrow screens
 - 👁️ Conditional visibility — show bars only when they meet a condition (e.g. CPU > 80%)
 - 📦 Compact mode — tighter spacing for dense dashboards
 - 🔲 Works in Sections view, Masonry view, and inside entities cards
@@ -390,9 +394,96 @@ What happens when you interact with a bar.
 | `hold_action` | `none` | Long press |
 | `double_tap_action` | `none` | Double tap |
 
-Available actions: `more-info`, `navigate`, `call-service`, `url`, `none`
+Available actions: `more-info`, `navigate`, `call-service`, `url`, `toggle`, `none`
 
 Each entity in a multi-entity card can have its own tap actions.
+
+### Slider Mode
+
+Turn any bar into an interactive slider. Tap anywhere to jump to a value, or drag to fine-tune it.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `interactive` | boolean/object | `false` | `true` to enable with auto-detected service, or an object for custom control |
+| `interactive.step` | number | auto | Override the step increment (e.g. `0.5` for half-degree steps) |
+| `interactive.service` | string | auto | Custom service call (e.g. `climate.set_temperature`) |
+| `interactive.data` | object | auto | Custom service data. Use `$value` as a placeholder for the slider value |
+
+Set `interactive: true` at the card level to make all entities interactive, or per-entity for a mix of read-only and interactive bars.
+
+Supported entity types (auto-detected): `input_number`, `number`, `light` (brightness), `cover` (position), `fan` (percentage), `media_player` (volume), `climate` (target temperature).
+
+```yaml
+# Simple — auto-detect everything
+type: custom:pulse-card
+interactive: true
+entities:
+  - entity: input_number.heating_threshold
+  - entity: number.lcd_brightness
+
+# Climate — point at the temperature attribute
+- entity: climate.living_room
+  attribute: temperature
+  interactive: true
+
+# Custom service override
+- entity: climate.living_room
+  attribute: temperature
+  interactive:
+    service: climate.set_temperature
+    data:
+      temperature: "$value"
+```
+
+### Secondary Info
+
+Show a second line of text below the entity name — an attribute value, static text, or when the entity last changed.
+
+| Option | Type | Description |
+|---|---|---|
+| `secondary_info.text` | string | Static text (e.g. `"input · drop"`) |
+| `secondary_info.attribute` | string | Show an entity attribute value (e.g. `hvac_action`) |
+| `secondary_info.type` | string | `last_changed` — show relative time since last state change |
+
+Priority when multiple are set: `text` > `attribute` > `type`.
+
+```yaml
+- entity: climate.dining
+  name: Dining
+  secondary_info:
+    attribute: hvac_action    # shows "heating", "idle", or "off"
+```
+
+### Custom State Labels
+
+Map entity state strings to custom display text.
+
+| Option | Type | Description |
+|---|---|---|
+| `state_map` | object | Map state strings to display labels |
+
+```yaml
+- entity: switch.firewall_rule
+  state_map:
+    'on': Enabled
+    'off': Disabled
+```
+
+### State-Based Colors
+
+Set bar color based on the entity's state string, independent of the numeric value. Takes priority over severity.
+
+| Option | Type | Description |
+|---|---|---|
+| `state_color` | object | Map state strings to bar colors |
+
+```yaml
+- entity: climate.dining
+  attribute: temperature
+  state_color:
+    'off': '#546E7A'     # grey when HVAC is off
+    'heat': '#FFA726'    # orange when heating
+```
 
 ---
 
@@ -823,6 +914,7 @@ Fine-tune the card's appearance using CSS custom properties. Set them via `card-
 | `--pulse-indicator-color` | Indicator arrow color (overrides directional colors) | Auto (green/red by direction) |
 | `--pulse-track-opacity` | Bar track background opacity | `0.12` |
 | `--pulse-sparkline-color` | Sparkline line color | `--primary-text-color` |
+| `--pulse-secondary-color` | Secondary info text color | `--secondary-text-color` (outside), inherited (inside) |
 | `--pulse-font-size` | Base font size for name, value, icon | `14px` (auto-scales inside bars) |
 
 ```yaml
@@ -840,7 +932,12 @@ card_mod:
 
 ### Data Attributes for card-mod
 
-Each bar row exposes a `data-state` attribute with the current numeric value (or `"unavailable"`). You can use this with card-mod to style bars based on their state:
+Each bar row exposes data attributes you can target with card-mod:
+
+- `data-state` — the current numeric value (or `"unavailable"`)
+- `data-entity` — the entity ID
+- `data-severity-color` — the resolved severity/state color (e.g. `"#4CAF50"`)
+- `data-interactive` — present when the bar is in slider mode
 
 ```yaml
 type: custom:pulse-card
@@ -850,14 +947,19 @@ card_mod:
     .bar-row[data-state="unavailable"] {
       opacity: 0.3;
     }
+    .bar-row[data-severity-color="#F44336"] {
+      /* extra styling for red severity bars */
+    }
 ```
 
 ---
 
 ## Known Limitations
 
-- Per-entity severity ranges are YAML-only — severity involves arrays of value ranges with colors and optional icons, which doesn't map well to a simple editor form. The visual editor handles per-entity name and color
+- Per-entity severity ranges are YAML-only — severity involves arrays of value ranges with colors and optional icons, which doesn't map well to a simple editor form. The visual editor handles per-entity name, color, secondary info, and interactive toggle
+- `state_map`, `state_color`, and `secondary_info.type` are YAML-only — the editor supports secondary info text and attribute fields
 - Conditional visibility is YAML-only — conditions are per-entity with multiple possible operators (above, below, equal, not equal) that combine with AND logic. Better expressed in YAML than a form
+- Slider mode with `complementary` is not supported — if both are set, `interactive` takes priority
 - The color picker uses your browser's native picker, which only supports solid hex colors. For rgba() with transparency or CSS variables, type the value directly in the text field
 - Sparkline and the trend indicator both need the HA recorder component to be enabled (it is by default)
 - `width`, `saturation`, `hue`, and `entity_config` from bar-card are not supported

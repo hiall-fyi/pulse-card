@@ -7,6 +7,7 @@
 import { STYLES } from './styles.js';
 import { VERSION, DEFAULTS } from './constants.js';
 import { bindActionListeners, cleanupActionListeners } from './action-handler.js';
+import { bindSliderListeners, cleanupSliderListeners } from './slider-handler.js';
 import {
   clamp,
   computeBarWidthScale,
@@ -99,6 +100,7 @@ class PulseCard extends HTMLElement {
     const rows = this._shadow.querySelectorAll('.bar-row');
     for (const row of rows) {
       cleanupActionListeners(/** @type {HTMLElement} */ (row));
+      cleanupSliderListeners(/** @type {HTMLElement} */ (row));
     }
   }
 
@@ -255,7 +257,7 @@ class PulseCard extends HTMLElement {
     // Sparkline [US-1]
     const sparklineHtml = this._buildSparklineHtml(ec, cfg);
 
-    const barHtml = `
+    const barContainerHtml = `
       <div class="bar-container" style="height:${height};border-radius:${borderRadius};--pulse-animation-speed:${animSpeed}s;">
         <div class="bar-track"></div>
         ${sparklineHtml}
@@ -264,15 +266,24 @@ class PulseCard extends HTMLElement {
         ${contentHtml}
       </div>`;
 
-    // ARIA [NFR-4]
+    // ARIA [NFR-4] — use role="slider" for interactive bars
+    const isInteractive = !!(ec.interactive ?? cfg.interactive);
+
+    // Wrap bar-container with step buttons for interactive bars
+    const barHtml = isInteractive
+      ? `<div class="bar-interactive-row"><div class="bar-step-btn" data-step="-1" role="button" aria-label="Decrease">−</div>${barContainerHtml}<div class="bar-step-btn" data-step="1" role="button" aria-label="Increase">+</div></div>`
+      : barContainerHtml;
+
+    const ariaRole = isInteractive ? 'slider' : 'progressbar';
     const ariaAttrs = bs.isUnavailable
-      ? `role="progressbar" aria-valuenow="0" aria-valuemin="${bs.min}" aria-valuemax="${bs.max}" aria-label="${escapeHtml(bs.name)}: Unavailable"`
-      : `role="progressbar" aria-valuenow="${bs.numValue}" aria-valuemin="${bs.min}" aria-valuemax="${bs.max}" aria-label="${escapeHtml(bs.name)}: ${escapeHtml(bs.displayValue)}"`;
+      ? `role="${ariaRole}" aria-valuenow="0" aria-valuemin="${bs.min}" aria-valuemax="${bs.max}" aria-label="${escapeHtml(bs.name)}: Unavailable"`
+      : `role="${ariaRole}" aria-valuenow="${bs.numValue}" aria-valuemin="${bs.min}" aria-valuemax="${bs.max}" aria-label="${escapeHtml(bs.name)}: ${escapeHtml(bs.displayValue)}"`;
 
     const unavailClass = bs.isUnavailable ? ' unavailable' : '';
+    const interactiveAttr = isInteractive ? ' data-interactive' : '';
     const stateAttr = bs.isUnavailable ? 'data-state="unavailable"' : `data-state="${escapeHtml(bs.numValue)}"`;
     const severityAttr = bs.color ? ` data-severity-color="${escapeHtml(bs.color)}"` : '';
-    return `<div class="bar-row${unavailClass}" data-entity="${escapeHtml(ec.entity)}" ${stateAttr}${severityAttr} ${ariaAttrs}>${labelsHtml}${barHtml}</div>`;
+    return `<div class="bar-row${unavailClass}" data-entity="${escapeHtml(ec.entity)}"${interactiveAttr} ${stateAttr}${severityAttr} ${ariaAttrs}>${labelsHtml}${barHtml}</div>`;
   }
 
   /**
@@ -367,6 +378,9 @@ class PulseCard extends HTMLElement {
       const barWidthScale = computeBarWidthScale(ec, cfg);
       const row = this._elements.rows?.[ec.entity];
       if (!row) continue;
+
+      // Skip update during active slider drag — optimistic UI takes priority
+      if (/** @type {*} */ (row).__pulseSliding) continue;
 
       // Visibility toggle [US-2]
       const visible = evaluateVisibility(ec, this._hass);
@@ -706,7 +720,13 @@ class PulseCard extends HTMLElement {
       if (entity) {
         this._elements.rows[entity] = row;
         const ec = entityMap.get(entity);
-        if (ec) bindActionListeners(row, this, this._hass, cfg, ec);
+        if (ec) {
+          bindActionListeners(row, this, this._hass, cfg, ec);
+          const interactiveCfg = ec.interactive ?? cfg.interactive;
+          if (interactiveCfg) {
+            bindSliderListeners(row, this, cfg, ec);
+          }
+        }
       }
     }
   }

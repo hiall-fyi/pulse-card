@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-04-19
+
+**Slider mode, step buttons, and state-based colors**
+
+### Added
+
+- **Slider mode** ([#2](https://github.com/hiall-fyi/pulse-card/issues/2), [Discussion #19](https://github.com/hiall-fyi/pulse-card/discussions/19) - @ChrisMarriott38) — add `interactive: true` to any entity and the bar becomes a slider. Tap anywhere to jump to a value, or drag to fine-tune it. Works with input numbers, number helpers, lights (brightness), covers (position), fans (speed), media players (volume), and climate entities (target temperature). Min, max, and step are picked up from the entity automatically
+- **Step buttons** ([Discussion #19](https://github.com/hiall-fyi/pulse-card/discussions/19) - @ChrisMarriott38) — interactive bars now have − and + buttons on each side for precise adjustments. Tap for a single step, hold to repeat. Step size follows the entity's attributes (e.g. 0.5°C for Tado TRVs) or your `interactive: { step: 0.5 }` override
+- **State-based bar colors (`state_color`)** — set bar colors based on the entity's state string, independent of the numeric value. Useful for climate entities where you want "off" zones greyed out while active zones keep their severity colors
+- **Custom service override** — for entity types not in the built-in list, you can specify the service call directly: `interactive: { service: "climate.set_temperature", data: { temperature: "$value" } }`
+
+### Improved
+
+- **Climate entity support** — bars for climate entities now correctly use `min_temp` and `max_temp` from the entity attributes for the fill range. The slider auto-detects `climate.set_temperature` and reads `target_temp_step` for the step size
+- **Secondary info readability** — the secondary text inside colored bars now inherits the parent text color instead of using hardcoded white, so it's readable in both light and dark themes
+- **Sparkline color** — removed a hardcoded dark fallback color that could make sparklines invisible on dark themes
+
+### Fixed
+
+- **Actions always use the latest entity state** — tap, hold, double-tap, and slider interactions now read the current Home Assistant state at the moment you interact, not a stale snapshot from when the card first loaded
+
 ## [0.4.0] - 2026-04-18
 
 **Binary entities, secondary info, and custom state labels**
