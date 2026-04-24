@@ -41,6 +41,8 @@ export const STYLES = `
     flex-direction: column;
     gap: 6px;
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -121,7 +123,7 @@ export const STYLES = `
     font-size: var(--pulse-font-size, clamp(10px, 40cqh, 16px));
   }
 
-  /* Target marker — visually distinct from fill [AC-7.3] */
+  /* Target marker — visually distinct from fill */
   .bar-target {
     position: absolute;
     top: -1px;
@@ -135,7 +137,7 @@ export const STYLES = `
     box-shadow: 0 0 0 1px var(--card-background-color, rgba(255,255,255,0.8));
   }
 
-  /* Target label [AC-7.4] */
+  /* Target label */
   .bar-target-label {
     position: absolute;
     top: -18px;
@@ -169,6 +171,9 @@ export const STYLES = `
     font-size: var(--pulse-font-size, 14px);
     color: var(--pulse-icon-color, var(--secondary-text-color));
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    line-height: 0;
   }
   .bar-content .bar-icon {
     color: var(--pulse-icon-color, var(--pulse-name-color, var(--primary-text-color)));
@@ -208,7 +213,7 @@ export const STYLES = `
   }
 
   /* Hover feedback */
-  .bar-row:active {
+  .bar-row:not(.has-ripple):active {
     opacity: 0.8;
   }
   @media (hover: hover) {
@@ -248,7 +253,7 @@ export const STYLES = `
     opacity: 0.6;
   }
 
-  /* Sparkline overlay [US-1] */
+  /* Sparkline overlay */
   .bar-sparkline {
     position: absolute;
     left: 0;
@@ -294,12 +299,14 @@ export const STYLES = `
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
     transition: opacity 0.15s;
   }
   .bar-step-btn:hover {
     opacity: 1;
   }
-  .bar-step-btn:active {
+  .bar-step-btn:not(.has-ripple):active {
     opacity: 0.4;
   }
 
@@ -314,7 +321,7 @@ export const STYLES = `
     min-width: 0;
   }
 
-  /* Compact mode [US-3] */
+  /* Compact mode */
   ha-card:has(.compact) {
     padding: 10px;
   }
@@ -335,5 +342,11 @@ export const STYLES = `
   }
   .compact .bar-indicator {
     font-size: 10px;
+  }
+
+  /* Reduced motion — respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .bar-fill.charge { animation: none; }
+    .bar-fill, .bar-row { transition: none; }
   }
 `;

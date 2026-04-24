@@ -1,6 +1,6 @@
 {
   "name": "pulse-card",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Compact horizontal bar chart card for Home Assistant sensor data visualization",
   "author": "hiall-fyi",
@@ -11,7 +11,9 @@
   },
   "type": "module",
   "scripts": {
-    "build": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify --external:./editor.js && esbuild src/editor.js --bundle --outfile=dist/editor.js --format=esm --minify",
+    "build": "npm run build:pulse-card && npm run build:pulse-switch",
+    "build:pulse-card": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify --external:./pulse-card-editor.js --external:./pulse-climate-editor.js && esbuild src/pulse-card-editor.js --bundle --outfile=dist/pulse-card-editor.js --format=esm --minify && esbuild src/pulse-climate/pulse-climate-editor.js --bundle --outfile=dist/pulse-climate-editor.js --format=esm --minify",
+    "build:pulse-switch": "esbuild src/pulse-switch/pulse-switch-card.js --bundle --outfile=dist/pulse-switch-card.js --format=esm --minify --external:./editor.js && node -e \"const f='dist/pulse-switch-card.js';require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace('./editor.js','./pulse-switch-editor.js'))\" && esbuild src/pulse-switch/editor.js --bundle --outfile=dist/pulse-switch-editor.js --format=esm --minify",
     "dev": "esbuild src/pulse-card.js --bundle --outfile=dist/pulse-card.js --format=esm --watch --external:./editor.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",

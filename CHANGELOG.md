@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] - 2026-04-24
+
+**Pulse Climate Card — your climate dashboard in one card.**
+
+This release introduces Pulse Climate Card alongside Pulse Card. Both cards ship in a single install and share the same Pulse DNA — clean typography, HA theme integration, and a visual editor — but each has its own personality. Pulse Card is minimal and compact. Pulse Climate Card is expressive and data-rich, with glowing power bars, animated energy flow with particles, heat shimmer, frosted glass panels, and a radial thermal compass.
+
+### Pulse Climate Card (New)
+
+- **Your whole climate system at a glance** — see every zone's temperature, target, humidity, HVAC status, and heating power on one card. Works with any thermostat — Tado, Ecobee, Nest, or a generic `climate.*` entity
+- **14 ways to visualise your data** — pick from zones, temperature graph, radial thermal compass, energy flow animation, thermal strip, comfort heatmap, donut chart, and seven Tado CE sections. Drag them into any order you like
+- **Tado CE? Zero setup** — the card scans for your Tado CE sensors and fills in mold risk, comfort levels, open window alerts, battery status, and more. You don't configure anything — it just appears
+- **Tap and drag to set temperature** — turn on the interactive slider and adjust your target temperature right from the card. Tap to jump, drag to fine-tune
+- **Three sparkline styles** — a subtle overlay behind the gauge, a prominent filled chart below the header, or the full pulse mode where the waveform becomes the zone's background and active zones glow
+- **Energy flow with particle animation** — watch tiny dots travel along the energy flow lines from your boiler to each zone. Particle size and speed scale with heating power — busier zones get bigger, faster particles
+- **Heat shimmer on high-power zones** — in the radial view, zones heating above 50% show a subtle wavy distortion on their arcs, like hot air rising
+- **Frosted glass panels** — the radial center display, zone detail panels, and tooltips use a frosted glass effect. You can customise the blur and background colour — see the [Configuration Guide](CLIMATE_CARD_GUIDE.md#css-custom-properties)
+- **Temperature change flash** — when a zone's temperature changes, its power bar and radial arc briefly flash brighter, so you can spot changes at a glance
+- **Respects reduced motion** — if you have "reduce motion" enabled in your OS settings, all animations are disabled automatically. No config needed
+- **Works on light and dark themes** — all colours, glows, and effects look right on any HA theme
+- **Visual editor** — add zones, pick sections from grouped panels, and tweak settings like graph hours and outside temperature entity — all without touching YAML
+- **Tap, hold, and double-tap** — every zone row and chip responds to your touch. Tap a chip to open its source entity, hold a zone to navigate somewhere, or double-tap for a custom action
+- **Full configuration guide** — everything you need is in [CLIMATE_CARD_GUIDE.md](CLIMATE_CARD_GUIDE.md)
+
+### Pulse Card
+
+- **Build your own labels with templates** — use `{attribute_name}` placeholders in secondary info to show dynamic text from entity attributes. `{bytes}` and `{packets}` are automatically formatted as human-readable numbers. Set it once at card level and every entity inherits the same format
+- **Auto-color bars by attribute** — set `attribute_color` at card level to colour bars based on an entity attribute. Map firewall `action: drop` to red and `action: accept` to green — every entity picks up its colour automatically
+- **Card-level secondary info default** — set `secondary_info` once and all entities inherit it. Per-entity overrides still work when you need something different
+- **Icons sit where they should** ([#24](https://github.com/hiall-fyi/pulse-card/issues/24) - @ChrisMarriott38) — icons inside and outside bars are now properly centred with the text
+- **Card-level min/max now works** ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @Si-Hill) — setting min and max in the Bar Limits section now applies to all bars as expected. Previously only per-entity min/max worked
+- **Tap feedback** — bar rows now show a ripple effect when you tap them, matching the feel of built-in HA cards
+- **Full configuration guide** — moved to [PULSE_CARD_GUIDE.md](PULSE_CARD_GUIDE.md). The README is now a concise landing page for both cards
+
+### Under the Hood
+
+- **Faster dashboard loads** — editor code only loads when you open the editor, so the cards themselves are lighter
+- **Shared foundations** — both cards share the same action handling and editor helpers, so they behave the same way everywhere
+
 ## [0.5.0] - 2026-04-19
 
 **Slider mode, step buttons, and state-based colors**

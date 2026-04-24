@@ -8,6 +8,7 @@ import { STYLES } from './styles.js';
 import { VERSION, DEFAULTS } from './constants.js';
 import { bindActionListeners, cleanupActionListeners } from './action-handler.js';
 import { bindSliderListeners, cleanupSliderListeners } from './slider-handler.js';
+import { attachRipple } from './shared/ripple.js';
 import {
   clamp,
   computeBarWidthScale,
@@ -105,7 +106,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Validate and store config. Throws on invalid. [CP-4, AC-12.15]
+   * Validate and store config. Throws on invalid.
    * @param {Record<string, *>} config
    */
   setConfig(config) {
@@ -123,7 +124,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Called by HA on every state change. Differential update. [NFR-1]
+   * Called by HA on every state change. Differential update.
    * @param {Hass} hass
    */
   set hass(hass) {
@@ -138,7 +139,7 @@ class PulseCard extends HTMLElement {
         needsRender = true;
         break;
       }
-      // Check if target entity state changed [AC-7.1]
+      // Check if target entity state changed
       const targetCfg = ec.target ?? this._cfg.target;
       if (typeof targetCfg === 'string') {
         const tState = hass.states[targetCfg];
@@ -198,7 +199,7 @@ class PulseCard extends HTMLElement {
     this._elements.container = this._shadow.querySelector('.pulse-card');
     this._cacheBarElements();
 
-    // Apply initial visibility [US-2]
+    // Apply initial visibility
     for (const ec of cfg.entities) {
       const row = /** @type {HTMLElement|undefined} */ (this._elements.rows?.[ec.entity]);
       if (row) row.style.display = evaluateVisibility(ec, this._hass) ? '' : 'none';
@@ -206,7 +207,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Render a single bar row HTML string. [US-1, AC-1.1–1.4]
+   * Render a single bar row HTML string.
    * @param {EntityConfig} ec - Entity config.
    * @returns {string} HTML string.
    */
@@ -251,10 +252,10 @@ class PulseCard extends HTMLElement {
     const scaledFill = bs.fill * barWidthScale;
     const fillDim = `width:${scaledFill}%;${transitionStyle}${fillStyle}`;
 
-    // Target marker [US-7]
+    // Target marker
     const targetHtml = this._buildTargetHtml(ec, cfg, bs.min, bs.max);
 
-    // Sparkline [US-1]
+    // Sparkline
     const sparklineHtml = this._buildSparklineHtml(ec, cfg);
 
     const barContainerHtml = `
@@ -266,7 +267,7 @@ class PulseCard extends HTMLElement {
         ${contentHtml}
       </div>`;
 
-    // ARIA [NFR-4] — use role="slider" for interactive bars
+    // ARIA — use role="slider" for interactive bars
     const isInteractive = !!(ec.interactive ?? cfg.interactive);
 
     // Wrap bar-container with step buttons for interactive bars
@@ -347,7 +348,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Build target marker HTML. [US-7, AC-7.1–7.4]
+   * Build target marker HTML.
    * @param {EntityConfig} ec
    * @param {NormalizedConfig} cfg
    * @param {number} min
@@ -369,7 +370,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Differential update — only change fill width, value text, color, icon. [NFR-1]
+   * Differential update — only change fill width, value text, color, icon.
    */
   _updateBars() {
     const cfg = this._cfg;
@@ -382,7 +383,7 @@ class PulseCard extends HTMLElement {
       // Skip update during active slider drag — optimistic UI takes priority
       if (/** @type {*} */ (row).__pulseSliding) continue;
 
-      // Visibility toggle [US-2]
+      // Visibility toggle
       const visible = evaluateVisibility(ec, this._hass);
       /** @type {HTMLElement} */ (row).style.display = visible ? '' : 'none';
       if (!visible) continue;
@@ -433,7 +434,7 @@ class PulseCard extends HTMLElement {
         row.removeAttribute('data-severity-color');
       }
 
-      // Update target marker position [US-7]
+      // Update target marker position
       /** @type {HTMLElement|null} */
       const targetEl = /** @type {HTMLElement|null} */ (row.querySelector('.bar-target'));
       const targetCfg = ec.target ?? cfg.target;
@@ -453,7 +454,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Schedule indicator data fetch with debounce. [US-16]
+   * Schedule indicator data fetch with debounce.
    */
   _scheduleIndicatorFetch() {
     const cfg = this._cfg;
@@ -470,7 +471,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Fetch history data and update indicator elements. [US-16, AC-16.1–16.5]
+   * Fetch history data and update indicator elements.
    * Uses a single batch WS call for all indicator entities.
    */
   async _fetchIndicators() {
@@ -531,7 +532,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Resolve sparkline config for an entity. [US-1]
+   * Resolve sparkline config for an entity.
    * Returns a fully-resolved config with all defaults applied, or null if disabled.
    * @param {EntityConfig} ec
    * @param {NormalizedConfig} cfg
@@ -557,7 +558,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Build sparkline SVG HTML for a bar row. [US-1, AC-1.4]
+   * Build sparkline SVG HTML for a bar row.
    * @param {EntityConfig} ec
    * @param {NormalizedConfig} cfg
    * @returns {string}
@@ -577,7 +578,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Schedule sparkline data fetch with interval gating. [US-1, AC-1.11]
+   * Schedule sparkline data fetch with interval gating.
    */
   _scheduleSparklineFetch() {
     const cfg = this._cfg;
@@ -604,7 +605,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Fetch sparkline history data and update SVG paths. [US-1, AC-1.2]
+   * Fetch sparkline history data and update SVG paths.
    */
   async _fetchSparklines() {
     const cfg = this._cfg;
@@ -636,7 +637,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Update sparkline SVG path elements in the DOM. [US-1, AC-1.8]
+   * Update sparkline SVG path elements in the DOM.
    * Creates SVG elements if they don't exist yet (first fetch after render).
    */
   _updateSparklines() {
@@ -727,12 +728,17 @@ class PulseCard extends HTMLElement {
             bindSliderListeners(row, this, cfg, ec);
           }
         }
+        attachRipple(row);
+        // Attach ripple to step buttons
+        for (const btn of row.querySelectorAll('.bar-step-btn')) {
+          attachRipple(/** @type {HTMLElement} */ (btn));
+        }
       }
     }
   }
 
   /**
-   * Return card height for masonry view. [US-11, AC-11.4]
+   * Return card height for masonry view.
    * @returns {number}
    */
   getCardSize() {
@@ -743,7 +749,7 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Return grid sizing for sections view. [US-11, AC-11.1–11.3]
+   * Return grid sizing for sections view.
    * @returns {object}
    */
   getGridOptions() {
@@ -754,17 +760,17 @@ class PulseCard extends HTMLElement {
   }
 
   /**
-   * Return editor custom element for visual editor. [US-4, AC-4.1]
+   * Return editor custom element for visual editor.
    * Lazy-loads editor.js (and lit dependency) on first editor open.
    * @returns {Promise<HTMLElement>}
    */
   static async getConfigElement() {
-    await import('./editor.js');
+    await import('./pulse-card-editor.js');
     return document.createElement('pulse-card-editor');
   }
 
   /**
-   * Return stub config for card picker. [AC-4.6, AC-12.13]
+   * Return stub config for card picker.
    * @param {Hass} hass
    * @returns {object}
    */
@@ -777,12 +783,12 @@ class PulseCard extends HTMLElement {
   }
 }
 
-// Register custom element [AC-12.12]
+// Register custom element
 if (!customElements.get('pulse-card')) {
   customElements.define('pulse-card', PulseCard);
 }
 
-// Register in card picker [AC-12.12, AC-12.13]
+// Register in card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'pulse-card',
@@ -797,5 +803,8 @@ console.info(
   'background:#03A9F4;color:white;font-weight:bold',
   'background:#333;color:white',
 );
+
+// Bundle Pulse Climate Card into the same file
+import './pulse-climate/pulse-climate-card.js';
 
 export default PulseCard;

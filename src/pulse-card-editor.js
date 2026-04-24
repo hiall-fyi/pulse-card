@@ -4,11 +4,11 @@
  * supporting multi-entity configuration with dynamic add/remove.
  * Uses ha-form for card settings + ha-entity-picker for entity list.
  * Pattern follows Mushroom Cards + HA Core entities card editor.
- * [US-4, AC-4.1]
  */
 
 import { LitElement, html, css, nothing } from 'lit';
 import { DEFAULTS } from './constants.js';
+import { loadEditorHelpers, renderReorderButtons, computeLabel } from './shared/editor-helpers.js';
 
 /** Default swatch color — resolves HA theme primary text color, falls back to HA blue. */
 function getDefaultSwatch() {
@@ -211,29 +211,10 @@ class PulseCardEditor extends LitElement {
     };
   }
 
-  /**
-   * Ensure HA lazy-loaded components (ha-entity-picker, etc.) are available.
-   * HA frontend lazy-loads these components — they are not registered until
-   * a built-in card editor triggers their load. We force this by creating
-   * an entities card element and requesting its config element, which
-   * pulls in ha-entity-picker as a dependency.
-   * Pattern from thomasloven's ScopedRegistry gist.
-   */
   async connectedCallback() {
     super.connectedCallback();
     if (this._helpersLoaded) return;
-    if (!window.loadCardHelpers) return;
-    try {
-      const helpers = await window.loadCardHelpers();
-      this._helpersLoaded = true;
-      const entitiesCard = await helpers.createCardElement({
-        type: 'entities',
-        entities: [],
-      });
-      entitiesCard.constructor.getConfigElement();
-    } catch (err) {
-      console.warn('Pulse Card: failed to load card helpers:', err);
-    }
+    this._helpersLoaded = await loadEditorHelpers('Pulse Card:');
   }
 
   /**
@@ -577,7 +558,7 @@ class PulseCardEditor extends LitElement {
    * @returns {string}
    */
   _computeLabel(schema) {
-    return schema.label || schema.name || '';
+    return computeLabel(schema);
   }
 
   render() {
@@ -665,28 +646,11 @@ class PulseCardEditor extends LitElement {
                     allow-custom-entity
                     @value-changed=${(/** @type {CustomEvent} */ ev) => this._entityChanged(i, ev)}
                   ></ha-entity-picker>
-                  ${entities.length > 1 ? html`
-                    <ha-icon-button
-                      .label=${'Move up'}
-                      .path=${'M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z'}
-                      class="move-icon"
-                      .disabled=${i === 0}
-                      @click=${() => this._moveEntity(i, -1)}
-                    ></ha-icon-button>
-                    <ha-icon-button
-                      .label=${'Move down'}
-                      .path=${'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z'}
-                      class="move-icon"
-                      .disabled=${i === entities.length - 1}
-                      @click=${() => this._moveEntity(i, 1)}
-                    ></ha-icon-button>
-                  ` : nothing}
-                  <ha-icon-button
-                    .label=${'Remove'}
-                    .path=${'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z'}
-                    class="remove-icon"
-                    @click=${() => this._removeEntity(i)}
-                  ></ha-icon-button>
+                  ${renderReorderButtons(
+                    i, entities.length,
+                    (idx, dir) => this._moveEntity(idx, dir),
+                    (idx) => this._removeEntity(idx),
+                  )}
                 </div>
                 <div class="entity-row-fields">
                   <ha-textfield

@@ -98,6 +98,7 @@ export {};
  * @typedef {object} SecondaryInfoConfig
  * @property {string} [attribute] - Show this entity attribute's value.
  * @property {string} [text] - Show static text.
+ * @property {string} [template] - Interpolate {attribute_name} placeholders from entity attributes. bytes/packets auto-format as K/M/G.
  * @property {string} [type] - 'last_changed' — show relative time since last state change.
  */
 
@@ -137,6 +138,7 @@ export {};
  * @property {SecondaryInfoConfig} [secondary_info]
  * @property {Record<string, string>} [state_map]
  * @property {Record<string, string>} [state_color]
+ * @property {AttributeColorConfig} [attribute_color]
  * @property {boolean|InteractiveConfig} [interactive]
  */
 
@@ -169,6 +171,14 @@ export {};
  * @property {boolean|InteractiveConfig} [interactive]
  * @property {string} [layout] - 'default' | 'compact'
  * @property {number|string} [font_size] - Base font size for name, value, icon (e.g. 10, '10px')
+ * @property {SecondaryInfoConfig} [secondary_info] - Card-level default secondary info for all entities.
+ * @property {AttributeColorConfig} [attribute_color] - Card-level default attribute-to-color mapping.
+ */
+
+/**
+ * @typedef {object} AttributeColorConfig
+ * @property {string} attribute - Entity attribute name to read value from.
+ * @property {Record<string, string>} map - Attribute value → color mapping.
  */
 
 /**

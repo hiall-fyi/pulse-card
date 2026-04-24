@@ -5,6 +5,9 @@
  */
 
 import { DEFAULTS, LOG_PREFIX } from './constants.js';
+// Re-export shared utilities for backward compatibility
+export { escapeHtml, sanitizeCssValue, clamp, cssValue } from './shared/utils.js';
+import { clamp } from './shared/utils.js';
 
 /** Known HA active/truthy states — O(1) Set lookup. */
 const BINARY_ACTIVE = new Set(['on', 'open', 'home', 'locked', 'playing', 'active']);
@@ -40,19 +43,10 @@ function formatBinaryDisplay(value, unit) {
   return unit ? `${capitalised}${unit}` : capitalised;
 }
 
-/**
- * Clamp a value between min and max.
- * @param {number} value
- * @param {number} min
- * @param {number} max
- * @returns {number}
- */
-export function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
+// clamp() is imported from shared/utils.js and re-exported above
 
 /**
- * Compute bar fill percentage. [CP-1]
+ * Compute bar fill percentage.
  * @internal
  * @param {*} value - Raw state value (will be parsed).
  * @param {number} min
@@ -71,7 +65,7 @@ function computeFill(value, min, max, complementary = false) {
 }
 
 /**
- * Resolve the first matching severity entry. [CP-2]
+ * Resolve the first matching severity entry.
  * @internal
  * @param {*} value
  * @param {import('./types.js').SeverityEntry[]} severityArray
@@ -153,16 +147,18 @@ function resolveGradientColor(value, severityArray) {
 }
 
 /**
- * Resolve min/max from entity config and entity state attributes. [US-14]
+ * Resolve min/max from entity config, card config, and entity state attributes.
+ * Fallback chain: per-entity config → card-level config → entity attributes → DEFAULTS.
  * Explicit config always overrides entity attributes.
  * @internal
  * @param {import('./types.js').EntityConfig} entityConfig
  * @param {import('./types.js').HassEntityState|null|undefined} entityState - HA entity state object.
+ * @param {Record<string, *>} [cardConfig] - Card-level config for fallback.
  * @returns {{min:number, max:number}}
  */
-function resolveMinMax(entityConfig, entityState) {
-  let min = entityConfig.min;
-  let max = entityConfig.max;
+function resolveMinMax(entityConfig, entityState, cardConfig) {
+  let min = entityConfig.min ?? cardConfig?.min;
+  let max = entityConfig.max ?? cardConfig?.max;
 
   if (min === undefined || min === null) {
     min = entityState?.attributes?.min ?? entityState?.attributes?.min_temp ?? DEFAULTS.min;
@@ -198,6 +194,19 @@ export function resolveUnit(ec, state) {
 }
 
 /**
+ * Format a large number for human-readable display (K/M/G suffixes).
+ * @param {number} num
+ * @returns {string}
+ */
+export function formatLargeNumber(num) {
+  if (!isFinite(num) || num < 0) return '0';
+  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}G`;
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  return num.toString();
+}
+
+/**
  * Format a numeric value with optional decimals and unit.
  * @internal
  * @param {*} value
@@ -216,7 +225,7 @@ function formatValue(value, decimal, unit) {
 }
 
 /**
- * Compute change indicator direction and delta. [CP-7]
+ * Compute change indicator direction and delta.
  * @param {*} currentValue
  * @param {*} previousValue
  * @returns {{direction: 'up'|'down'|'neutral', delta: number}}
@@ -270,24 +279,7 @@ export function formatIndicator(direction, delta, showDelta, decimal, unit) {
   return { arrow, text: `${arrow} ${sign}${rounded}${unitStr}` };
 }
 
-/**
- * Sanitize a CSS value to prevent style injection via user-controlled config.
- * Strips characters that could break out of a CSS property value context
- * (semicolons, braces) and dangerous url() functions.
- * Legitimate values (hex colors, rgb(), named colors, px/em/rem/% units)
- * pass through unchanged.
- * @param {*} value - CSS value to sanitize (coerced to string).
- * @returns {string} Sanitized CSS value.
- */
-export function sanitizeCssValue(value) {
-  if (value === undefined || value === null || value === '') return '';
-  const str = String(value);
-  return str
-    .replace(/[;{}]/g, '')
-    .replace(/url\s*\(/gi, '')
-    .replace(/expression\s*\(/gi, '')
-    .replace(/-moz-binding\s*:/gi, '');
-}
+// sanitizeCssValue() is imported from shared/utils.js and re-exported above
 
 /**
  * Log a warning with the Pulse Card prefix.
@@ -299,7 +291,7 @@ export function warn(msg, ...args) {
 }
 
 /**
- * Batch-fetch previous values for multiple entities in a single WS call. [US-16]
+ * Batch-fetch previous values for multiple entities in a single WS call.
  * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
  * @param {string[]} entityIds - Entity IDs to query.
  * @param {number} minutesAgo - How far back to look (default 60).
@@ -337,36 +329,9 @@ export async function fetchPreviousValues(hass, entityIds, minutesAgo = 60) {
   return results;
 }
 
-/**
- * Ensure a CSS dimension value has a unit. Appends 'px' if the value is
- * a bare number (e.g. "40" → "40px", 40 → "40px"). Values that already
- * contain a unit (e.g. "40px", "2em", "50%") are returned as-is.
- * @param {*} value - CSS dimension value.
- * @returns {string}
- */
-export function cssValue(value) {
-  if (value === undefined || value === null || value === '') return '';
-  const str = String(value);
-  // If it's a pure number (integer or float), append px
-  if (/^\d+(\.\d+)?$/.test(str)) return `${str}px`;
-  return str;
-}
+// cssValue() is imported from shared/utils.js and re-exported above
 
-/**
- * Escape HTML special characters to prevent XSS when inserting
- * user-controlled strings via innerHTML.
- * @param {*} str - Value to escape (coerced to string).
- * @returns {string} Escaped string safe for HTML insertion.
- */
-export function escapeHtml(str) {
-  const s = String(str);
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+// escapeHtml() is imported from shared/utils.js and re-exported above
 
 /**
  * Pre-sort a severity array by `from` value for gradient interpolation.
@@ -381,7 +346,7 @@ function preSortSeverity(severity) {
 
 /**
  * Validate and normalize card config. Throws on invalid config.
- * Used by PulseCard.setConfig() and testable independently. [CP-4]
+ * Used by PulseCard.setConfig() and testable independently.
  * @param {Record<string, *>} config - Raw user config.
  * @returns {import('./types.js').PulseCardConfig & {entities: import('./types.js').EntityConfig[]}} Normalized config with defaults merged.
  */
@@ -415,6 +380,10 @@ export function normalizeConfig(config) {
         const ec = typeof e === 'string' ? { entity: e } : { ...e };
         // Pre-sort per-entity severity
         if (ec.severity) ec.severity = preSortSeverity(ec.severity);
+        // Attach card-level secondary_info as fallback
+        if (!ec.secondary_info && merged.secondary_info) {
+          ec._cardSecondaryInfo = merged.secondary_info;
+        }
         return ec;
       })
     : [{ entity: config.entity }];
@@ -432,7 +401,7 @@ export function normalizeConfig(config) {
 }
 
 /**
- * Resolve target config to a numeric value and label visibility. [US-7]
+ * Resolve target config to a numeric value and label visibility.
  * Supports number, entity ID string, or object with value + show_label.
  * @param {number|string|import('./types.js').TargetObjectConfig|undefined|null} target
  * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance for entity lookups.
@@ -470,7 +439,7 @@ export function resolveBarState(ec, cfg, hass) {
     state.state === 'unknown' ||
     state.state === 'error';
 
-  const { min, max } = resolveMinMax(ec, state);
+  const { min, max } = resolveMinMax(ec, state, cfg);
   const rawValue = ec.attribute
     ? state?.attributes?.[ec.attribute]
     : state?.state;
@@ -502,17 +471,30 @@ export function resolveBarState(ec, cfg, hass) {
     if (stateColorMap && entityState && stateColorMap[entityState]) {
       severityColor = stateColorMap[entityState];
     } else {
-      const sevArray = ec.severity ?? cfg.severity;
-      if (sevArray && sevArray.length > 0) {
-        const isGradient = sevArray.some((s) => s.mode === 'gradient');
-        if (isGradient) {
-          const gradColor = resolveGradientColor(numValue, sevArray);
-          if (gradColor) severityColor = gradColor;
-        } else {
-          const severity = resolveSeverity(numValue, sevArray);
-          if (severity) {
-            severityColor = severity.color;
-            if (severity.icon) severityIcon = severity.icon;
+      // attribute_color: map attribute value → color (card-level or per-entity)
+      const attrColorCfg = ec.attribute_color ?? cfg.attribute_color;
+      if (attrColorCfg?.attribute && attrColorCfg?.map) {
+        const attrVal = state.attributes?.[attrColorCfg.attribute];
+        if (attrVal !== undefined && attrVal !== null) {
+          const mapped = attrColorCfg.map[String(attrVal)];
+          if (mapped) severityColor = mapped;
+        }
+      }
+
+      // severity: numeric value → color (only if no color resolved yet)
+      if (!severityColor) {
+        const sevArray = ec.severity ?? cfg.severity;
+        if (sevArray && sevArray.length > 0) {
+          const isGradient = sevArray.some((s) => s.mode === 'gradient');
+          if (isGradient) {
+            const gradColor = resolveGradientColor(numValue, sevArray);
+            if (gradColor) severityColor = gradColor;
+          } else {
+            const severity = resolveSeverity(numValue, sevArray);
+            if (severity) {
+              severityColor = severity.color;
+              if (severity.icon) severityIcon = severity.icon;
+            }
           }
         }
       }
@@ -550,7 +532,7 @@ export function computeBarWidthScale(ec, cfg) {
 }
 
 /**
- * Batch-fetch sparkline history data for multiple entities. [US-1]
+ * Batch-fetch sparkline history data for multiple entities.
  * Returns full history arrays (timestamp + value pairs) for SVG rendering.
  * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
  * @param {string[]} entityIds - Entity IDs to query.
@@ -574,24 +556,29 @@ export async function fetchSparklineData(hass, entityIds, hoursToShow = 24) {
       significant_changes_only: true,
     });
     for (const eid of entityIds) {
-      const states = history?.[eid];
-      if (!states || states.length < 2) {
-        results[eid] = [];
-        continue;
-      }
-      /** @type {{t:number, v:number}[]} */
-      const points = [];
-      for (const s of states) {
-        const v = parseFloat(s.s);
-        if (!isNaN(v)) {
-          // lu is a Unix timestamp (seconds as float) in compressed format,
-          // or an ISO string in non-compressed format (last_updated fallback).
-          const rawTime = s.lu ?? s.last_updated;
-          const t = typeof rawTime === 'number' ? rawTime * 1000 : new Date(rawTime).getTime();
-          points.push({ t, v });
+      try {
+        const states = history?.[eid];
+        if (!states || states.length < 2) {
+          results[eid] = [];
+          continue;
         }
+        /** @type {{t:number, v:number}[]} */
+        const points = [];
+        for (const s of states) {
+          const v = parseFloat(s.s);
+          if (!isNaN(v)) {
+            // lu is a Unix timestamp (seconds as float) in compressed format,
+            // or an ISO string in non-compressed format (last_updated fallback).
+            const rawTime = s.lu ?? s.last_updated;
+            const t = typeof rawTime === 'number' ? rawTime * 1000 : new Date(rawTime).getTime();
+            if (isFinite(t)) points.push({ t, v });
+          }
+        }
+        results[eid] = points;
+      } catch {
+        // Isolate per-entity parsing errors so one bad entity doesn't block others
+        results[eid] = [];
       }
-      results[eid] = points;
     }
   } catch (e) {
     warn('Sparkline fetch failed: %O', e);
@@ -663,7 +650,7 @@ function downsampleData(data, slots, aggregateFunc = 'avg') {
 }
 
 /**
- * Build a smooth SVG path from sparkline data. [CP-1, CP-2]
+ * Build a smooth SVG path from sparkline data.
  * Downsamples with configurable aggregation, then applies optional
  * midpoint + quadratic Bezier smoothing.
  * Auto-scales Y axis to the data range.
@@ -729,7 +716,7 @@ export function buildSparklinePath(data, width, height, slots = 24, aggregateFun
 }
 
 /**
- * Evaluate whether an entity bar should be visible based on visibility conditions. [US-2]
+ * Evaluate whether an entity bar should be visible based on visibility conditions.
  * Returns true if no visibility config is set (default: always visible).
  * All conditions are AND-ed — all must be true for the bar to show.
  * @param {import('./types.js').EntityConfig} ec - Entity config.
@@ -887,7 +874,7 @@ function formatRelativeTime(isoString) {
  * @returns {string} Resolved secondary info text, or empty string if none.
  */
 export function resolveSecondaryInfo(ec, hass) {
-  const si = ec.secondary_info;
+  const si = ec.secondary_info ?? /** @type {*} */ (ec)._cardSecondaryInfo;
   if (!si) return '';
 
   // Priority 1: static text
@@ -898,13 +885,25 @@ export function resolveSecondaryInfo(ec, hass) {
   const state = hass?.states[ec.entity];
   if (!state) return '';
 
-  // Priority 2: attribute value
+  // Priority 2: template — interpolate {attribute_name} placeholders
+  if (si.template) {
+    return si.template.replace(/\{(\w+)\}/g, (/** @type {string} */ _, /** @type {string} */ attr) => {
+      const val = state.attributes?.[attr];
+      if (val === undefined || val === null) return '';
+      if ((attr === 'bytes' || attr === 'packets') && typeof val === 'number') {
+        return formatLargeNumber(val);
+      }
+      return String(val);
+    });
+  }
+
+  // Priority 3: attribute value
   if (si.attribute) {
     const val = state.attributes?.[si.attribute];
     return val !== undefined && val !== null ? String(val) : '';
   }
 
-  // Priority 3: type
+  // Priority 4: type
   if (si.type === 'last_changed') {
     return formatRelativeTime(state.last_changed);
   }

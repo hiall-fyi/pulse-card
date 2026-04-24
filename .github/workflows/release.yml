@@ -17,9 +17,10 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm run build
+      - run: npm run build:pulse-card
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/pulse-card.js
-            dist/editor.js
+            dist/pulse-card-editor.js
+            dist/pulse-climate-editor.js
