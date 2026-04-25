@@ -138,6 +138,9 @@ export {};
  * @property {string} entity_id
  * @property {number|null} [display_precision]
  * @property {string|null} [platform]
+ * @property {string} [unique_id]
+ * @property {string} [translation_key]
+ * @property {string} [device_id]
  */
 
 // ── Chart Types ─────────────────────────────────────────────────────

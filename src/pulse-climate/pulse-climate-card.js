@@ -7,7 +7,7 @@ import { CARD_NAME, EDITOR_NAME, VERSION } from './constants.js';
 import { STYLES } from './styles.js';
 import { normalizeClimateConfig, warn, resolveZoneDisplay } from './utils.js';
 import { discoverTadoEntities, extractZoneName } from './zone-resolver.js';
-import { createHistoryCache, isCacheValid, updateCache } from './history.js';
+import { createHistoryCache, isCacheValid, updateCache, getSharedCache, updateSharedCache } from './history.js';
 import { renderZonesSection, updateZonesSection } from './sections/zones.js';
 import { renderApiSection } from './sections/api.js';
 import { renderBridgeSection } from './sections/bridge.js';
@@ -32,6 +32,52 @@ import { fetchSparklineData } from '../utils.js';
 /** Module-level flag — log discovery results once per page load across all card instances. */
 let _discoveryLogged = false;
 
+// ── Shared CSS StyleSheet ───────────────────────────────────────────
+// Created once at module evaluation time and shared across all card instances
+// via adoptedStyleSheets. Falls back to <style> injection for Safari < 16.4.
+
+/** @type {boolean} */
+const _supportsAdoptedStyleSheets = typeof CSSStyleSheet !== 'undefined'
+  && typeof CSSStyleSheet.prototype.replaceSync === 'function'
+  && typeof document !== 'undefined'
+  && 'adoptedStyleSheets' in (document.createElement('div').attachShadow({ mode: 'open' }));
+
+/** @type {CSSStyleSheet|null} */
+const _sharedSheet = _supportsAdoptedStyleSheets ? (() => {
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(STYLES);
+  return sheet;
+})() : null;
+
+
+// ── History Section Classification ──────────────────────────────────
+// Sections that depend on history cache data — only these are re-rendered
+// during the 5-minute history refresh cycle.
+
+/** @type {Set<string>} Section types that depend on history cache data. */
+const HISTORY_SECTIONS = new Set([
+  'zones', 'api', 'graph', 'bridge', 'thermal_strip',
+  'comfort_strip', 'homekit', 'weather', 'radial', 'donut',
+]);
+
+/** @type {Record<string, string>} Section type → CSS selector mapping. */
+const SECTION_SELECTORS = {
+  zones: '.section-zones',
+  api: '.section-api',
+  graph: '.section-graph',
+  bridge: '.section-bridge',
+  thermal_strip: '.section-thermal-strip',
+  comfort_strip: '.section-comfort-strip',
+  homekit: '.section-homekit',
+  weather: '.section-weather',
+  radial: '.section-radial',
+  donut: '.section-donut',
+  environment: '.section-environment',
+  thermal: '.section-thermal',
+  schedule: '.section-schedule',
+  energy_flow: '.section-energy-flow',
+};
+
 class PulseClimateCard extends HTMLElement {
   /** @type {import('./types.js').PulseClimateConfig|null} */
   _config = null;
@@ -49,6 +95,30 @@ class PulseClimateCard extends HTMLElement {
   _shadow;
   /** @type {ReturnType<typeof setInterval>|null} */
   _countdownTimer = null;
+  /** @type {boolean} Guard against concurrent history fetches. */
+  _historyFetchInProgress = false;
+  /** @type {number|null} RAF handle for throttled hass updates. */
+  _rafId = null;
+  /** @type {number} Timestamp of last differential update. */
+  _lastUpdateTime = 0;
+  /** @type {{selector: string, watchIds: string[], render: () => string}[]|null} Cached rerender targets. */
+  _rerenderTargets = null;
+  /** @type {AbortController|null} */
+  _chipAbort = null;
+  /** @type {AbortController|null} */
+  _sectionChipAbort = null;
+  /** @type {AbortController|null} */
+  _radialAbort = null;
+  /** @type {AbortController|null} */
+  _timelineAbort = null;
+  /** @type {AbortController|null} */
+  _heatmapAbort = null;
+  /** @type {AbortController|null} */
+  _energyFlowAbort = null;
+  /** @type {AbortController|null} */
+  _sparklineAbort = null;
+  /** @type {Map<string, {linePath: string, areaPath: string}>} Pre-computed sparkline SVG paths. */
+  _sparklinePathCache = new Map();
 
   constructor() {
     super();
@@ -69,10 +139,13 @@ class PulseClimateCard extends HTMLElement {
       this._runDiscovery();
       this._fullRender();
     }
+    this._buildRerenderTargets();
   }
 
   /**
    * HA calls this setter on every state change.
+   * Throttled to max once per ~200ms to avoid excessive DOM work
+   * when many entities update in quick succession.
    * @param {import('./types.js').Hass} hass
    */
   set hass(hass) {
@@ -87,11 +160,26 @@ class PulseClimateCard extends HTMLElement {
       return;
     }
 
-    // Differential update
-    this._updateZones();
-    this._updateSections();
-    this._refreshHistoryIfNeeded();
-    this._prevStates = { ...hass.states };
+    // Throttle differential updates — coalesce rapid state changes into
+    // a single RAF-aligned update pass. Prevents 15+ card instances from
+    // each doing full DOM diffing on every individual entity state change.
+    if (this._rafId) return;
+    this._rafId = requestAnimationFrame(() => {
+      this._rafId = null;
+      if (!this._hass || !this._config || !this._discovery) return;
+      const now = Date.now();
+      if (now - this._lastUpdateTime < 200) return;
+      this._lastUpdateTime = now;
+      // Zone change guard — skip _updateZones() if no zone entity changed (O(1) per zone)
+      const states = this._hass.states;
+      const zonesChanged = (this._config._zones || []).some((z) =>
+        states[z.entity] !== this._prevStates[z.entity]
+      );
+      if (zonesChanged) this._updateZones();
+      this._updateSections();
+      this._refreshHistoryIfNeeded();
+      this._cacheWatchedStates();
+    });
   }
 
   /** Run Tado CE entity discovery. */
@@ -99,7 +187,7 @@ class PulseClimateCard extends HTMLElement {
     if (!this._hass || !this._config) return;
     const zones = this._config._zones || [];
     const zoneNames = zones.map((/** @type {import('./types.js').ZoneConfig} */ z) => extractZoneName(z.entity));
-    this._discovery = discoverTadoEntities(this._hass.states, zoneNames);
+    this._discovery = discoverTadoEntities(this._hass.states, zoneNames, this._hass.entities);
 
     // Log discovery results once per page load (module-level flag survives instance recreation)
     if (!_discoveryLogged && this._discovery.isTadoCE) {
@@ -110,6 +198,157 @@ class PulseClimateCard extends HTMLElement {
         console.warn('Pulse Climate: hub discovery — missing:', this._discovery.missingHubKeys.join(', '));
       }
     }
+    this._buildRerenderTargets();
+  }
+
+
+
+  /**
+   * Pre-compute sparkline SVG paths for all zone temperature sensors.
+   * Called after history cache update so detail panel sparklines render instantly on tap.
+   */
+  _rebuildSparklinePathCache() {
+    this._sparklinePathCache.clear();
+    const data = this._historyCache?.data;
+    if (!data) return;
+    for (const [entityId, points] of Object.entries(data)) {
+      if (!points || points.length < 2) continue;
+      const result = buildFilledSparkline(points, 340, 36, 48);
+      if (result) {
+        this._sparklinePathCache.set(entityId, result);
+      }
+    }
+  }
+
+  /**
+   * Build and cache the rerenderTargets array.
+   * Called from setConfig() and _runDiscovery() so the array is ready
+   * before _updateSections() runs on the next RAF cycle.
+   */
+  _buildRerenderTargets() {
+    if (!this._config || !this._discovery) return;
+    const discovery = this._discovery;
+    const hubEntities = discovery.hubEntities;
+    const zones = this._config._zones || [];
+
+    this._rerenderTargets = [
+      {
+        selector: '.section-zones',
+        watchIds: [hubEntities.home_state].filter(Boolean),
+        render: () => {
+          const config = /** @type {import('./types.js').PulseClimateConfig} */ (this._config);
+          const states = this._hass?.states || {};
+          return renderZonesSection(zones, config, states, discovery, this._historyCache);
+        },
+      },
+      {
+        selector: '.section-api',
+        watchIds: [hubEntities.api_usage, hubEntities.api_limit, hubEntities.api_status, hubEntities.next_sync, hubEntities.token_status].filter(Boolean),
+        render: () => {
+          const states = this._hass?.states || {};
+          const sections = this._config?.sections || [{ type: 'zones' }];
+          const apiSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'api') || {};
+          return renderApiSection(hubEntities, states, /** @type {*} */ (apiSection), this._historyCache);
+        },
+      },
+      {
+        selector: '.section-homekit',
+        watchIds: [hubEntities.homekit_connected, hubEntities.homekit_reads_saved, hubEntities.homekit_writes_saved].filter(Boolean),
+        render: () => {
+          const states = this._hass?.states || {};
+          return renderHomekitSection(hubEntities, states, this._historyCache);
+        },
+      },
+      {
+        selector: '.section-bridge',
+        watchIds: [hubEntities.bridge_connected, hubEntities.boiler_flow_temp, hubEntities.wc_status, hubEntities.wc_target_flow].filter(Boolean),
+        render: () => {
+          const states = this._hass?.states || {};
+          return renderBridgeSection(hubEntities, states, this._historyCache);
+        },
+      },
+      {
+        selector: '.section-weather',
+        watchIds: [hubEntities.outside_temp, hubEntities.weather, hubEntities.solar_intensity].filter(Boolean),
+        render: () => {
+          const states = this._hass?.states || {};
+          return renderWeatherSection(hubEntities, states, this._historyCache);
+        },
+      },
+      {
+        selector: '.section-environment',
+        watchIds: zones.flatMap((z) => {
+          const zn = extractZoneName(z.entity);
+          const ze = discovery.zoneEntities?.[zn] || {};
+          return [ze.mold_risk, ze.condensation, ze.comfort_level, ze.surface_temp, ze.dew_point].filter(Boolean);
+        }),
+        render: () => {
+          const states = this._hass?.states || {};
+          return renderEnvironmentSection(zones, states, discovery);
+        },
+      },
+      {
+        selector: '.section-thermal',
+        watchIds: zones.flatMap((z) => {
+          const zn = extractZoneName(z.entity);
+          const ze = discovery.zoneEntities?.[zn] || {};
+          return [ze.heating_rate, ze.thermal_inertia, ze.preheat_time, ze.confidence].filter(Boolean);
+        }),
+        render: () => {
+          const states = this._hass?.states || {};
+          return renderThermalSection(zones, states, discovery);
+        },
+      },
+      {
+        selector: '.section-schedule',
+        watchIds: zones.flatMap((z) => {
+          const zn = extractZoneName(z.entity);
+          const ze = discovery.zoneEntities?.[zn] || {};
+          return [ze.next_schedule, ze.next_sched_temp, ze.schedule_deviation, ze.preheat_advisor, ze.comfort_target].filter(Boolean);
+        }),
+        render: () => {
+          const states = this._hass?.states || {};
+          return renderScheduleSection(zones, states, discovery);
+        },
+      },
+      {
+        selector: '.section-radial',
+        watchIds: zones.map((z) => z.entity),
+        render: () => {
+          const states = this._hass?.states || {};
+          const sections = this._config?.sections || [{ type: 'zones' }];
+          const radialSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'radial') || {};
+          return renderRadialSection(zones, /** @type {*} */ (radialSection), states, discovery, this._historyCache);
+        },
+      },
+      {
+        selector: '.section-donut',
+        watchIds: (() => {
+          const sections = this._config?.sections || [];
+          const donutSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'donut');
+          const source = /** @type {*} */ (donutSection)?.source;
+          if (source === 'api_breakdown' && hubEntities.api_breakdown) return [hubEntities.api_breakdown];
+          if (source === 'homekit_saved') return [hubEntities.homekit_reads_saved, hubEntities.homekit_writes_saved].filter(Boolean);
+          return [];
+        })(),
+        render: () => {
+          const states = this._hass?.states || {};
+          const sections = this._config?.sections || [];
+          const donutSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'donut') || {};
+          return renderDonutSection(/** @type {*} */ (donutSection), hubEntities, states);
+        },
+      },
+      {
+        selector: '.section-graph',
+        watchIds: [],
+        render: () => {
+          const states = this._hass?.states || {};
+          const sections = this._config?.sections || [{ type: 'zones' }];
+          const graphSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'graph') || {};
+          return renderGraphSection(/** @type {*} */ (graphSection), zones, this._historyCache, states, discovery);
+        },
+      },
+    ];
   }
 
   /** Full render — build ha-card with all sections. */
@@ -125,8 +364,12 @@ class PulseClimateCard extends HTMLElement {
 
     let html = '';
 
-    // Style
-    html += `<style>${STYLES}</style>`;
+    // Style — use shared CSSStyleSheet when supported, fallback to <style> injection
+    if (_sharedSheet) {
+      this._shadow.adoptedStyleSheets = [_sharedSheet];
+    } else {
+      html += `<style>${STYLES}</style>`;
+    }
 
     // Card wrapper
     if (!isEntityRow) {
@@ -153,7 +396,7 @@ class PulseClimateCard extends HTMLElement {
     // Cache DOM refs
     this._elements.zonesSection = this._shadow.querySelector('.section-zones');
     this._elements.apiSection = this._shadow.querySelector('.section-api');
-    this._prevStates = { ...states };
+    this._cacheWatchedStates();
 
     // Bind action listeners on zone rows
     this._bindZoneActions();
@@ -257,6 +500,9 @@ class PulseClimateCard extends HTMLElement {
    */
   _bindChipActions() {
     if (!this._config || !this._hass) return;
+    if (this._chipAbort) this._chipAbort.abort();
+    this._chipAbort = new AbortController();
+    const { signal: chipSignal } = this._chipAbort;
     const zones = this._config._zones || [];
     const rows = this._shadow.querySelectorAll('.zone-row');
 
@@ -285,7 +531,7 @@ class PulseClimateCard extends HTMLElement {
           ev.stopPropagation();
           if (!this._hass) return;
           sharedExecuteAction(this, this._hass, tapAction, chipEntityId, warn);
-        });
+        }, { signal: chipSignal });
 
         // Hold
         /** @type {ReturnType<typeof setTimeout>|null} */
@@ -296,10 +542,10 @@ class PulseClimateCard extends HTMLElement {
             if (!this._hass || holdAction.action === 'none') return;
             sharedExecuteAction(this, this._hass, holdAction, chipEntityId, warn);
           }, HOLD_THRESHOLD);
-        });
-        chipEl.addEventListener('pointerup', (ev) => { ev.stopPropagation(); if (holdTimer) clearTimeout(holdTimer); });
-        chipEl.addEventListener('pointercancel', () => { if (holdTimer) clearTimeout(holdTimer); });
-        chipEl.addEventListener('contextmenu', (ev) => ev.preventDefault());
+        }, { signal: chipSignal });
+        chipEl.addEventListener('pointerup', (ev) => { ev.stopPropagation(); if (holdTimer) clearTimeout(holdTimer); }, { signal: chipSignal });
+        chipEl.addEventListener('pointercancel', () => { if (holdTimer) clearTimeout(holdTimer); }, { signal: chipSignal });
+        chipEl.addEventListener('contextmenu', (ev) => ev.preventDefault(), { signal: chipSignal });
       }
     }
   }
@@ -309,6 +555,9 @@ class PulseClimateCard extends HTMLElement {
    * All section chips with data-entity open more-info for their source entity.
    */
   _bindSectionChipActions() {
+    if (this._sectionChipAbort) this._sectionChipAbort.abort();
+    this._sectionChipAbort = new AbortController();
+    const { signal: sectionChipSignal } = this._sectionChipAbort;
     const chips = this._shadow.querySelectorAll('.section .chip[data-entity]');
     for (const chip of chips) {
       const chipEl = /** @type {HTMLElement} */ (chip);
@@ -323,7 +572,7 @@ class PulseClimateCard extends HTMLElement {
         if (entityId) {
           fireEvent(this, 'hass-more-info', { entityId });
         }
-      });
+      }, { signal: sectionChipSignal });
     }
   }
 
@@ -352,6 +601,9 @@ class PulseClimateCard extends HTMLElement {
 
   /** Bind radial arc + legend click → select zone, update center, dim others. */
   _bindRadialInteractions() {
+    if (this._radialAbort) this._radialAbort.abort();
+    this._radialAbort = new AbortController();
+    const { signal: radialSignal } = this._radialAbort;
     const arcs = this._shadow.querySelectorAll('.arc-group');
     const legendItems = this._shadow.querySelectorAll('.radial-legend .legend-item');
     const centerEl = this._shadow.querySelector('#radial-center');
@@ -364,37 +616,45 @@ class PulseClimateCard extends HTMLElement {
     const svgCenter = svgSize / 2;
 
     const zones = this._config?._zones || [];
-    const states = this._hass?.states || {};
-    const discovery = this._discovery;
     /** @type {number|null} */
     let selectedIdx = null;
 
     const outsideTempEntityConfig = this._shadow.querySelector('.section-radial')?.getAttribute('data-outdoor-temp-entity');
-    const outsideTempEntity = outsideTempEntityConfig || discovery?.hubEntities?.outside_temp;
     const radialAttribute = this._shadow.querySelector('.section-radial')?.getAttribute('data-attribute') || 'temperature';
-    let defaultCenter = '--';
-    let defaultCenterSub = '';
-    if (radialAttribute !== 'humidity' && outsideTempEntity && states[outsideTempEntity]) {
-      const s = states[outsideTempEntity];
-      if (s.state !== 'unavailable' && s.state !== 'unknown') {
-        const val = s.attributes?.temperature !== undefined ? s.attributes.temperature : s.state;
-        defaultCenter = `${val}${s.attributes?.unit_of_measurement || '°C'}`;
-      }
-    }
     const outsideHumEntityConfig = this._shadow.querySelector('.section-radial')?.getAttribute('data-outdoor-humidity-entity');
-    if (outsideHumEntityConfig && states[outsideHumEntityConfig]) {
-      const s = states[outsideHumEntityConfig];
-      if (s.state !== 'unavailable' && s.state !== 'unknown') {
-        const val = s.attributes?.humidity !== undefined ? s.attributes.humidity : s.state;
-        if (radialAttribute === 'humidity') {
-          defaultCenter = `${val}%`;
-        } else {
-          defaultCenterSub = `${val}%`;
+
+    /** Compute default center text from current state. */
+    const getDefaults = () => {
+      const states = this._hass?.states || {};
+      const discovery = this._discovery;
+      const outsideTempEntity = outsideTempEntityConfig || discovery?.hubEntities?.outside_temp;
+      let center = '--';
+      let centerSub = '';
+      if (radialAttribute !== 'humidity' && outsideTempEntity && states[outsideTempEntity]) {
+        const s = states[outsideTempEntity];
+        if (s.state !== 'unavailable' && s.state !== 'unknown') {
+          const val = s.attributes?.temperature !== undefined ? s.attributes.temperature : s.state;
+          center = `${val}${s.attributes?.unit_of_measurement || '°C'}`;
         }
       }
-    }
+      if (outsideHumEntityConfig && states[outsideHumEntityConfig]) {
+        const s = states[outsideHumEntityConfig];
+        if (s.state !== 'unavailable' && s.state !== 'unknown') {
+          const val = s.attributes?.humidity !== undefined ? s.attributes.humidity : s.state;
+          if (radialAttribute === 'humidity') {
+            center = `${val}%`;
+          } else {
+            centerSub = `${val}%`;
+          }
+        }
+      }
+      return { center, centerSub };
+    };
 
     const selectZone = (/** @type {number} */ idx) => {
+      // Late-binding: read current state at event time
+      const states = this._hass?.states || {};
+      const discovery = this._discovery;
       if (selectedIdx === idx) { deselectZone(); return; }
       selectedIdx = idx;
       const zoneConfig = zones[idx];
@@ -455,6 +715,7 @@ class PulseClimateCard extends HTMLElement {
 
     const deselectZone = () => {
       selectedIdx = null;
+      const { center: defaultCenter, centerSub: defaultCenterSub } = getDefaults();
       const valueEl = centerEl.querySelector('.center-value');
       const labelEl = centerEl.querySelector('.center-label');
       const subEl = centerEl.querySelector('.center-sub');
@@ -467,11 +728,11 @@ class PulseClimateCard extends HTMLElement {
     };
 
     arcs.forEach((/** @type {Element} */ arc, /** @type {number} */ i) => {
-      arc.addEventListener('click', () => selectZone(i));
+      arc.addEventListener('click', () => selectZone(i), { signal: radialSignal });
     });
     legendItems.forEach((/** @type {Element} */ item, /** @type {number} */ i) => {
       attachRipple(/** @type {HTMLElement} */ (item));
-      item.addEventListener('click', () => selectZone(i));
+      item.addEventListener('click', () => selectZone(i), { signal: radialSignal });
     });
 
     // Per-zone shimmer — zones light up sequentially like piano keys
@@ -532,17 +793,16 @@ class PulseClimateCard extends HTMLElement {
 
   /** Bind thermal strip row click → select zone, show detail panel. */
   _bindTimelineInteractions() {
+    if (this._timelineAbort) this._timelineAbort.abort();
+    this._timelineAbort = new AbortController();
     const rows = this._shadow.querySelectorAll('.section-thermal-strip .timeline-row');
     const detailEl = this._shadow.querySelector('.section-thermal-strip');
     if (rows.length === 0 || !detailEl) return;
 
     const zones = this._config?._zones || [];
-    const states = this._hass?.states || {};
-    const discovery = this._discovery;
-    const historyCache = this._historyCache;
     const subtitleEl = detailEl.querySelector('.section-subtitle');
     const defaultSubtitle = 'Tap a zone for details';
-    const tempUnit = states[zones[0]?.entity]?.attributes?.unit_of_measurement || '°C';
+    const tempUnit = this._hass?.states?.[zones[0]?.entity]?.attributes?.unit_of_measurement || '°C';
     /** @type {number|null} */
     let selectedIdx = null;
     /** @type {number|null} */
@@ -563,6 +823,11 @@ class PulseClimateCard extends HTMLElement {
     rows.forEach((/** @type {Element} */ row, /** @type {number} */ i) => {
       attachRipple(/** @type {HTMLElement} */ (row));
       row.addEventListener('click', () => {
+        // Late-binding: read current state at event time, not bind time
+        const states = this._hass?.states || {};
+        const discovery = this._discovery;
+        const historyCache = this._historyCache;
+
         // Clear any drag-select highlights
         detailEl.querySelectorAll('.strip-drag-highlight').forEach((/** @type {Element} */ h) => { /** @type {HTMLElement} */ (h).style.display = 'none'; });
 
@@ -589,7 +854,7 @@ class PulseClimateCard extends HTMLElement {
             const cmpSensorId = cmpConfig.temperature_entity || cmpZoneEntities.temperature || cmpEntityId;
             const cmpData = historyCache?.data?.[cmpSensorId] || [];
             if (cmpData.length >= 2) {
-              const cmpResult = buildFilledSparkline(cmpData, 340, 36, 48);
+              const cmpResult = this._sparklinePathCache.get(cmpSensorId) || buildFilledSparkline(cmpData, 340, 36, 48);
               if (cmpResult) {
                 const cmpPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 cmpPath.setAttribute('d', cmpResult.linePath);
@@ -692,7 +957,7 @@ class PulseClimateCard extends HTMLElement {
             ? '#FF9800'
             : (temp !== undefined && isFinite(Number(temp)) ? temperatureToColor(Number(temp)) : 'var(--primary-text-color)');
           const safeColor = sanitizeCssValue(sparkColor);
-          const result = buildFilledSparkline(historyData, 340, 36, 48);
+          const result = this._sparklinePathCache.get(sensorId) || buildFilledSparkline(historyData, 340, 36, 48);
           if (result) {
             const gradId = `tl-detail-grad-${i}`;
             sparklineHtml = `<div class="detail-sparkline sparkline-filled" style="height:36px;margin-top:10px">` +
@@ -822,6 +1087,8 @@ class PulseClimateCard extends HTMLElement {
 
   /** Bind comfort strip row click → select zone, show detail panel. */
   _bindHeatmapInteractions() {
+    if (this._heatmapAbort) this._heatmapAbort.abort();
+    this._heatmapAbort = new AbortController();
     const rows = this._shadow.querySelectorAll('.section-comfort-strip .heatmap-row');
     const detailEl = this._shadow.querySelector('#heatmap-detail');
     if (rows.length === 0 || !detailEl) return;
@@ -995,6 +1262,9 @@ class PulseClimateCard extends HTMLElement {
 
   /** Bind energy flow ribbon/label click → select zone, show detail, dim others. */
   _bindEnergyFlowInteractions() {
+    if (this._energyFlowAbort) this._energyFlowAbort.abort();
+    this._energyFlowAbort = new AbortController();
+    const { signal: energyFlowSignal } = this._energyFlowAbort;
     const ribbons = this._shadow.querySelectorAll('.section-energy-flow path[data-zone]');
     const detailContainer = this._shadow.querySelector('.section-energy-flow');
     if (ribbons.length === 0 || !detailContainer) return;
@@ -1018,12 +1288,14 @@ class PulseClimateCard extends HTMLElement {
         ribbons.forEach((/** @type {Element} */ r) => {
           r.classList.toggle('dimmed', r.getAttribute('data-zone') !== zone);
         });
-      });
+      }, { signal: energyFlowSignal });
     });
   }
 
   /** Bind crosshair + tooltip on zone sparkline containers only. */
   _bindSparklineCrosshairs() {
+    if (this._sparklineAbort) this._sparklineAbort.abort();
+    this._sparklineAbort = new AbortController();
     // Clean up previous instances (prevents accumulation on re-bind after history refresh)
     this._shadow.querySelectorAll('.strip-tooltip-fixed').forEach((el) => el.remove());
     this._shadow.querySelectorAll('.sparkline-crosshair').forEach((el) => el.remove());
@@ -1222,100 +1494,11 @@ class PulseClimateCard extends HTMLElement {
     if (!this._hass || !this._discovery || !this._config) return;
     const states = this._hass.states;
     const discovery = this._discovery;
-    const hubEntities = discovery.hubEntities;
     const zones = this._config._zones || [];
 
-    // API section is handled by rerenderTargets below (full section re-render on any API entity change)
-
-    // Sections without differential update — re-render via replaceWith.
-    // Only replace if any watched entity actually changed since last render.
-    /** @type {{selector: string, watchIds: string[], render: () => string}[]} */
-    const rerenderTargets = [
-      {
-        selector: '.section-zones',
-        watchIds: [hubEntities.home_state].filter(Boolean),
-        render: () => {
-          const config = /** @type {import('./types.js').PulseClimateConfig} */ (this._config);
-          return renderZonesSection(zones, config, states, discovery, this._historyCache);
-        },
-      },
-      {
-        selector: '.section-api',
-        watchIds: [hubEntities.api_usage, hubEntities.api_limit, hubEntities.api_status, hubEntities.next_sync, hubEntities.token_status].filter(Boolean),
-        render: () => {
-          const sections = this._config?.sections || [{ type: 'zones' }];
-          const apiSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'api') || {};
-          return renderApiSection(hubEntities, states, /** @type {*} */ (apiSection), this._historyCache);
-        },
-      },
-      {
-        selector: '.section-homekit',
-        watchIds: [hubEntities.homekit_connected, hubEntities.homekit_reads_saved, hubEntities.homekit_writes_saved].filter(Boolean),
-        render: () => renderHomekitSection(hubEntities, states, this._historyCache),
-      },
-      {
-        selector: '.section-bridge',
-        watchIds: [hubEntities.bridge_connected, hubEntities.boiler_flow_temp, hubEntities.wc_status, hubEntities.wc_target_flow].filter(Boolean),
-        render: () => renderBridgeSection(hubEntities, states, this._historyCache),
-      },
-      {
-        selector: '.section-weather',
-        watchIds: [hubEntities.outside_temp, hubEntities.weather, hubEntities.solar_intensity].filter(Boolean),
-        render: () => renderWeatherSection(hubEntities, states, this._historyCache),
-      },
-      {
-        selector: '.section-environment',
-        watchIds: zones.flatMap((z) => {
-          const zn = extractZoneName(z.entity);
-          const ze = discovery.zoneEntities?.[zn] || {};
-          return [ze.mold_risk, ze.condensation, ze.comfort_level, ze.surface_temp, ze.dew_point].filter(Boolean);
-        }),
-        render: () => renderEnvironmentSection(zones, states, discovery),
-      },
-      {
-        selector: '.section-thermal',
-        watchIds: zones.flatMap((z) => {
-          const zn = extractZoneName(z.entity);
-          const ze = discovery.zoneEntities?.[zn] || {};
-          return [ze.heating_rate, ze.thermal_inertia, ze.preheat_time, ze.confidence].filter(Boolean);
-        }),
-        render: () => renderThermalSection(zones, states, discovery),
-      },
-      {
-        selector: '.section-schedule',
-        watchIds: zones.flatMap((z) => {
-          const zn = extractZoneName(z.entity);
-          const ze = discovery.zoneEntities?.[zn] || {};
-          return [ze.next_schedule, ze.next_sched_temp, ze.schedule_deviation, ze.preheat_advisor, ze.comfort_target].filter(Boolean);
-        }),
-        render: () => renderScheduleSection(zones, states, discovery),
-      },
-      {
-        selector: '.section-radial',
-        watchIds: zones.map((z) => z.entity),
-        render: () => {
-          const sections = this._config?.sections || [{ type: 'zones' }];
-          const radialSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'radial') || {};
-          return renderRadialSection(zones, /** @type {*} */ (radialSection), states, discovery, this._historyCache);
-        },
-      },
-      {
-        selector: '.section-donut',
-        watchIds: (() => {
-          const sections = this._config?.sections || [];
-          const donutSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'donut');
-          const source = /** @type {*} */ (donutSection)?.source;
-          if (source === 'api_breakdown' && hubEntities.api_breakdown) return [hubEntities.api_breakdown];
-          if (source === 'homekit_saved') return [hubEntities.homekit_reads_saved, hubEntities.homekit_writes_saved].filter(Boolean);
-          return [];
-        })(),
-        render: () => {
-          const sections = this._config?.sections || [];
-          const donutSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'donut') || {};
-          return renderDonutSection(/** @type {*} */ (donutSection), hubEntities, states);
-        },
-      },
-    ];
+    // Use cached rerenderTargets — built in setConfig() / _runDiscovery()
+    const rerenderTargets = this._rerenderTargets;
+    if (!rerenderTargets) return;
 
     /** @type {Set<string>} */
     const replaced = new Set();
@@ -1343,8 +1526,15 @@ class PulseClimateCard extends HTMLElement {
       }
     }
 
-    // Only re-bind listeners on sections that were actually replaced
-    if (replaced.has('.section-zones') || replaced.size > 0) {
+    // Only re-bind listeners on sections that were actually replaced.
+    // Section chip actions exist on system sections (api, bridge, homekit, etc.)
+    // — skip re-bind if only non-chip sections (graph, donut) were replaced.
+    const chipSections = new Set([
+      '.section-zones', '.section-api', '.section-bridge', '.section-homekit',
+      '.section-weather', '.section-environment', '.section-thermal', '.section-schedule',
+    ]);
+    const hasReplacedChipSection = [...replaced].some((s) => chipSections.has(s));
+    if (hasReplacedChipSection) {
       this._bindSectionChipActions();
     }
     if (replaced.has('.section-zones')) {
@@ -1355,6 +1545,9 @@ class PulseClimateCard extends HTMLElement {
     if (replaced.has('.section-api')) {
       this._elements.apiSection = this._shadow.querySelector('.section-api');
       this._startCountdownTimer();
+    }
+    if (replaced.has('.section-radial')) {
+      this._bindRadialInteractions();
     }
 
     // Energy flow: differential update preserves ongoing SVG <animate> flow animations.
@@ -1394,8 +1587,9 @@ class PulseClimateCard extends HTMLElement {
 
   /**
    * Re-render only history-dependent sections after cache update.
-   * Replaces individual section containers instead of rebuilding the entire shadow DOM.
-   * Preserves non-history sections, countdown timer, and avoids full event re-binding.
+   * Skips non-history sections (environment, thermal, schedule) to preserve
+   * their DOM elements, interactive state, and event listeners.
+   * Only re-binds listeners on sections that were actually replaced.
    */
   _updateHistorySections() {
     if (!this._config || !this._hass || !this._discovery) return;
@@ -1405,24 +1599,14 @@ class PulseClimateCard extends HTMLElement {
     const discovery = this._discovery;
     const zones = config._zones || [];
     const sections = config.sections || [{ type: 'zones' }];
-
-    /** @type {Record<string, string>} */
-    const sectionSelectors = {
-      zones: '.section-zones',
-      api: '.section-api',
-      graph: '.section-graph',
-      bridge: '.section-bridge',
-      thermal_strip: '.section-thermal-strip',
-      comfort_strip: '.section-comfort-strip',
-      homekit: '.section-homekit',
-      weather: '.section-weather',
-      radial: '.section-radial',
-      donut: '.section-donut',
-    };
+    /** @type {string[]} */
+    const replacedTypes = [];
 
     for (const section of sections) {
       const type = typeof section === 'string' ? section : section.type;
-      const selector = sectionSelectors[type];
+      if (!HISTORY_SECTIONS.has(type)) continue; // Skip non-history sections
+
+      const selector = SECTION_SELECTORS[type];
       if (!selector) continue;
 
       const oldEl = this._shadow.querySelector(selector);
@@ -1435,25 +1619,63 @@ class PulseClimateCard extends HTMLElement {
       const tpl = document.createElement('template');
       tpl.innerHTML = html;
       const newEl = tpl.content.firstElementChild;
-      if (newEl) oldEl.replaceWith(newEl);
+      if (newEl) {
+        oldEl.replaceWith(newEl);
+        replacedTypes.push(type);
+      }
     }
 
-    // Re-cache DOM refs for sections that were replaced
-    this._elements.zonesSection = this._shadow.querySelector('.section-zones');
-    this._elements.apiSection = this._shadow.querySelector('.section-api');
+    if (replacedTypes.length === 0) return;
 
-    // Re-bind listeners on replaced sections
-    this._bindZoneActions();
-    this._bindChipActions();
-    this._bindSectionInteractions();
-    this._bindSectionChipActions();
-    // Restart countdown timer (old chip element was replaced)
-    this._startCountdownTimer();
+    // Re-cache DOM refs for sections that were replaced
+    if (replacedTypes.includes('zones')) {
+      this._elements.zonesSection = this._shadow.querySelector('.section-zones');
+      this._bindZoneActions();
+      this._bindChipActions();
+      this._bindSparklineCrosshairs();
+    }
+    if (replacedTypes.includes('api')) {
+      this._elements.apiSection = this._shadow.querySelector('.section-api');
+      this._startCountdownTimer();
+    }
+    if (replacedTypes.includes('radial')) {
+      this._bindRadialInteractions();
+    }
+    if (replacedTypes.includes('thermal_strip')) {
+      this._bindTimelineInteractions();
+    }
+    if (replacedTypes.includes('comfort_strip')) {
+      this._bindHeatmapInteractions();
+    }
+    if (replacedTypes.includes('energy_flow')) {
+      this._bindEnergyFlowInteractions();
+    }
+
+    // Re-bind section chip actions if any chip-bearing section was replaced
+    const hasChipSection = replacedTypes.some((t) =>
+      ['zones', 'api', 'bridge', 'homekit', 'weather'].includes(t));
+    if (hasChipSection) {
+      this._bindSectionChipActions();
+    }
   }
 
   /** Refresh history cache if expired, then re-render chart sections. */
   async _refreshHistoryIfNeeded() {
     if (!this._hass || !this._config || isCacheValid(this._historyCache)) return;
+
+    // Check shared module-level cache first — another card instance may have
+    // already fetched fresh data for the same (or overlapping) entities.
+    const shared = getSharedCache();
+    if (isCacheValid(shared)) {
+      this._historyCache = shared;
+      this._rebuildSparklinePathCache();
+      const withData = Object.values(shared.data).filter((/** @type {*} */ d) => d.length >= 2).length;
+      if (withData > 0) this._updateHistorySections();
+      return;
+    }
+
+    if (this._historyFetchInProgress) return;
+    this._historyFetchInProgress = true;
     const zones = this._config._zones || [];
     /** @type {string[]} */
     const entityIds = [];
@@ -1492,13 +1714,16 @@ class PulseClimateCard extends HTMLElement {
       entityIds.push(this._discovery.hubEntities.outside_temp);
     }
 
-    if (entityIds.length === 0) return;
+    if (entityIds.length === 0) { this._historyFetchInProgress = false; return; }
     // Filter out any undefined/empty entries
     const validIds = entityIds.filter((/** @type {string} */ id) => id && typeof id === 'string' && id.includes('.'));
-    if (validIds.length === 0) return;
+    if (validIds.length === 0) { this._historyFetchInProgress = false; return; }
     try {
       const data = await fetchSparklineData(this._hass, validIds, 24);
       this._historyCache = updateCache(this._historyCache, data);
+      this._rebuildSparklinePathCache();
+      // Update shared cache so other card instances can reuse this data
+      updateSharedCache(data);
       // Count how many entities got data
       const withData = Object.values(data).filter((/** @type {*} */ d) => d.length >= 2).length;
       if (withData > 0) {
@@ -1506,12 +1731,61 @@ class PulseClimateCard extends HTMLElement {
       }
     } catch {
       warn('History fetch failed, using cached data');
+    } finally {
+      this._historyFetchInProgress = false;
     }
   }
 
+  /**
+   * Cache only the entity states that this card watches for differential updates.
+   * Avoids shallow-copying the entire hass.states object (hundreds of keys)
+   * on every update cycle.
+   */
+  _cacheWatchedStates() {
+    if (!this._hass || !this._config || !this._discovery) return;
+    const states = this._hass.states;
+    const zones = this._config._zones || [];
+    const hub = this._discovery.hubEntities;
+    /** @type {Record<string, *>} */
+    const watched = {};
+
+    // Zone climate entities + discovered per-zone sensors
+    for (const z of zones) {
+      const eid = z.entity;
+      if (states[eid]) watched[eid] = states[eid];
+      const zoneName = extractZoneName(eid);
+      const ze = this._discovery.zoneEntities?.[zoneName] || {};
+      for (const sensorId of Object.values(ze)) {
+        if (sensorId && states[sensorId]) watched[sensorId] = states[sensorId];
+      }
+    }
+
+    // Hub entities (api, bridge, homekit, weather, etc.)
+    for (const eid of Object.values(hub)) {
+      if (eid && states[eid]) watched[eid] = states[eid];
+    }
+
+    this._prevStates = watched;
+  }
+
   disconnectedCallback() {
-    this._historyCache = createHistoryCache();
+    // Preserve history cache across disconnect/reconnect — avoids blank
+    // sections on dashboard refresh while history re-fetches in background.
     if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+    // Abort all bind method controllers
+    this._chipAbort?.abort();
+    this._sectionChipAbort?.abort();
+    this._radialAbort?.abort();
+    this._timelineAbort?.abort();
+    this._heatmapAbort?.abort();
+    this._energyFlowAbort?.abort();
+    this._sparklineAbort?.abort();
+    // Stop radial shimmer animation
+    const firstArc = this._shadow?.querySelector('.arc-group');
+    if (firstArc && typeof /** @type {*} */ (firstArc).__shimmerStop === 'function') {
+      /** @type {*} */ (firstArc).__shimmerStop();
+    }
     // Clean up action listeners to prevent leaks
     const rows = this._shadow?.querySelectorAll('.zone-row') || [];
     for (const row of rows) {
@@ -1524,6 +1798,7 @@ class PulseClimateCard extends HTMLElement {
     if (this._config && this._hass && !this._shadow.querySelector('ha-card')) {
       if (!this._discovery) this._runDiscovery();
       this._fullRender();
+      this._refreshHistoryIfNeeded();
     }
   }
 

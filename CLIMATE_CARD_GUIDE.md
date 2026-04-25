@@ -219,6 +219,29 @@ sections:
 
 Sections are rendered in the order they appear in your `sections` list.
 
+### Section Compatibility
+
+Not all sections work with every setup. Here's a quick reference:
+
+| Section | Works with any climate entity | Needs Tado CE |
+|---|---|---|
+| `zones` | ✅ | — |
+| `graph` | ✅ | — |
+| `thermal_strip` | ✅ | — |
+| `comfort_strip` | ✅ | — |
+| `energy_flow` | ✅ (needs `heating_power`) | — |
+| `radial` | ✅ | — |
+| `donut` | ✅ (with custom `segments`) | ✅ (for `api_breakdown` / `homekit_saved`) |
+| `api` | — | ✅ |
+| `bridge` | — | ✅ |
+| `homekit` | — | ✅ |
+| `weather` | — | ✅ |
+| `environment` | — | ✅ |
+| `thermal` | — | ✅ |
+| `schedule` | — | ✅ |
+
+Sections marked "Needs Tado CE" rely on entities created by the [Tado CE](https://github.com/hiall-fyi/tado_ce) integration. Without those entities, these sections won't display any data.
+
 ### zones
 
 Your climate zones with temperature, humidity, power bars, and status chips. This is the primary section and is shown by default.
@@ -248,19 +271,35 @@ sections:
 
 ### donut
 
-A ring chart for visualising proportional data. Works with Tado CE API breakdown or HomeKit savings data, or you can define your own segments.
+A ring chart for visualising proportional data. **You must specify either a `source` or custom `segments`** — without one of these, the donut won't render.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `size` | number | `120` | Chart diameter in pixels |
-| `source` | string | — | Pre-built data source: `api_breakdown` or `homekit_saved` (Tado CE only) |
-| `segments` | list | — | Custom segments — each with `entity`, `label`, and `color` |
+| `source` | string | — | Pre-built data source: `api_breakdown` or `homekit_saved` (requires [Tado CE](https://github.com/hiall-fyi/tado_ce)) |
+| `segments` | list | — | Custom segments — each with `entity`, `label`, and `color` (works with any entity) |
+
+**Tado CE sources:**
 
 ```yaml
 sections:
   - type: donut
     source: api_breakdown
     size: 140
+```
+
+**Custom segments (any entity):**
+
+```yaml
+sections:
+  - type: donut
+    segments:
+      - entity: sensor.living_room_temperature
+        label: Living Room
+        color: "#FF9800"
+      - entity: sensor.bedroom_temperature
+        label: Bedroom
+        color: "#4CAF50"
 ```
 
 ### thermal_strip
@@ -334,35 +373,35 @@ sections:
 
 ### Tado CE Sections
 
-The following sections display data from the [Tado CE](https://github.com/hiall-fyi/tado_ce) integration. They appear automatically when Tado CE entities are detected, but you can also add them explicitly. If Tado CE is not installed, these sections show "No data available."
+The following sections display data from the [Tado CE](https://github.com/hiall-fyi/tado_ce) integration. They rely on auto-discovery of `sensor.tado_ce_*` entities — if these entities aren't present, the sections won't show any data. You can include them in your config regardless; they simply won't render if the required entities aren't found.
 
 #### api
 
-API usage dashboard showing a gauge of your current API usage, a sparkline of call history, and a breakdown of call types.
+API usage dashboard showing a gauge of your current API usage, a sparkline of call history, and a breakdown of call types. Needs: `sensor.tado_ce_*_api_usage`, `sensor.tado_ce_*_api_limit`, and related API entities.
 
 #### bridge
 
-Bridge connection status, boiler flow temperature, and weather compensation details.
+Bridge connection status, boiler flow temperature, and weather compensation details. Needs: `binary_sensor.tado_ce_*_bridge_connected` and related bridge entities.
 
 #### homekit
 
-HomeKit connection status, saved API calls, and write statistics.
+HomeKit connection status, saved API calls, and write statistics. Needs: `binary_sensor.tado_ce_*_homekit_connected` and related HomeKit entities.
 
 #### weather
 
-Outdoor temperature, current weather condition, and solar intensity.
+Outdoor temperature, current weather condition, and solar intensity. Needs: `sensor.tado_ce_*_outside_temp` and related weather entities.
 
 #### environment
 
-Per-zone environmental data — mold risk, condensation risk, comfort level, and surface temperature.
+Per-zone environmental data — mold risk, condensation risk, comfort level, and surface temperature. Needs per-zone sensors like `sensor.{zone}_ce_mold_risk`, `sensor.{zone}_ce_condensation`, etc.
 
 #### thermal
 
-Per-zone thermal analysis — heating rate, thermal inertia, preheat time, and analysis confidence.
+Per-zone thermal analysis — heating rate, thermal inertia, preheat time, and analysis confidence. Needs per-zone sensors like `sensor.{zone}_ce_heating_rate`, `sensor.{zone}_ce_thermal_inertia`, etc.
 
 #### schedule
 
-Per-zone schedule information — next scheduled change, deviation from schedule, and preheat advisor recommendations.
+Per-zone schedule information — next scheduled change, deviation from schedule, and preheat advisor recommendations. Needs per-zone sensors like `sensor.{zone}_ce_next_schedule`, `sensor.{zone}_ce_schedule_deviation`, etc.
 
 None of these sections have configurable options — they read data directly from your Tado CE entities.
 
@@ -463,7 +502,7 @@ If you have the [Tado CE](https://github.com/hiall-fyi/tado_ce) integration inst
 
 ### How It Works
 
-The card scans for entities matching the `sensor.tado_ce_*` pattern. When found, it automatically discovers:
+The card uses Home Assistant's entity registry to find your Tado CE sensors by their internal identifiers — this works regardless of your HA language setting (Italian, German, Spanish, etc.). When Tado CE entities are found, the card automatically discovers:
 
 **Per-zone sensors** — temperature, humidity, heating power, AC power, mold risk, condensation risk, surface temperature, dew point, comfort level, thermal inertia, heating rate, preheat time, open window, battery status, and more.
 
@@ -497,7 +536,7 @@ If you don't use Tado CE, the card still works with any `climate.*` entity. You 
 
 For history-based features like sparklines and strip charts, point `temperature_entity` and `humidity_entity` to your dedicated sensor entities (see [Generic Climate Entities](#generic-climate-entities) above).
 
-Tado CE-specific sections (api, bridge, homekit, weather, environment, thermal, schedule) will show "No data available" without Tado CE installed.
+Tado CE-specific sections (api, bridge, homekit, weather, environment, thermal, schedule) simply won't render without Tado CE installed — they don't take up any space on your card.
 
 ---
 
@@ -618,4 +657,4 @@ Several sections respond to taps and gestures:
 - **Visual editor doesn't cover everything** — per-zone chip filters, chip action overrides, and some section-specific options (like `outdoor_humidity_entity` on radial) are YAML-only. The editor handles the most common settings
 - **Comfort scores are approximate** — the comfort heatmap blends temperature deviation, humidity, and Tado CE comfort level into a single score. It's a useful overview, not a scientific measurement
 - **Energy flow needs heating power data** — the energy flow section only shows meaningful ribbons when your climate entities (or Tado CE sensors) report `heating_power`. Without it, you'll see "No heating data"
-- **One card per dashboard view** — some SVG gradient and filter IDs are shared across sections. If you place two Pulse Climate Cards on the same dashboard view, visual effects may interfere. Use one card per view with multiple sections instead
+- **Multiple cards share resources** — placing several Pulse Climate Cards on the same dashboard view works well. Cards share history data, entity discovery, and CSS to keep things efficient. Some SVG gradient IDs may overlap between cards in rare cases — if you notice visual glitches, try combining your zones into a single card with multiple sections instead

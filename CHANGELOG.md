@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-04-25
+
+**Performance, reliability, and international compatibility.**
+
+### Bug Fixes
+
+- **Charts and sparklines now load on page refresh** ([#29](https://github.com/hiall-fyi/pulse-card/issues/29) - @Si-Hill) — history-based sections (graphs, thermal strips, comfort heatmaps, sparklines) showed empty data after refreshing the dashboard. The card now re-fetches history on reconnect and preserves cached data across page navigations
+- **Radial shimmer and interactions survive updates** — the arc glow animation and tap-to-select stopped working after a zone's temperature changed. Now they re-bind correctly after each update
+- **Entity discovery now works in any language** ([#28](https://github.com/hiall-fyi/pulse-card/issues/28) - @dragorex71) — if your Home Assistant is set to Italian, German, or any non-English language, Tado CE sensors get translated names and the card couldn't find them. The card now looks up sensors by their stable internal identifier instead of matching names, so all sections work regardless of your HA language
+- **Battery and connection chip discovery** ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @driagi) — battery and connection sensors are now discovered correctly. These are device-level entities with a different naming pattern that the previous scanner missed. Multi-device zones (e.g. a room with two TRVs) show both battery sensors
+- **Battery chip icons now match the actual state** — the battery chip was comparing against uppercase states ("LOW") but Tado CE reports Title Case ("Low"). Icons and colors now resolve correctly for Normal, Low, and Critical states
+- **Condensation chip no longer shows when there's no risk** — heating zones report "None" when condensation risk is zero. The chip now hides in that case instead of showing a meaningless "None" label
+
+### Improvements
+
+- **Dramatically lower CPU usage on multi-card dashboards** ([#27](https://github.com/hiall-fyi/pulse-card/issues/27) - @hapklaar) — dashboards with many climate cards no longer spike CPU to 200%. Updates are now throttled and batched, and the card only tracks entities it actually uses instead of watching everything
+- **Cards on the same page share history data** — multiple climate cards no longer make separate data requests for the same sensors. The first card to fetch shares its data with all other cards on the page
+- **Cards on the same page share sensor discovery** — the scan that finds your Tado CE sensors now runs once and is shared across all cards, instead of each card scanning independently
+- **Zone updates skip when nothing changed** — the card now checks if any zone actually changed before doing work. On a dashboard with 15 zones and 50 cards, this avoids thousands of unnecessary checks per second
+- **History refresh preserves your interactions** — the 5-minute data refresh no longer rebuilds environment, thermal, and schedule sections. If you had a panel expanded or an item selected, it stays exactly as you left it
+- **Detail panel sparklines render instantly** — tapping a zone in the thermal strip or comfort heatmap now shows the sparkline immediately. The chart paths are prepared in advance when data arrives, not computed on every tap
+- **Tapping a zone always shows the latest data** — if you tap a zone 5 minutes after the last refresh, the detail panel now shows the current temperature and history, not stale data from the last refresh
+- **No more listener buildup on long-running dashboards** — re-rendering a section now cleanly removes old interactions before adding new ones, preventing slowdowns on dashboards that stay open for hours
+- **Smarter refresh targeting** — updating a section that doesn't have tappable chips (like a graph) no longer triggers unnecessary work on unrelated sections
+- **Styles shared across all cards** — on modern browsers, the card's stylesheet is parsed once and shared across all instances instead of each card parsing its own copy. Older browsers work exactly as before
+
+### Documentation
+
+- **Section compatibility table** ([#28](https://github.com/hiall-fyi/pulse-card/issues/28) - @dragorex71) — the Climate Card Guide now has a clear table showing which sections work with any climate entity and which need Tado CE
+- **Donut section requires a source** — the guide now explains that you need to specify `source: api_breakdown`, `source: homekit_saved`, or custom `segments` for the donut chart to render
+- **Tado CE sections list required entities** — each Tado CE section now documents which `sensor.tado_ce_*` entities it needs
+
 ## [1.0.0] - 2026-04-24
 
 **Pulse Climate Card — your climate dashboard in one card.**
