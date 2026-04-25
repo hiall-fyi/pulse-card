@@ -5,7 +5,7 @@
  */
 
 /** Pulse Switch Card version string. */
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 /** Card custom element name. */
 export const CARD_NAME = 'pulse-switch-card';

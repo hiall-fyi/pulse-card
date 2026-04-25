@@ -50,7 +50,9 @@ export function resolveZoneDisplay(entityId, states, zoneConfig) {
  * @returns {{cssVar: string, fallback: string}}
  */
 export function resolveRiskColor(level) {
-  return /** @type {Record<string, *>} */ (RISK_COLORS)[level] || RISK_COLORS.None;
+  // Normalise to Title Case for RISK_COLORS lookup (handles "critical", "CRITICAL", "Critical")
+  const normalised = level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
+  return /** @type {Record<string, *>} */ (RISK_COLORS)[normalised] || RISK_COLORS.Low;
 }
 
 /**
@@ -107,7 +109,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   const pushRiskChip = (type, icon, entityKey) => {
     if (!include(type) || !discoveredEntities[entityKey]) return;
     const s = states[discoveredEntities[entityKey]];
-    if (s && s.state !== 'unavailable' && s.state !== 'None') {
+    if (s && !['unavailable', 'unknown', 'none'].includes(s.state.toLowerCase())) {
       const riskColor = resolveRiskColor(s.state);
       chips.push({ type, icon, label: s.state, color: riskColor.fallback, severity: s.state, entityId: discoveredEntities[entityKey] });
     }
@@ -156,8 +158,9 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   if (include('battery') && discoveredEntities.battery) {
     const s = states[discoveredEntities.battery];
     if (s && s.state !== 'unavailable') {
-      const battIcon = s.state === 'LOW' || s.state === 'CRITICAL' ? 'mdi:battery-alert' : 'mdi:battery';
-      const battColor = s.state === 'CRITICAL' ? '#F44336' : s.state === 'LOW' ? '#FF9800' : undefined;
+      const battLower = s.state.toLowerCase();
+      const battIcon = battLower === 'low' || battLower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
+      const battColor = battLower === 'critical' ? '#F44336' : battLower === 'low' ? '#FF9800' : undefined;
       chips.push({ type: 'battery', icon: battIcon, label: s.state, color: battColor, entityId: discoveredEntities.battery });
     }
   }
