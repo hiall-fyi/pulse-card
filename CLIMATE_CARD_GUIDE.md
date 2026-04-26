@@ -523,6 +523,21 @@ zones:
 
 Zone-level `temperature_entity` and `humidity_entity` always take priority over auto-discovered entities.
 
+### External Sensor Auto-Detection
+
+If you've configured an external temperature or humidity sensor in Tado CE (e.g. a Sonoff Zigbee sensor), the card picks it up automatically. It reads the `external_temp_sensor` and `external_humidity_sensor` attributes from your climate entity and uses that sensor for history data — graphs, thermal strips, comfort heatmaps, and sparklines all benefit from the external sensor's denser reporting interval.
+
+The resolution order for history data is:
+
+1. **YAML override** (`temperature_entity` / `humidity_entity`) — always wins
+2. **External sensor** from Tado CE config — auto-detected, no YAML needed
+3. **Discovered Tado CE sensor** — the built-in TRV sensor
+4. **Climate entity fallback** — last resort
+
+When an external sensor is in use, a small label appears next to the zone name in thermal strips and comfort heatmaps showing the sensor's friendly name. Hover it to see the full entity ID.
+
+If you've just paired a new external sensor and it hasn't accumulated history yet, the card shows "Waiting for data" instead of "No data" so you know it's working.
+
 ### Without Tado CE
 
 If you don't use Tado CE, the card still works with any `climate.*` entity. You get:
@@ -652,7 +667,7 @@ Several sections respond to taps and gestures:
 
 ## Known Limitations
 
-- **History-based sections need a sensor entity** — sparklines, thermal strips, comfort heatmaps, and graph sections rely on HA history data. Climate entities (`climate.*`) don't store numeric history the same way sensors do. If you don't use Tado CE (which auto-discovers the right sensors), point `temperature_entity` and `humidity_entity` to your dedicated sensor entities for these features to work
+- **History-based sections need a sensor entity** — sparklines, thermal strips, comfort heatmaps, and graph sections rely on HA history data. Climate entities (`climate.*`) don't store numeric history the same way sensors do. If you use Tado CE with external sensors, the card picks them up automatically. For other integrations, point `temperature_entity` and `humidity_entity` to your dedicated sensor entities
 - **Frosted glass needs a modern browser** — the frosted glass effect on panels and tooltips uses `backdrop-filter`, which isn't supported in older browsers. The card falls back to a solid background — nothing breaks, it just looks less fancy
 - **Visual editor doesn't cover everything** — per-zone chip filters, chip action overrides, and some section-specific options (like `outdoor_humidity_entity` on radial) are YAML-only. The editor handles the most common settings
 - **Comfort scores are approximate** — the comfort heatmap blends temperature deviation, humidity, and Tado CE comfort level into a single score. It's a useful overview, not a scientific measurement

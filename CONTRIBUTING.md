@@ -52,6 +52,7 @@ src/
 │   ├── constants.js           #   Defaults, HVAC visuals, section types
 │   ├── chart-primitives.js    #   Shared SVG rendering (arcs, sparklines, colors)
 │   ├── zone-resolver.js       #   Tado CE entity auto-discovery
+│   ├── sensor-resolver.js     #   History sensor resolution chain (external sensor auto-detection)
 │   ├── history.js             #   History cache management
 │   └── sections/              #   One file per section type
 │       ├── zones.js, radial.js, energy-flow.js, ...

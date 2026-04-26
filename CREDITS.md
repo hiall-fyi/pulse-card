@@ -4,6 +4,12 @@ Community members who shaped Pulse Card through bug reports, feature requests, t
 
 ---
 
+### v1.2.0
+
+- **[@driagi](https://github.com/driagi)** — Reported zone icon not rendering, prominent sparkline color bleeding between zones, and tap_action issues in the companion app. Confirmed v2.x entity discovery root cause through persistent testing and screenshots ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20))
+- **[@dragorex71](https://github.com/dragorex71)** — Reported open_window chip not showing on v1.1.0, helping identify remaining discovery edge cases ([#28](https://github.com/hiall-fyi/pulse-card/issues/28))
+- **[@Si-Hill](https://github.com/Si-Hill)** — Shared detailed debug output and Sonoff external sensor details that led to the external sensor auto-detection feature. Provided screenshots of the black cell issue in thermal strips ([#29](https://github.com/hiall-fyi/pulse-card/issues/29))
+
 ### v1.1.0
 
 - **[@dragorex71](https://github.com/dragorex71)** — Discovered the i18n entity discovery issue on Italian HA setups, confirmed the root cause was translated entity IDs, and reported the donut chart needing a source config ([#28](https://github.com/hiall-fyi/pulse-card/issues/28))

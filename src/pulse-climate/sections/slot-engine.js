@@ -31,8 +31,16 @@ export function computeSlots(data, slots, windowMs) {
 
   /** @type {SlotData[]} */
   const result = [];
-  let lastVal = null;
   let di = 0;
+
+  // Seed lastVal from the most recent data point before the window starts.
+  // Without this, early slots show null (black cells) even when a valid
+  // reading exists just before the window boundary.
+  let lastVal = null;
+  while (di < data.length && data[di].t < windowStart) {
+    if (isFinite(data[di].v)) lastVal = Math.round(data[di].v * 10) / 10;
+    di++;
+  }
 
   for (let s = 0; s < slots; s++) {
     const sStart = windowStart + s * slotSize;

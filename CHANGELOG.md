@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-04-26
+
+**External sensor auto-detection, discovery fixes, and visual polish.**
+
+### New
+
+- **External sensor auto-detection** ([#29](https://github.com/hiall-fyi/pulse-card/issues/29) - @Si-Hill) — if you've configured an external temperature or humidity sensor in Tado CE (e.g. Sonoff Zigbee SNZB-02D), the card now picks it up automatically and uses it for graphs, thermal strips, comfort heatmaps, and sparklines. External sensors typically report every few minutes, so your history charts will be noticeably denser. No YAML changes needed — the card reads the `external_temp_sensor` and `external_humidity_sensor` attributes from your climate entity
+- **Source indicator on history sections** — when a zone's history data comes from an external sensor, a small label appears next to the zone name showing the sensor's friendly name. Hover for the full entity ID. Helps you understand why your graphs might differ from the Tado app
+- **"Waiting for data" vs "No data"** — when an external sensor is configured but hasn't accumulated history yet (e.g. just paired), the card shows "Waiting for data" instead of "No data" so you know it's working, just needs time
+- **Zone icons** ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @driagi) — custom icons set via `icon: mdi:sofa` in your zone config now render next to the zone name
+
+### Bug Fixes
+
+- **Thermal strip no longer shows black cells at the start** — the first few time slots in thermal and comfort strips appeared black when history data started slightly before the visible window. The card now carries forward the last known reading, so early slots show the correct temperature colour
+- **Empty heatmap cells are now visually distinct** — cells with no data now show a subtle diagonal stripe pattern instead of a solid dark colour that looked like a temperature reading
+- **Tado CE sensors discovered for v2.x upgrade users** ([#29](https://github.com/hiall-fyi/pulse-card/issues/29) - @Si-Hill, [Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @driagi) — if you first installed Tado CE before v3.0, your sensors kept the old internal identifiers. The card now recognises both old and new formats, so temperature, humidity, mold risk, and all other zone sensors are discovered correctly
+- **Multi-valve zones show all battery chips** — rooms with two or more TRVs now show a battery chip for each valve, not just the first one found
+- **Prominent sparkline colors no longer bleed between zones** ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @driagi) — each zone's prominent sparkline now uses its own SVG gradient, so setting different colors per zone works as expected
+- **History fetch deduplication** — when an external sensor entity matches the discovered sensor, the card no longer fetches the same entity twice
+
 ## [1.1.0] - 2026-04-25
 
 **Performance, reliability, and international compatibility.**

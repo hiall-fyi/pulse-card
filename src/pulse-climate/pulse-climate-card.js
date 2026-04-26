@@ -7,6 +7,7 @@ import { CARD_NAME, EDITOR_NAME, VERSION } from './constants.js';
 import { STYLES } from './styles.js';
 import { normalizeClimateConfig, warn, resolveZoneDisplay } from './utils.js';
 import { discoverTadoEntities, extractZoneName } from './zone-resolver.js';
+import { resolveHistoryTempSensor, resolveHistoryHumSensor } from './sensor-resolver.js';
 import { createHistoryCache, isCacheValid, updateCache, getSharedCache, updateSharedCache } from './history.js';
 import { renderZonesSection, updateZonesSection } from './sections/zones.js';
 import { renderApiSection } from './sections/api.js';
@@ -1680,15 +1681,18 @@ class PulseClimateCard extends HTMLElement {
     /** @type {string[]} */
     const entityIds = [];
 
-    // Collect sensor entities for history (not climate entities — their state is "heat"/"cool", not numeric)
+    // Collect sensor entities for history using shared resolver
+    // (ensures same resolution chain as section renderers — Req 5, 6)
+    const states = this._hass.states;
     for (const zone of zones) {
       const zoneName = extractZoneName(zone.entity);
       const zoneEntities = this._discovery?.zoneEntities?.[zoneName] || {};
-      // Temperature sensor: explicit override → discovered → climate entity fallback
-      entityIds.push(zone.temperature_entity || zoneEntities.temperature || zone.entity);
-      // Humidity sensor: explicit override → discovered
-      const humId = zone.humidity_entity || zoneEntities.humidity;
-      if (humId) entityIds.push(humId);
+      // Temperature sensor via 4-level resolution chain
+      const tempResolved = resolveHistoryTempSensor(zone.entity, states, zoneEntities, zone);
+      entityIds.push(tempResolved.entityId);
+      // Humidity sensor via 4-level resolution chain
+      const humResolved = resolveHistoryHumSensor(zone.entity, states, zoneEntities, zone);
+      if (humResolved) entityIds.push(humResolved.entityId);
     }
 
     // Hub entities for API history
@@ -1715,8 +1719,8 @@ class PulseClimateCard extends HTMLElement {
     }
 
     if (entityIds.length === 0) { this._historyFetchInProgress = false; return; }
-    // Filter out any undefined/empty entries
-    const validIds = entityIds.filter((/** @type {string} */ id) => id && typeof id === 'string' && id.includes('.'));
+    // Filter out undefined/empty entries and deduplicate (Req 6.3)
+    const validIds = [...new Set(entityIds.filter((/** @type {string} */ id) => id && typeof id === 'string' && id.includes('.')))];
     if (validIds.length === 0) { this._historyFetchInProgress = false; return; }
     try {
       const data = await fetchSparklineData(this._hass, validIds, 24);

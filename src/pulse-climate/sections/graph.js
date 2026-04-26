@@ -9,6 +9,7 @@ import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { CHART_PALETTE } from '../constants.js';
 import { buildFilledSparkline, buildMultiLinePaths, buildLegendChips } from '../chart-primitives.js';
 import { extractZoneName } from '../zone-resolver.js';
+import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 
 /**
  * Resolve the color for a zone at a given index.
@@ -110,28 +111,6 @@ export function renderGraphSection(sectionConfig, zones, historyCache, states, d
 }
 
 /**
- * Resolve the best sensor entity for history data.
- * @param {string} climateEntityId
- * @param {string} attribute
- * @param {import('../types.js').TadoDiscovery} discovery
- * @param {import('../types.js').ZoneConfig[]} [zones] - Zone configs for override lookup.
- * @returns {string} Entity ID to use for history lookup.
- */
-function resolveHistoryEntity(climateEntityId, attribute, discovery, zones) {
-  const zoneName = extractZoneName(climateEntityId);
-  const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
-  const zoneConfig = zones?.find((/** @type {*} */ z) => z.entity === climateEntityId);
-
-  if (attribute === 'current_temperature' || attribute === 'temperature') {
-    return zoneConfig?.temperature_entity || zoneEntities.temperature || climateEntityId;
-  }
-  if (attribute === 'current_humidity' || attribute === 'humidity') {
-    return zoneConfig?.humidity_entity || zoneEntities.humidity || climateEntityId;
-  }
-  return climateEntityId;
-}
-
-/**
  * Render a single attribute graph with legend.
  * @param {string[]} climateIds
  * @param {string} attribute
@@ -147,17 +126,22 @@ function resolveHistoryEntity(climateEntityId, attribute, discovery, zones) {
 function renderAttributeGraph(climateIds, attribute, label, height, palette, historyCache, states, discovery, zones) {
   const series = [];
   const legendItems = [];
+  const isHumidity = attribute === 'current_humidity' || attribute === 'humidity';
 
   for (let i = 0; i < climateIds.length; i++) {
     const climateId = climateIds[i];
     const color = resolveChartColor(i, palette);
-    const historyEntityId = resolveHistoryEntity(climateId, attribute, discovery, zones);
-    const data = historyCache.data[historyEntityId] || [];
     const zoneName = extractZoneName(climateId);
+    const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
     const zoneConfig = zones?.find((/** @type {*} */ z) => z.entity === climateId);
+    const resolved = isHumidity
+      ? resolveHistoryHumSensor(climateId, states, zoneEntities, zoneConfig)
+      : resolveHistoryTempSensor(climateId, states, zoneEntities, zoneConfig);
+    const historyEntityId = resolved?.entityId || climateId;
+    const data = historyCache.data[historyEntityId] || [];
     const friendlyName = zoneConfig?.name || states[climateId]?.attributes?.friendly_name || zoneName;
     const currentValue = states[climateId]?.attributes?.[attribute];
-    const unit = attribute === 'current_humidity' ? '%' : (states[climateId]?.attributes?.unit_of_measurement || '°C');
+    const unit = isHumidity ? '%' : (states[climateId]?.attributes?.unit_of_measurement || '°C');
 
     series.push({ entityId: historyEntityId, data, color });
     legendItems.push({

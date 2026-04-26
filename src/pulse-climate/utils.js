@@ -165,6 +165,17 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     }
   }
 
+  // Second battery for multi-valve zones (e.g. room with 2+ TRVs)
+  if (include('battery') && discoveredEntities.battery_2) {
+    const s2 = states[discoveredEntities.battery_2];
+    if (s2 && s2.state !== 'unavailable') {
+      const batt2Lower = s2.state.toLowerCase();
+      const batt2Icon = batt2Lower === 'low' || batt2Lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
+      const batt2Color = batt2Lower === 'critical' ? '#F44336' : batt2Lower === 'low' ? '#FF9800' : undefined;
+      chips.push({ type: 'battery_2', icon: batt2Icon, label: s2.state, color: batt2Color, entityId: discoveredEntities.battery_2 });
+    }
+  }
+
   // Smart Valve Control — reads climate entity attributes directly (not discovered entities)
   if (include('valve_control')) {
     const climateState = states[zoneState.entityId];

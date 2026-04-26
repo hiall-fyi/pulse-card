@@ -8,6 +8,7 @@
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { resolveZoneState, resolveHvacVisual, tempToPosition, computeGlowStdDev } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
+import { resolveHistoryTempSensor } from '../sensor-resolver.js';
 import { temperatureToColor, buildFilledSparkline, buildSparklineDataAttr } from '../chart-primitives.js';
 import { buildSparklinePath } from '../../utils.js';
 
@@ -46,7 +47,7 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
   let html = `<div class="zone-row${unavailableClass}" tabindex="0" role="button"
     aria-label="${escapeHtml(ariaLabel)}" data-entity="${escapeHtml(zs.entityId)}">`;
   html += `<div class="zone-header">`;
-  html += `<span class="zone-name">${escapeHtml(zs.name)}${humidityDisplay}</span>`;
+  html += `<span class="zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}${humidityDisplay}</span>`;
   html += `<span class="zone-temp">${tempDisplay}${targetDisplay}</span>`;
   html += `</div>`;
 
@@ -121,7 +122,7 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
 
     if (sparklineMode === 'prominent') {
       // Prominent mode: filled sparkline using shared primitive
-      html += renderProminentSparkline(lineColor, sparklineData, zs.unit);
+      html += renderProminentSparkline(lineColor, sparklineData, zs.unit, zs.entityId);
     }
     // overlay mode: no standalone sparkline block (rendered inside gauge if applicable)
   }
@@ -204,7 +205,7 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
   // Zone info overlay
   html += `<div class="pulse-info">`;
   html += `<div class="pulse-info-left">`;
-  html += `<div class="zone-name">${escapeHtml(zs.name)}</div>`;
+  html += `<div class="zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}</div>`;
   html += `<div class="pulse-status">`;
   html += `<span class="status-dot" style="background:${safeColor}"></span>`;
   html += `${escapeHtml(actionText)}`;
@@ -230,7 +231,15 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
  * @param {string} unit - Temperature unit string.
  * @returns {string} HTML string.
  */
-function renderProminentSparkline(lineColor, data, unit) {
+/**
+ * Render a prominent (filled area) sparkline below the zone header.
+ * @param {string} lineColor - CSS color for the sparkline.
+ * @param {{t: number, v: number}[]} data - History data points.
+ * @param {string} unit - Temperature unit.
+ * @param {string} [entityId] - Entity ID for unique gradient ID.
+ * @returns {string} HTML string.
+ */
+function renderProminentSparkline(lineColor, data, unit, entityId) {
   const result = buildFilledSparkline(data, 300, 40, 48);
   if (!result) {
     // Fallback to line-only sparkline
@@ -239,15 +248,18 @@ function renderProminentSparkline(lineColor, data, unit) {
     return `<div class="sparkline-prominent"><svg viewBox="0 0 300 40" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${sanitizeCssValue(lineColor)}" stroke-width="1.5" opacity="0.7" /></svg></div>`;
   }
 
+  // Use entity ID hash for unique gradient ID — prevents color bleeding between zones
+  const gradSuffix = entityId ? entityId.replace(/[^a-z0-9]/gi, '-') : String(Math.random()).slice(2, 8);
+  const gradId = `prom-grad-${gradSuffix}`;
   const safeColor = sanitizeCssValue(lineColor);
   const dataAttr = buildSparklineDataAttr(data, 24, unit);
   let html = `<div class="sparkline-filled" style="height:40px"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
   html += `<svg viewBox="0 0 300 40" preserveAspectRatio="none">`;
-  html += `<defs><linearGradient id="prom-grad" x1="0" y1="0" x2="0" y2="1">`;
+  html += `<defs><linearGradient id="${escapeHtml(gradId)}" x1="0" y1="0" x2="0" y2="1">`;
   html += `<stop offset="0%" stop-color="${safeColor}" stop-opacity="0.3"/>`;
   html += `<stop offset="100%" stop-color="${safeColor}" stop-opacity="0"/>`;
   html += `</linearGradient></defs>`;
-  html += `<path d="${result.areaPath}" fill="url(#prom-grad)" />`;
+  html += `<path d="${result.areaPath}" fill="url(#${escapeHtml(gradId)})" />`;
   html += `<path d="${result.linePath}" fill="none" stroke="${safeColor}" stroke-width="1.5" opacity="0.7" />`;
   html += `</svg></div>`;
   return html;
@@ -295,9 +307,9 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
     const zoneName = extractZoneName(entityId);
     const discoveredEntities = discovery?.zoneEntities?.[zoneName] || {};
     const zoneState = resolveZoneState(entityId, discoveredEntities, states, zoneConfig, config);
-    // History is keyed by sensor entity ID (not climate entity ID)
-    const tempSensorId = zoneConfig.temperature_entity || discoveredEntities.temperature || entityId;
-    const sparklineData = historyCache?.data?.[tempSensorId] || historyCache?.data?.[entityId] || [];
+    // History is keyed by sensor entity ID (not climate entity ID) — use shared resolver
+    const tempResolved = resolveHistoryTempSensor(entityId, states, discoveredEntities, zoneConfig);
+    const sparklineData = historyCache?.data?.[tempResolved.entityId] || historyCache?.data?.[entityId] || [];
     html += renderZoneRow(zoneState, zoneConfig, config, sparklineData);
   }
 

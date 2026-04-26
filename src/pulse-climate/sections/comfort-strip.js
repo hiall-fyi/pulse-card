@@ -8,6 +8,7 @@
 
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { extractZoneName } from '../zone-resolver.js';
+import { resolveHistoryTempSensor, resolveHistoryHumSensor, buildSourceIndicator } from '../sensor-resolver.js';
 import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slot-engine.js';
 
 /**
@@ -135,8 +136,10 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     const zoneName = extractZoneName(entityId);
     const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
     const friendlyName = zoneConfig.name || states[entityId]?.attributes?.friendly_name || zoneName;
-    const tempSensorId = zoneConfig.temperature_entity || zoneEntities.temperature || entityId;
-    const humSensorId = zoneConfig.humidity_entity || zoneEntities.humidity;
+    const tempResolved = resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig);
+    const tempSensorId = tempResolved.entityId;
+    const humResolved = resolveHistoryHumSensor(entityId, states, zoneEntities, zoneConfig);
+    const humSensorId = humResolved?.entityId || null;
     const tempData = historyCache?.data?.[tempSensorId] || [];
     const humData = humSensorId ? (historyCache?.data?.[humSensorId] || []) : [];
     const targetTemp = states[entityId]?.attributes?.temperature ?? null;
@@ -146,9 +149,20 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     // Compute scores for each slot as SlotData[]
     /** @type {import('./slot-engine.js').SlotData[]} */
     const slotData = [];
+    const slotSize = windowMs / slots;
+
+    // Seed lastScore from the most recent data before the window starts,
+    // so early slots don't show as empty when data exists just before the boundary.
     /** @type {number|null} */
     let lastScore = null;
-    const slotSize = windowMs / slots;
+    if (tempData.length > 0) {
+      const preWindowTemp = closestValue(tempData, windowStart, Infinity);
+      const preWindowHum = humData.length > 0 ? closestValue(humData, windowStart, Infinity) : null;
+      if (preWindowTemp !== null) {
+        lastScore = computeComfortScore(preWindowTemp, targetTemp, preWindowHum, comfortLevel);
+      }
+    }
+
     for (let s = 0; s < slots; s++) {
       const slotStart = windowStart + s * slotSize;
       const slotMid = slotStart + slotSize / 2;
@@ -162,7 +176,7 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     }
 
     html += `<div class="heatmap-row" data-zone="${escapeHtml(zoneName)}" data-idx="${z}">`;
-    html += `<span class="zone-label">${escapeHtml(friendlyName)}</span>`;
+    html += `<span class="zone-label">${escapeHtml(friendlyName)}${buildSourceIndicator(tempResolved, states)}</span>`;
     const ariaLabel = `${friendlyName} comfort over ${hours}h`;
     if (mode === 'timeline') {
       html += renderTimelineStrip(slotData, scoreToColor, { ariaLabel, nowPct });
