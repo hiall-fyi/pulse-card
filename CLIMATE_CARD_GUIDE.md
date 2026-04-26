@@ -121,7 +121,9 @@ zones:
       - battery
 ```
 
-Available chip types: `hvac_action`, `overlay`, `preset`, `humidity`, `open_window`, `window_predicted`, `mold_risk`, `condensation`, `comfort_level`, `preheat_now`, `battery`, `valve_control`, `temp_source`.
+Available chip types: `hvac_action`, `overlay`, `preset`, `humidity`, `open_window`, `window_predicted`, `mold_risk`, `condensation`, `comfort_level`, `preheat_now`, `battery`, `battery_all`, `valve_control`, `temp_source`.
+
+For multi-valve zones (rooms with 2+ TRVs), `battery` shows the worst battery state across all valves — if 3 are Normal and 1 is Low, you see "Low". Use `battery_all` to show every valve's battery individually.
 
 ### Sparkline Modes
 

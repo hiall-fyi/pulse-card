@@ -4,6 +4,10 @@ Community members who shaped Pulse Card through bug reports, feature requests, t
 
 ---
 
+### v1.2.1
+
+- **[@driagi](https://github.com/driagi)** — Ran the targeted console debug that revealed `unique_id: undefined` across all entities, uncovering that HA removed `unique_id` from the frontend registry in 2023.3. This led to the full discovery rewrite using device grouping ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20))
+
 ### v1.2.0
 
 - **[@driagi](https://github.com/driagi)** — Reported zone icon not rendering, prominent sparkline color bleeding between zones, and tap_action issues in the companion app. Confirmed v2.x entity discovery root cause through persistent testing and screenshots ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20))

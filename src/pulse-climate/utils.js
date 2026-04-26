@@ -155,24 +155,45 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     }
   }
 
-  if (include('battery') && discoveredEntities.battery) {
-    const s = states[discoveredEntities.battery];
-    if (s && s.state !== 'unavailable') {
-      const battLower = s.state.toLowerCase();
-      const battIcon = battLower === 'low' || battLower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-      const battColor = battLower === 'critical' ? '#F44336' : battLower === 'low' ? '#FF9800' : undefined;
-      chips.push({ type: 'battery', icon: battIcon, label: s.state, color: battColor, entityId: discoveredEntities.battery });
+  // Battery chips — default: show worst state across all TRVs in the zone.
+  // Use chips: [battery_all] to show every TRV's battery individually.
+  if (include('battery') || include('battery_all')) {
+    const showAll = chipFilter && chipFilter.includes('battery_all');
+    // Collect all battery slots: battery, battery_2, battery_3, ...
+    /** @type {{eid: string, state: string, lower: string}[]} */
+    const batteries = [];
+    const keys = ['battery'];
+    let idx = 2;
+    while (discoveredEntities[`battery_${idx}`]) { keys.push(`battery_${idx}`); idx++; }
+    for (const key of keys) {
+      const eid = discoveredEntities[key];
+      if (!eid) continue;
+      const s = states[eid];
+      if (!s || s.state === 'unavailable') continue;
+      batteries.push({ eid, state: s.state, lower: s.state.toLowerCase() });
     }
-  }
 
-  // Second battery for multi-valve zones (e.g. room with 2+ TRVs)
-  if (include('battery') && discoveredEntities.battery_2) {
-    const s2 = states[discoveredEntities.battery_2];
-    if (s2 && s2.state !== 'unavailable') {
-      const batt2Lower = s2.state.toLowerCase();
-      const batt2Icon = batt2Lower === 'low' || batt2Lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-      const batt2Color = batt2Lower === 'critical' ? '#F44336' : batt2Lower === 'low' ? '#FF9800' : undefined;
-      chips.push({ type: 'battery_2', icon: batt2Icon, label: s2.state, color: batt2Color, entityId: discoveredEntities.battery_2 });
+    if (batteries.length > 0) {
+      if (showAll) {
+        // Show every battery chip individually
+        for (let i = 0; i < batteries.length; i++) {
+          const b = batteries[i];
+          const battIcon = b.lower === 'low' || b.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
+          const battColor = b.lower === 'critical' ? '#F44336' : b.lower === 'low' ? '#FF9800' : undefined;
+          chips.push({ type: `battery${i > 0 ? `_${i + 1}` : ''}`, icon: battIcon, label: b.state, color: battColor, entityId: b.eid });
+        }
+      } else {
+        // Show worst battery state only (Critical > Low > Normal)
+        /** @type {Record<string, number>} */
+        const SEVERITY = { critical: 3, low: 2, normal: 1 };
+        let worst = batteries[0];
+        for (const b of batteries) {
+          if ((SEVERITY[b.lower] || 0) > (SEVERITY[worst.lower] || 0)) worst = b;
+        }
+        const battIcon = worst.lower === 'low' || worst.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
+        const battColor = worst.lower === 'critical' ? '#F44336' : worst.lower === 'low' ? '#FF9800' : undefined;
+        chips.push({ type: 'battery', icon: battIcon, label: worst.state, color: battColor, entityId: worst.eid });
+      }
     }
   }
 

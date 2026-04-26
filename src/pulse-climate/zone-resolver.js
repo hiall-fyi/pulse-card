@@ -171,45 +171,30 @@ const TADO_HUB_PATTERNS = {
  * Build a lookup index from hass.entities: translation_key → entity_id
  * for all Tado CE entities. This is O(n) once, then O(1) per lookup.
  * @param {Record<string, import('./types.js').HassEntityRegistryEntry>} entities - hass.entities registry.
- * @returns {{byTranslationKey: Map<string, string>, byUniqueIdSuffix: Map<string, string>}}
+ * @returns {{byTranslationKey: Map<string, string>}}
  */
 function buildRegistryIndex(entities) {
-  /** @type {Map<string, string>} translation_key → entity_id */
+  /** @type {Map<string, string>} translation_key → entity_id (first match for hub entities) */
   const byTranslationKey = new Map();
-  /** @type {Map<string, string>} unique_id suffix → entity_id */
-  const byUniqueIdSuffix = new Map();
 
   for (const [entityId, entry] of Object.entries(entities)) {
     if (entry.platform !== 'tado_ce') continue;
     if (entry.translation_key) {
       // Multiple entities may share a translation_key (e.g. per-zone "temperature").
-      // Store all of them — zone matching will filter by unique_id suffix later.
       // For hub entities (only one per translation_key), first match wins.
       if (!byTranslationKey.has(entry.translation_key)) {
         byTranslationKey.set(entry.translation_key, entityId);
       }
     }
-    if (entry.unique_id) {
-      // Extract suffix after the prefix portion of the unique_id.
-      // v3+: tado_ce_{home_id}_{suffix...} — home_id is numeric
-      // v2:  tado_ce_{suffix...} — no home_id, suffix starts immediately after "tado_ce_"
-      const parts = entry.unique_id.split('_');
-      // Find the first segment after "tado" and "ce" that isn't purely numeric (= start of suffix)
-      const idx = parts.findIndex((p, i) => i >= 2 && !/^\d+$/.test(p));
-      if (idx > 0) {
-        const suffix = parts.slice(idx).join('_');
-        byUniqueIdSuffix.set(suffix, entityId);
-      }
-    }
   }
 
-  return { byTranslationKey, byUniqueIdSuffix };
+  return { byTranslationKey };
 }
 
 /**
  * Discover hub entities using the entity registry (i18n-safe).
  * @param {Record<string, import('./types.js').HassEntityRegistryEntry>} entities - hass.entities.
- * @param {{byTranslationKey: Map<string, string>, byUniqueIdSuffix: Map<string, string>}} index - Pre-built registry index.
+ * @param {{byTranslationKey: Map<string, string>}} index - Pre-built registry index.
  * @returns {Record<string, string>} Logical key → entity_id map.
  */
 function discoverHubViaRegistry(entities, index) {
@@ -217,13 +202,8 @@ function discoverHubViaRegistry(entities, index) {
   const hubEntities = {};
 
   for (const [logicalKey, translationKey] of Object.entries(HUB_TRANSLATION_KEYS)) {
-    // Primary: translation_key match
     const byTk = index.byTranslationKey.get(translationKey);
-    if (byTk) { hubEntities[logicalKey] = byTk; continue; }
-
-    // Secondary: unique_id suffix match (for entities without translation_key)
-    const bySuffix = index.byUniqueIdSuffix.get(translationKey);
-    if (bySuffix) { hubEntities[logicalKey] = bySuffix; }
+    if (byTk) hubEntities[logicalKey] = byTk;
   }
 
   return hubEntities;
@@ -231,94 +211,61 @@ function discoverHubViaRegistry(entities, index) {
 
 /**
  * Discover zone entities using the entity registry (i18n-safe).
- * Zone entities have unique_id pattern: tado_ce_{home_id}_zone_{zone_id}_{suffix}
- * We match by finding Tado CE entities whose unique_id contains the zone's climate
- * entity's zone_id and ends with the expected suffix.
+ * Uses device_id grouping: all entities in a Tado CE zone share the same device_id.
+ * For each configured zone, find the climate entity's device_id, then scan all
+ * Tado CE entities with that device_id and match by translation_key.
+ *
+ * Note: hass.entities does NOT include unique_id (removed in HA 2023.3).
+ * device_id + translation_key is the only reliable discovery method.
+ *
  * @param {Record<string, import('./types.js').HassEntityRegistryEntry>} entities - hass.entities.
  * @param {string[]} zoneNames - Zone name prefixes from climate entity IDs.
  * @param {Record<string, *>} states - hass.states for existence check.
  * @returns {Record<string, Record<string, string>>} zoneName → {logicalKey → entity_id}.
  */
 function discoverZonesViaRegistry(entities, zoneNames, states) {
-  // Build a per-zone lookup: for each zone, find its climate entity's unique_id
-  // to extract the zone_id, then find all zone-level sensors by unique_id suffix.
-
-  // First, build a map of all Tado CE entities grouped by their zone_id
-  // unique_id pattern: tado_ce_{home_id}_zone_{zone_id}_{suffix} (v3+)
-  //                 or tado_ce_zone_{zone_id}_{suffix} (v2.x upgrades)
-  /** @type {Map<string, {suffix: string, entityId: string}[]>} zone_id → entries */
-  const zoneIdMap = new Map();
-
-  for (const [entityId, entry] of Object.entries(entities)) {
-    if (entry.platform !== 'tado_ce' || !entry.unique_id) continue;
-    const match = entry.unique_id.match(/^tado_ce_(?:\d+_)?zone_(\d+)_(.+)$/);
-    if (!match) continue;
-    const [, zoneId, suffix] = match;
-    if (!zoneIdMap.has(zoneId)) zoneIdMap.set(zoneId, []);
-    /** @type {*} */ (zoneIdMap.get(zoneId)).push({ suffix, entityId });
-  }
-
-  // For each configured zone, find its zone_id from the climate entity's unique_id
   /** @type {Record<string, Record<string, string>>} */
   const zoneEntities = {};
+
+  // Combined zone + device translation keys for a single scan
+  const ALL_ZONE_KEYS = { ...ZONE_TRANSLATION_KEYS, ...DEVICE_TRANSLATION_KEYS };
 
   for (const zoneName of zoneNames) {
     zoneEntities[zoneName] = {};
 
-    // Try to find the climate entity's registry entry to get zone_id
     const climateEntityId = `climate.${zoneName}`;
     const climateEntry = entities[climateEntityId];
-    let zoneId = null;
-
-    if (climateEntry?.platform === 'tado_ce' && climateEntry.unique_id) {
-      // Pattern: tado_ce_{home_id}_zone_{zone_id}_climate (v3+)
-      //       or tado_ce_zone_{zone_id}_climate (v2.x upgrades)
-      const climateMatch = climateEntry.unique_id.match(/^tado_ce_(?:\d+_)?zone_(\d+)_/);
-      if (climateMatch) zoneId = climateMatch[1];
-    }
-
-    if (zoneId && zoneIdMap.has(zoneId)) {
-      const entries = /** @type {*[]} */ (zoneIdMap.get(zoneId));
-      // Build suffix → logicalKey reverse map from ZONE_TRANSLATION_KEYS
-      // Zone unique_id suffixes match the values in ZONE_TRANSLATION_KEYS
-      // (e.g. suffix "temp" for temperature, "humidity" for humidity)
-      for (const [logicalKey, translationKey] of Object.entries(ZONE_TRANSLATION_KEYS)) {
-        // Match by translation_key on the registry entry (most reliable)
-        const byTk = entries.find((e) => {
-          const regEntry = entities[e.entityId];
-          return regEntry?.translation_key === translationKey;
-        });
-        if (byTk && states[byTk.entityId]) {
-          zoneEntities[zoneName][logicalKey] = byTk.entityId;
-        }
-      }
-    }
-  }
-
-  // Device-level discovery: battery, connection share device_id with climate entity
-  for (const zoneName of zoneNames) {
-    const climateEntityId = `climate.${zoneName}`;
-    const climateEntry = entities[climateEntityId];
-    if (!climateEntry?.device_id) continue;
+    if (!climateEntry?.device_id || climateEntry.platform !== 'tado_ce') continue;
 
     const deviceId = climateEntry.device_id;
 
+    // Single scan: find all Tado CE entities sharing this device_id
     for (const [entityId, entry] of Object.entries(entities)) {
       if (entry.platform !== 'tado_ce' || entry.device_id !== deviceId) continue;
       if (!entry.translation_key || !states[entityId]) continue;
 
-      for (const [logicalKey, tkPrefix] of Object.entries(DEVICE_TRANSLATION_KEYS)) {
-        if (entry.translation_key === tkPrefix) {
-          // Primary device entity (e.g. "battery")
-          if (!zoneEntities[zoneName][logicalKey]) {
-            zoneEntities[zoneName][logicalKey] = entityId;
-          }
-        } else if (entry.translation_key === `${tkPrefix}_suffixed`) {
-          // Secondary device entity (e.g. "battery_suffixed")
-          const suffixedKey = `${logicalKey}_2`;
-          if (!zoneEntities[zoneName][suffixedKey]) {
-            zoneEntities[zoneName][suffixedKey] = entityId;
-          }
+      const tk = entry.translation_key;
+
+      // Handle suffixed variants (battery_suffixed, connection_suffixed)
+      if (tk.endsWith('_suffixed')) {
+        const baseTk = tk.replace('_suffixed', '');
+        // Find the logical key for this base translation_key
+        const logicalKey = Object.keys(ALL_ZONE_KEYS).find((k) => ALL_ZONE_KEYS[k] === baseTk);
+        if (!logicalKey) continue;
+        // Fill primary slot first, then numbered slots
+        if (!zoneEntities[zoneName][logicalKey]) {
+          zoneEntities[zoneName][logicalKey] = entityId;
+        } else {
+          let idx = 2;
+          while (zoneEntities[zoneName][`${logicalKey}_${idx}`]) idx++;
+          zoneEntities[zoneName][`${logicalKey}_${idx}`] = entityId;
+        }
+      } else {
+        // Standard entity — match translation_key to logical key
+        const logicalKey = Object.keys(ALL_ZONE_KEYS).find((k) => ALL_ZONE_KEYS[k] === tk);
+        if (!logicalKey) continue;
+        if (!zoneEntities[zoneName][logicalKey]) {
+          zoneEntities[zoneName][logicalKey] = entityId;
         }
       }
     }
@@ -461,7 +408,7 @@ export function discoverTadoEntities(states, zoneNames, entities) {
     for (const [zoneName, ze] of Object.entries(zoneEntities)) {
       const keys = Object.keys(ze);
       if (keys.length === 0) {
-        console.debug('Pulse Climate: zone "%s" — no entities discovered (check unique_id format)', zoneName);
+        console.debug('Pulse Climate: zone "%s" — no Tado CE entities discovered', zoneName);
       }
     }
   }

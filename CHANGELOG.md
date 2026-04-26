@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.1] - 2026-04-26
+
+### Bug Fixes
+
+- **Zone discovery rewritten — works for all users** ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @driagi) — the previous discovery method relied on an internal identifier that Home Assistant removed from the frontend in 2023.3. This meant mold risk, comfort level, condensation, and other zone-level chips never appeared for most users. The card now uses device grouping instead, which works on every HA version and every language
+
+### Improvements
+
+- **Multi-valve battery chip shows worst state** ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20) - @driagi) — rooms with multiple TRVs now show a single battery chip with the worst state across all valves (e.g. if 3 are Normal and 1 is Low, you see "Low"). Use `battery_all` in your chips list to see every valve's battery individually
+- **Multi-valve zones fully discovered** — all battery and connection entities are now found for zones with 2+ TRVs, even when every device uses a suffixed name
+
 ## [1.2.0] - 2026-04-26
 
 **External sensor auto-detection, discovery fixes, and visual polish.**
