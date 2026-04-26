@@ -190,11 +190,11 @@ function buildRegistryIndex(entities) {
       }
     }
     if (entry.unique_id) {
-      // Extract suffix after last underscore-delimited home_id prefix
-      // e.g. "tado_ce_482920_api_usage" → "api_usage"
+      // Extract suffix after the prefix portion of the unique_id.
+      // v3+: tado_ce_{home_id}_{suffix...} — home_id is numeric
+      // v2:  tado_ce_{suffix...} — no home_id, suffix starts immediately after "tado_ce_"
       const parts = entry.unique_id.split('_');
-      // Pattern: tado_ce_{home_id}_{suffix...}
-      // home_id is numeric, so find the first non-"tado"/"ce"/numeric segment
+      // Find the first segment after "tado" and "ce" that isn't purely numeric (= start of suffix)
       const idx = parts.findIndex((p, i) => i >= 2 && !/^\d+$/.test(p));
       if (idx > 0) {
         const suffix = parts.slice(idx).join('_');
@@ -244,13 +244,14 @@ function discoverZonesViaRegistry(entities, zoneNames, states) {
   // to extract the zone_id, then find all zone-level sensors by unique_id suffix.
 
   // First, build a map of all Tado CE entities grouped by their zone_id
-  // unique_id pattern: tado_ce_{home_id}_zone_{zone_id}_{suffix}
+  // unique_id pattern: tado_ce_{home_id}_zone_{zone_id}_{suffix} (v3+)
+  //                 or tado_ce_zone_{zone_id}_{suffix} (v2.x upgrades)
   /** @type {Map<string, {suffix: string, entityId: string}[]>} zone_id → entries */
   const zoneIdMap = new Map();
 
   for (const [entityId, entry] of Object.entries(entities)) {
     if (entry.platform !== 'tado_ce' || !entry.unique_id) continue;
-    const match = entry.unique_id.match(/^tado_ce_\d+_zone_(\d+)_(.+)$/);
+    const match = entry.unique_id.match(/^tado_ce_(?:\d+_)?zone_(\d+)_(.+)$/);
     if (!match) continue;
     const [, zoneId, suffix] = match;
     if (!zoneIdMap.has(zoneId)) zoneIdMap.set(zoneId, []);
@@ -270,8 +271,9 @@ function discoverZonesViaRegistry(entities, zoneNames, states) {
     let zoneId = null;
 
     if (climateEntry?.platform === 'tado_ce' && climateEntry.unique_id) {
-      // Pattern: tado_ce_{home_id}_zone_{zone_id}_climate
-      const climateMatch = climateEntry.unique_id.match(/^tado_ce_\d+_zone_(\d+)_/);
+      // Pattern: tado_ce_{home_id}_zone_{zone_id}_climate (v3+)
+      //       or tado_ce_zone_{zone_id}_climate (v2.x upgrades)
+      const climateMatch = climateEntry.unique_id.match(/^tado_ce_(?:\d+_)?zone_(\d+)_/);
       if (climateMatch) zoneId = climateMatch[1];
     }
 
@@ -453,6 +455,16 @@ export function discoverTadoEntities(states, zoneNames, entities) {
   const missingHubKeys = Object.keys(HUB_TRANSLATION_KEYS).filter((k) => !hubEntities[k]);
 
   const result = { isTadoCE, hubEntities, zoneEntities, missingHubKeys };
+
+  // Debug logging for discovery diagnostics
+  if (isTadoCE) {
+    for (const [zoneName, ze] of Object.entries(zoneEntities)) {
+      const keys = Object.keys(ze);
+      if (keys.length === 0) {
+        console.debug('Pulse Climate: zone "%s" — no entities discovered (check unique_id format)', zoneName);
+      }
+    }
+  }
 
   // Update cache — store a copy of zoneNames to prevent external mutation
   _discoveryCache = { states, zoneNames: [...zoneNames], result };

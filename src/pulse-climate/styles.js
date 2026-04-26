@@ -525,6 +525,12 @@ ha-card {
   color: var(--primary-text-color);
   font-weight: 500;
 }
+.source-indicator {
+  font-size: 9px;
+  color: var(--secondary-text-color, #636366);
+  opacity: 0.7;
+  margin-left: 4px;
+}
 /* Heatmap cells — shared by comfort strip and thermal strip (heatmap mode) */
 .section-comfort-strip .cells,
 .section-thermal-strip .cells {
@@ -546,7 +552,13 @@ ha-card {
 .section-thermal-strip .cell:hover { transform: scaleY(1.2); z-index: 1; }
 .section-comfort-strip .cell-empty,
 .section-thermal-strip .cell-empty {
-  background: var(--divider-color, rgba(0,0,0,0.08));
+  background: repeating-linear-gradient(
+    45deg,
+    var(--divider-color, rgba(255,255,255,0.06)) 0px,
+    var(--divider-color, rgba(255,255,255,0.06)) 2px,
+    transparent 2px,
+    transparent 4px
+  );
 }
 .heatmap-legend {
   display: flex;

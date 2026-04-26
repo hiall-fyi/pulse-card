@@ -10,6 +10,7 @@
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { temperatureToColor, humidityToColor } from '../chart-primitives.js';
 import { extractZoneName } from '../zone-resolver.js';
+import { resolveHistoryTempSensor, resolveHistoryHumSensor, buildSourceIndicator } from '../sensor-resolver.js';
 import { computeSlots, renderTimelineStrip, renderHeatmapStrip, renderTimeLabels } from './slot-engine.js';
 
 /**
@@ -55,18 +56,23 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
     const entityId = zoneConfig.entity;
     const zoneName = extractZoneName(entityId);
     const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
-    // Pick sensor based on attribute mode
-    const sensorId = isHumidity
-      ? (zoneConfig.humidity_entity || zoneEntities.humidity || entityId)
-      : (zoneConfig.temperature_entity || zoneEntities.temperature || entityId);
+    // Pick sensor based on attribute mode using shared resolver
+    const resolved = isHumidity
+      ? resolveHistoryHumSensor(entityId, states, zoneEntities, zoneConfig)
+      : resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig);
+    const sensorId = resolved?.entityId || entityId;
     const friendlyName = zoneConfig.name || states[entityId]?.attributes?.friendly_name || zoneName;
     const data = historyCache?.data?.[sensorId] || [];
 
     html += `<div class="timeline-row" data-zone="${escapeHtml(zoneName)}" data-entity="${escapeHtml(entityId)}">`;
-    html += `<span class="zone-label">${escapeHtml(friendlyName)}</span>`;
+    html += `<span class="zone-label">${escapeHtml(friendlyName)}${buildSourceIndicator(resolved, states)}</span>`;
 
     if (data.length < 2) {
-      html += `<div class="strip-container"><div class="chart-empty" style="height:14px;font-size:10px">No data</div></div>`;
+      // Distinguish "waiting for data" (entity exists but no history yet) from "no data"
+      const entityExists = !!states[sensorId];
+      const hasCacheEntry = sensorId in (historyCache?.data || {});
+      const emptyMsg = (entityExists && !hasCacheEntry) ? 'Waiting for data' : 'No data';
+      html += `<div class="strip-container"><div class="chart-empty" style="height:14px;font-size:10px">${escapeHtml(emptyMsg)}</div></div>`;
     } else {
       const slotData = computeSlots(data, slots, windowMs);
       const unitLabel = isHumidity ? 'humidity' : 'temperature';

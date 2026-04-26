@@ -5,7 +5,7 @@
  */
 
 /** Pulse Climate Card version string. */
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 
 /** Custom element tag name. */
 export const CARD_NAME = 'pulse-climate-card';
