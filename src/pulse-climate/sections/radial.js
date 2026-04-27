@@ -189,7 +189,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       html += `><title>${titleText}</title>`;
       if (isActive && !reducedMotion) {
         const dur = z.power > 0 ? (4.5 - (z.power / 100) * 3).toFixed(1) : '5.0';
-        html += `<animate attributeName="opacity" values="1;0.65;1" dur="${dur}s" repeatCount="indefinite"/>`;
+        html += `<animate attributeName="opacity" values="1;0.82;1" dur="${dur}s" repeatCount="indefinite"/>`;
       }
       html += `</path>`;
     }
@@ -223,6 +223,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   // Smallest inner radius = baseOuterR - 28 (at max power). Leave 8px gap.
   const centerDiameter = Math.round((baseOuterR - 28 - 8) * 2);
   html += `<div class="center-info" id="radial-center" style="width:${centerDiameter}px;height:${centerDiameter}px">`;
+  html += `<div class="center-sheen" id="radial-sheen"></div>`;
   html += `<div class="center-value">${centerValue}</div>`;
   html += `<div class="center-label">Outdoor</div>`;
   html += `<div class="center-sub">${centerSub}</div>`;

@@ -232,6 +232,8 @@ Not all sections work with every setup. Here's a quick reference:
 | `thermal_strip` | ✅ | — |
 | `comfort_strip` | ✅ | — |
 | `energy_flow` | ✅ (needs `heating_power`) | — |
+| `home_status` | ✅ | — |
+| `zone_ranking` | ✅ (Comfort tab needs Tado CE) | — |
 | `radial` | ✅ | — |
 | `donut` | ✅ (with custom `segments`) | ✅ (for `api_breakdown` / `homekit_saved`) |
 | `api` | — | ✅ |
@@ -351,6 +353,34 @@ sections:
   - energy_flow
 ```
 
+### home_status
+
+A single-glance summary of your entire home's heating state. Shows a hero indicator at the top (All Good / Warming Up / Cold Start) based on how many zones are at target temperature, a sorted list of every zone with actual → target temps and a colour-coded deviation bar, and a summary footer with aggregate stats.
+
+Zones are sorted by how far they are from target — the zone that needs the most attention appears first. Off zones are grouped at the bottom. Tap any zone row to open its more-info dialog.
+
+This section has no configurable options — it reads data from your zones automatically.
+
+```yaml
+sections:
+  - home_status
+```
+
+### zone_ranking
+
+A leaderboard view of your zones, ranked by a metric you choose. Switch between Power, Temp, Humidity, and Comfort tabs to re-rank. Each zone shows its rank number, name, a proportional bar, and the metric value. Summary stats at the bottom show average, highest, lowest, and spread.
+
+The Comfort tab only appears when you have Tado CE installed — it uses the ASHRAE 55 adaptive comfort model to score each zone based on how close its temperature is to the calculated comfort target. Power and Comfort bars use severity colours (green/amber/red), while Temp and Humidity bars use a uniform blue.
+
+Tap any zone row to open its more-info dialog.
+
+This section has no configurable options — it reads data from your zones automatically.
+
+```yaml
+sections:
+  - zone_ranking
+```
+
 ### radial
 
 A circular thermal compass showing all your zones as coloured arcs around a center display. Arc colour reflects temperature (cool blue → warm red), arc thickness reflects heating power, and active zones glow with a pulse animation. The center shows the outside temperature.
@@ -435,6 +465,8 @@ sections:
     stacked: true
   - type: radial
     size: 200
+  - home_status
+  - zone_ranking
   - energy_flow
   - type: thermal_strip
     hours_to_show: 48

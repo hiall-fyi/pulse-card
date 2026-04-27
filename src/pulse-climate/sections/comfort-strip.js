@@ -8,7 +8,7 @@
 
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { extractZoneName } from '../zone-resolver.js';
-import { resolveHistoryTempSensor, resolveHistoryHumSensor, buildSourceIndicator } from '../sensor-resolver.js';
+import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slot-engine.js';
 
 /**
@@ -176,7 +176,7 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     }
 
     html += `<div class="heatmap-row" data-zone="${escapeHtml(zoneName)}" data-idx="${z}">`;
-    html += `<span class="zone-label">${escapeHtml(friendlyName)}${buildSourceIndicator(tempResolved, states)}</span>`;
+    html += `<span class="zone-label">${escapeHtml(friendlyName)}</span>`;
     const ariaLabel = `${friendlyName} comfort over ${hours}h`;
     if (mode === 'timeline') {
       html += renderTimelineStrip(slotData, scoreToColor, { ariaLabel, nowPct });

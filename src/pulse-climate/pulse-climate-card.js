@@ -23,6 +23,8 @@ import { renderThermalStripSection } from './sections/thermal-strip.js';
 import { renderComfortStripSection } from './sections/comfort-strip.js';
 import { renderEnergyFlowSection, updateEnergyFlowSection } from './sections/energy-flow.js';
 import { renderRadialSection } from './sections/radial.js';
+import { renderHomeStatusSection } from './sections/home-status.js';
+import { renderZoneRankingSection } from './sections/zone-ranking.js';
 import { escapeHtml, sanitizeCssValue, isReducedMotion } from '../shared/utils.js';
 import { buildFilledSparkline, temperatureToColor } from './chart-primitives.js';
 import { createStripTooltip, createFixedTooltip, pointerToSlotIndex, bindDragSelect, bindCrosshair } from './sections/slot-engine.js';
@@ -77,6 +79,8 @@ const SECTION_SELECTORS = {
   thermal: '.section-thermal',
   schedule: '.section-schedule',
   energy_flow: '.section-energy-flow',
+  home_status: '.section-home-status',
+  zone_ranking: '.section-zone-ranking',
 };
 
 class PulseClimateCard extends HTMLElement {
@@ -349,6 +353,24 @@ class PulseClimateCard extends HTMLElement {
           return renderGraphSection(/** @type {*} */ (graphSection), zones, this._historyCache, states, discovery);
         },
       },
+      {
+        selector: '.section-home-status',
+        watchIds: zones.map((z) => z.entity),
+        render: () => {
+          const states = this._hass?.states || {};
+          return renderHomeStatusSection(zones, states, discovery);
+        },
+      },
+      {
+        selector: '.section-zone-ranking',
+        watchIds: zones.map((z) => z.entity),
+        render: () => {
+          const states = this._hass?.states || {};
+          const existing = this._shadow.querySelector('.section-zone-ranking');
+          const activeMetric = existing?.getAttribute('data-metric') || 'power';
+          return renderZoneRankingSection(zones, states, discovery, activeMetric);
+        },
+      },
     ];
   }
 
@@ -492,6 +514,7 @@ class PulseClimateCard extends HTMLElement {
     this._bindHeatmapInteractions();
     this._bindEnergyFlowInteractions();
     this._bindSparklineCrosshairs();
+    this._bindZoneRankingTabs();
   }
 
   /**
@@ -559,17 +582,19 @@ class PulseClimateCard extends HTMLElement {
     if (this._sectionChipAbort) this._sectionChipAbort.abort();
     this._sectionChipAbort = new AbortController();
     const { signal: sectionChipSignal } = this._sectionChipAbort;
-    const chips = this._shadow.querySelectorAll('.section .chip[data-entity]');
-    for (const chip of chips) {
-      const chipEl = /** @type {HTMLElement} */ (chip);
-      // Skip zone chips — they're handled by _bindChipActions
-      if (chipEl.closest('.zone-row')) continue;
+    const tappables = this._shadow.querySelectorAll('.section [data-entity]');
+    for (const el of tappables) {
+      const tappable = /** @type {HTMLElement} */ (el);
+      // Skip zone row chips — they're handled by _bindChipActions
+      if (tappable.closest('.zone-row') && tappable.classList.contains('chip')) continue;
+      // Skip zone rows themselves — they're handled by _bindZoneActions
+      if (tappable.classList.contains('zone-row')) continue;
 
-      chipEl.style.cursor = 'pointer';
-      attachRipple(chipEl);
-      chipEl.addEventListener('click', (ev) => {
+      tappable.style.cursor = 'pointer';
+      attachRipple(tappable);
+      tappable.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        const entityId = chipEl.dataset.entity;
+        const entityId = tappable.dataset.entity;
         if (entityId) {
           fireEvent(this, 'hass-more-info', { entityId });
         }
@@ -754,7 +779,7 @@ class PulseClimateCard extends HTMLElement {
         if (!arc) { setTimeout(shimmerCycle, 300); return; }
 
         // Brighten this zone
-        arc.style.filter = 'brightness(1.4)';
+        arc.style.filter = 'brightness(1.8)';
         arc.style.transition = 'filter 0.3s ease-in';
 
         // Fade back after a short hold
@@ -788,6 +813,51 @@ class PulseClimateCard extends HTMLElement {
       const firstArc = arcs[0];
       if (firstArc) {
         /** @type {*} */ (firstArc).__shimmerStop = () => { shimmerRunning = false; };
+      }
+    }
+
+    // ── Glass sheen sweep ──────────────────────────────────────────
+    // A thin light band sweeps across the center glass pane at random intervals.
+    if (!isReducedMotion()) {
+      const sheenEl = /** @type {HTMLElement|null} */ (this._shadow.querySelector('#radial-sheen'));
+      if (sheenEl) {
+        // Detect light theme for sheen color
+        const bgColor = getComputedStyle(this).getPropertyValue('--primary-background-color').trim();
+        const rgbMatch = bgColor.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+        const isLight = rgbMatch ? (0.299 * Number(rgbMatch[1]) + 0.587 * Number(rgbMatch[2]) + 0.114 * Number(rgbMatch[3])) / 255 >= 0.5 : false;
+        if (isLight) sheenEl.classList.add('light-theme');
+        else sheenEl.classList.remove('light-theme');
+
+        let sheenRunning = true;
+        const sheenCycle = () => {
+          if (!sheenRunning) return;
+          const fromLeft = Math.random() > 0.5;
+          const startPos = fromLeft ? '-100% 50%' : '200% 50%';
+          const endPos = fromLeft ? '200% 50%' : '-100% 50%';
+          const duration = 1.2 + Math.random() * 1.5;
+
+          sheenEl.style.transition = 'none';
+          sheenEl.style.backgroundPosition = startPos;
+          void sheenEl.offsetWidth;
+          sheenEl.style.transition = `background-position ${duration}s ease-in-out`;
+          sheenEl.style.backgroundPosition = endPos;
+
+          setTimeout(() => {
+            const pause = 4000 + Math.random() * 6000;
+            setTimeout(sheenCycle, pause);
+          }, duration * 1000);
+        };
+
+        setTimeout(sheenCycle, 2000 + Math.random() * 3000);
+
+        const sheenArc = arcs[0];
+        if (sheenArc) {
+          const prevStop = /** @type {*} */ (sheenArc).__shimmerStop;
+          /** @type {*} */ (sheenArc).__shimmerStop = () => {
+            sheenRunning = false;
+            if (typeof prevStop === 'function') prevStop();
+          };
+        }
       }
     }
   }
@@ -1386,6 +1456,39 @@ class PulseClimateCard extends HTMLElement {
   }
 
   /**
+   * Bind click listeners on zone ranking metric tabs.
+   * Reads the clicked tab's data-metric, re-renders the section, and re-binds.
+   */
+  _bindZoneRankingTabs() {
+    const sectionEl = this._shadow.querySelector('.section-zone-ranking');
+    if (!sectionEl) return;
+    const tabs = sectionEl.querySelectorAll('.ranking-tab');
+    if (tabs.length === 0) return;
+
+    const zones = this._config?._zones || [];
+    const discovery = this._discovery;
+    if (!discovery) return;
+
+    for (const tab of tabs) {
+      tab.addEventListener('click', () => {
+        const newMetric = /** @type {string} */ (/** @type {HTMLElement} */ (tab).dataset.metric);
+        if (!newMetric) return;
+        const states = this._hass?.states || {};
+        const html = renderZoneRankingSection(zones, states, discovery, newMetric);
+        if (!html) return;
+        const tpl = document.createElement('template');
+        tpl.innerHTML = html;
+        const newEl = tpl.content.firstElementChild;
+        if (newEl) {
+          sectionEl.replaceWith(newEl);
+          this._bindZoneRankingTabs();
+          this._bindSectionChipActions();
+        }
+      });
+    }
+  }
+
+  /**
    * Render a single section to HTML. Centralises the section type → renderer mapping.
    * @param {*} section - Section config (string or object with type).
    * @param {import('./types.js').ZoneConfig[]} zones
@@ -1413,6 +1516,8 @@ class PulseClimateCard extends HTMLElement {
       case 'comfort_strip': return renderComfortStripSection(zones, /** @type {*} */ (section), states, discovery, hc);
       case 'energy_flow': return renderEnergyFlowSection(zones, states, discovery);
       case 'radial': return renderRadialSection(zones, /** @type {*} */ (section), states, discovery, hc);
+      case 'home_status': return renderHomeStatusSection(zones, states, discovery);
+      case 'zone_ranking': return renderZoneRankingSection(zones, states, discovery);
       default: return '';
     }
   }
@@ -1533,6 +1638,7 @@ class PulseClimateCard extends HTMLElement {
     const chipSections = new Set([
       '.section-zones', '.section-api', '.section-bridge', '.section-homekit',
       '.section-weather', '.section-environment', '.section-thermal', '.section-schedule',
+      '.section-home-status', '.section-zone-ranking',
     ]);
     const hasReplacedChipSection = [...replaced].some((s) => chipSections.has(s));
     if (hasReplacedChipSection) {
@@ -1549,6 +1655,9 @@ class PulseClimateCard extends HTMLElement {
     }
     if (replaced.has('.section-radial')) {
       this._bindRadialInteractions();
+    }
+    if (replaced.has('.section-zone-ranking')) {
+      this._bindZoneRankingTabs();
     }
 
     // Energy flow: differential update preserves ongoing SVG <animate> flow animations.
@@ -1803,6 +1912,14 @@ class PulseClimateCard extends HTMLElement {
       if (!this._discovery) this._runDiscovery();
       this._fullRender();
       this._refreshHistoryIfNeeded();
+    } else if (this._config && this._hass && this._shadow.querySelector('ha-card')) {
+      // Reconnected after dashboard edit — DOM preserved but timers/listeners stopped.
+      // Re-bind interactions to restart shimmer, glass sheen, and event listeners.
+      this._bindSectionInteractions();
+      this._bindZoneActions();
+      this._bindChipActions();
+      this._bindSectionChipActions();
+      this._startCountdownTimer();
     }
   }
 

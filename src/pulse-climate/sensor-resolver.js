@@ -107,18 +107,3 @@ export function resolveHistoryHumSensor(climateEntityId, states, zoneEntities, z
 }
 
 
-/**
- * Build a source indicator HTML snippet for external sensor sources.
- * Returns empty string for non-external sources (discovery, climate_fallback, yaml_override).
- * @param {ResolvedSensor|null} resolved - Resolved sensor result.
- * @param {Record<string, *>} states - hass.states for friendly name lookup.
- * @returns {string} HTML string (empty if not external source).
- */
-export function buildSourceIndicator(resolved, states) {
-  if (!resolved || resolved.source !== 'external') return '';
-  const friendlyName = states[resolved.entityId]?.attributes?.friendly_name || resolved.entityId;
-  // Use shared/utils escapeHtml inline to avoid circular import
-  const safe = String(friendlyName).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const safeId = String(resolved.entityId).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  return ` <span class="source-indicator" title="${safeId}">${safe}</span>`;
-}

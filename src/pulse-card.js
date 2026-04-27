@@ -105,6 +105,14 @@ class PulseCard extends HTMLElement {
     }
   }
 
+  /** Re-bind listeners when reconnected after dashboard edit. */
+  connectedCallback() {
+    if (this._config && this._hass && this._elements.container) {
+      // DOM preserved but listeners cleaned up — re-bind action and slider listeners
+      this._cacheBarElements();
+    }
+  }
+
   /**
    * Validate and store config. Throws on invalid.
    * @param {Record<string, *>} config

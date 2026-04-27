@@ -10,7 +10,7 @@
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { temperatureToColor, humidityToColor } from '../chart-primitives.js';
 import { extractZoneName } from '../zone-resolver.js';
-import { resolveHistoryTempSensor, resolveHistoryHumSensor, buildSourceIndicator } from '../sensor-resolver.js';
+import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 import { computeSlots, renderTimelineStrip, renderHeatmapStrip, renderTimeLabels } from './slot-engine.js';
 
 /**
@@ -65,7 +65,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
     const data = historyCache?.data?.[sensorId] || [];
 
     html += `<div class="timeline-row" data-zone="${escapeHtml(zoneName)}" data-entity="${escapeHtml(entityId)}">`;
-    html += `<span class="zone-label">${escapeHtml(friendlyName)}${buildSourceIndicator(resolved, states)}</span>`;
+    html += `<span class="zone-label">${escapeHtml(friendlyName)}</span>`;
 
     if (data.length < 2) {
       // Distinguish "waiting for data" (entity exists but no history yet) from "no data"

@@ -525,12 +525,7 @@ ha-card {
   color: var(--primary-text-color);
   font-weight: 500;
 }
-.source-indicator {
-  font-size: 9px;
-  color: var(--secondary-text-color, #636366);
-  opacity: 0.7;
-  margin-left: 4px;
-}
+
 /* Heatmap cells — shared by comfort strip and thermal strip (heatmap mode) */
 .section-comfort-strip .cells,
 .section-thermal-strip .cells {
@@ -617,6 +612,21 @@ ha-card {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+.center-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle farthest-side at 0 0, rgba(255,255,255,0) 88%, rgba(255,255,255,0.5) 96%, rgba(255,255,255,0) 100%) no-repeat;
+  background-size: 200% 200%;
+  background-position: -100% 50%;
+}
+.center-sheen.light-theme {
+  background: radial-gradient(circle farthest-side at 0 0, rgba(0,0,0,0) 88%, rgba(0,0,0,0.12) 96%, rgba(0,0,0,0) 100%) no-repeat;
+  background-size: 200% 200%;
+  background-position: -100% 50%;
 }
 .center-value {
   font-size: 28px;
@@ -811,6 +821,231 @@ ha-card {
 .flow-sparkline {
   display: inline-block;
   vertical-align: middle;
+}
+
+/* Home Status section */
+.section-home-status { }
+.home-status-hero {
+  text-align: center;
+  padding: 16px 0 20px;
+}
+.home-status-icon {
+  --mdc-icon-size: 36px;
+  display: block;
+  margin: 0 auto 6px;
+}
+.home-status-label {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.home-status-detail {
+  font-size: 12px;
+  color: var(--secondary-text-color, #9E9E9E);
+}
+.home-status-zones {
+  display: flex;
+  flex-direction: column;
+}
+.home-status-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.home-status-row:last-child { border-bottom: none; }
+.home-status-row:hover {
+  background: color-mix(in srgb, var(--primary-color, #03A9F4) 6%, transparent);
+}
+.home-status-row:focus-visible {
+  outline: 2px solid var(--primary-color, #03A9F4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.home-status-zone-name {
+  width: 70px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--secondary-text-color, #9E9E9E);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-status-temps {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.home-status-actual {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text-color);
+  min-width: 52px;
+}
+.home-status-actual.off {
+  color: var(--secondary-text-color, #9E9E9E);
+}
+.home-status-arrow {
+  font-size: 11px;
+  color: var(--secondary-text-color, #9E9E9E);
+}
+.home-status-target {
+  font-size: 13px;
+  color: var(--secondary-text-color, #9E9E9E);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+}
+.home-status-delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.home-status-bar-track {
+  position: relative;
+  width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+  overflow: hidden;
+}
+.home-status-bar-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: color-mix(in srgb, white 15%, transparent);
+}
+.home-status-bar-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+}
+.home-status-delta-text {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  width: 40px;
+  text-align: right;
+}
+.home-status-summary {
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+  padding-top: 14px;
+  margin-top: 16px;
+}
+.home-status-summary .stat { text-align: center; }
+.home-status-summary .stat-value {
+  font-size: 18px;
+  font-weight: 300;
+}
+.home-status-summary .stat-label {
+  font-size: 9px;
+}
+
+/* Zone Ranking section */
+.section-zone-ranking { }
+.ranking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.ranking-tabs {
+  display: flex;
+  gap: 4px;
+}
+.ranking-tab {
+  font-size: 10px;
+  color: var(--secondary-text-color, #9E9E9E);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+.ranking-tab:hover {
+  background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+}
+.ranking-tab.active {
+  background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+  color: var(--primary-text-color);
+  border-color: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+}
+.ranking-list { }
+.rank-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rank-row:hover {
+  background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+}
+.rank-row:focus-visible {
+  outline: 2px solid var(--primary-color, #03A9F4);
+  outline-offset: 2px;
+}
+.rank-num {
+  width: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text-color, #9E9E9E);
+  flex-shrink: 0;
+}
+.rank-num.top { color: #FFD60A; }
+.rank-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-bar-track {
+  flex: 2;
+  height: 8px;
+  background: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+  border-radius: 4px;
+  margin: 0 12px;
+  overflow: hidden;
+}
+.rank-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease, background 0.4s ease;
+}
+.rank-value {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.ranking-summary {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+}
+.ranking-summary .stat { text-align: center; }
+.ranking-summary .stat-value {
+  font-size: 18px;
+  font-weight: 300;
+}
+.ranking-summary .stat-label {
+  font-size: 9px;
 }
 
 /* Responsive degradation for new sections */

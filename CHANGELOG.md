@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] - 2026-04-27
+
+**Two new sections — Home Status and Zone Ranking — plus visual polish and reliability fixes.**
+
+### New
+
+- **Home Status section** — add `home_status` to your sections list for a single-glance summary of your entire home's heating state. A hero indicator at the top tells you whether things are All Good, Warming Up, or in Cold Start based on how many zones are at target. Below that, every zone is listed with its actual → target temps and a colour-coded deviation bar, sorted so the zone furthest from target appears first. A summary footer shows aggregate stats. Tap any zone to open its controls
+- **Zone Ranking section** — add `zone_ranking` for a leaderboard view of your zones. Switch between Power, Temp, Humidity, and Comfort tabs to re-rank. Each zone shows its rank, a proportional bar, and the metric value. Summary stats at the bottom show average, highest, lowest, and spread. The Comfort tab appears automatically when you have Tado CE — it uses the ASHRAE 55 comfort model to score each zone based on how close it is to its calculated comfort target
+- **Glass sheen on the radial center** — a subtle light band sweeps across the center circle at random intervals, giving the glass pane a polished, alive feel. Adapts to your theme automatically and respects reduced motion preferences
+
+### Improvements
+
+- **Livelier radial view** — the shimmer sweep is brighter and active zone arcs stay more vivid throughout their pulse cycle, so the whole radial section feels more energetic at a glance
+- **Cleaner zone labels on thermal strips and comfort heatmaps** — removed the external sensor name that appeared below each zone name. Zone labels now just show the zone name everywhere. If you need to know which sensor is feeding a zone's data, use the `temp_source` chip
+- **Tado CE features auto-hide when not available** — sections and tabs that need Tado CE data (like the Comfort ranking tab) only appear when the card detects Tado CE sensors. Non-Tado users see a clean interface with no empty or broken sections
+
+### Bug Fixes
+
+- **Fixed visual effects not resuming after dashboard edit** — shimmer sweep, glass sheen, and all tap actions on the Climate Card stopped working after editing and saving your dashboard. You had to hard-refresh the page to get them back. The card now properly restores everything when HA reconnects it
+- **Fixed tap actions not resuming after dashboard edit on the Bar Card** — same issue as above but for the Pulse Bar Card. Tap, hold, double-tap, and slider interactions now resume correctly after a dashboard save
+
 ## [1.2.1] - 2026-04-26
 
 ### Bug Fixes

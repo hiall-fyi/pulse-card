@@ -5,7 +5,7 @@
  */
 
 /** Pulse Climate Card version string. */
-export const VERSION = '1.2.1';
+export const VERSION = '1.3.0';
 
 /** Custom element tag name. */
 export const CARD_NAME = 'pulse-climate-card';
@@ -52,6 +52,7 @@ export const SECTION_TYPES = [
   'environment', 'thermal', 'schedule',
   'graph', 'donut',
   'thermal_strip', 'comfort_strip', 'energy_flow', 'radial',
+  'home_status', 'zone_ranking',
 ];
 
 /**
