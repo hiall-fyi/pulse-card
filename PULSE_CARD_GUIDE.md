@@ -34,11 +34,25 @@ This guide covers every configuration option, style presets, migration from bar-
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `min` | number | `0` | The value where the bar is empty |
-| `max` | number | `100` | The value where the bar is full |
+| `min` | number | `0` | The value where the bar is empty. Can be set at card level (applies to all bars) or per-entity to override |
+| `max` | number | `100` | The value where the bar is full. Can be set at card level or per-entity to override |
 | `complementary` | boolean | `false` | Flip the bar — show what's left instead of what's used. Useful for "remaining" displays (e.g. disk space free) |
 | `limit_value` | boolean | `false` | If the value goes beyond min/max, cap the displayed number. Without this, a value of 120 with max 100 still shows "120" |
 | `attribute` | string | — | Read a specific attribute instead of the main state (e.g. `brightness` from a light entity) |
+
+Per-entity min/max override — useful when most bars share one range but a few need their own:
+
+```yaml
+type: custom:pulse-card
+min: -5
+max: 25
+entities:
+  - entity: sensor.outside_temperature
+  - entity: sensor.living_room_temperature
+  - entity: input_number.base_temperature
+    min: 15
+    max: 25
+```
 
 ### Layout
 

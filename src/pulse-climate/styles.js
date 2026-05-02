@@ -5,7 +5,9 @@
  * custom properties for user override.
  */
 
-export const STYLES = `
+import { SHARED_STYLES } from '../shared/styles.js';
+
+export const STYLES = `${SHARED_STYLES}
 :host { display: block; }
 
 ha-card {
@@ -20,7 +22,7 @@ ha-card {
 .pulse-title {
   font-size: 16px;
   font-weight: 500;
-  color: var(--primary-text-color);
+  color: var(--pulse-text-primary);
   margin-bottom: 12px;
 }
 
@@ -28,10 +30,10 @@ ha-card {
 .section { margin-top: 12px; }
 .section:first-child { margin-top: 0; }
 .section-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--pulse-font-label);
+  font-weight: var(--pulse-weight-semibold);
   text-transform: uppercase;
-  color: var(--secondary-text-color);
+  color: var(--pulse-text-secondary);
   opacity: 0.7;
   margin-bottom: 6px;
   letter-spacing: 0.5px;
@@ -48,13 +50,13 @@ ha-card {
   -webkit-tap-highlight-color: transparent;
 }
 .zone-row:focus-visible {
-  outline: 2px solid var(--primary-color, #03A9F4);
+  outline: 2px solid var(--pulse-accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
 .zone-row.unavailable { opacity: 0.5; }
 .zone-row.unavailable .power-bar-fill {
-  background: var(--disabled-color, #bdbdbd) !important;
+  background: var(--pulse-disabled) !important;
   width: 100% !important;
   opacity: 0.2;
 }
@@ -85,13 +87,13 @@ ha-card {
 }
 .zone-target {
   font-size: 0.8em;
-  color: var(--secondary-text-color);
+  color: var(--pulse-text-secondary);
   margin-left: 4px;
 }
 .zone-humidity {
   font-size: 0.8em;
   font-weight: 400;
-  color: var(--secondary-text-color);
+  color: var(--pulse-text-secondary);
   opacity: 0.7;
   display: inline-flex;
   align-items: center;
@@ -149,7 +151,7 @@ ha-card {
 .power-bar-track {
   position: absolute;
   inset: 0;
-  background: var(--primary-color, #03A9F4);
+  background: var(--pulse-accent);
   opacity: 0.12;
   border-radius: inherit;
 }
@@ -182,7 +184,7 @@ ha-card {
   align-items: center;
   gap: 3px;
   font-size: 11px;
-  color: var(--pulse-chip-color, var(--secondary-text-color));
+  color: var(--pulse-chip-color, var(--pulse-text-secondary));
   white-space: nowrap;
   cursor: pointer;
   position: relative;
@@ -190,8 +192,8 @@ ha-card {
   -webkit-tap-highlight-color: transparent;
 }
 .chip ha-icon { --mdc-icon-size: 14px; }
-.chip.severity-high { color: var(--label-badge-red, #F44336); }
-.chip.severity-medium { color: var(--label-badge-yellow, #FF9800); }
+.chip.severity-high { color: var(--pulse-status-red); }
+.chip.severity-medium { color: var(--pulse-status-yellow); }
 .chip.severity-critical { color: var(--label-badge-red, #B71C1C); font-weight: 600; }
 
 /* Multi-column zone grid */
@@ -219,7 +221,7 @@ ha-card {
 }
 .system-label {
   font-size: 12px;
-  color: var(--secondary-text-color);
+  color: var(--pulse-text-secondary);
   min-width: 80px;
 }
 /* ── Chart Styles ──────────────────────────────────────────────────── */
@@ -332,7 +334,7 @@ ha-card {
   touch-action: pan-y;
 }
 .zone-row-pulse:focus-visible {
-  outline: 2px solid var(--primary-color, #03A9F4);
+  outline: 2px solid var(--pulse-accent);
   outline-offset: 2px;
 }
 .zone-row-pulse .pulse-bg {
@@ -455,11 +457,11 @@ ha-card {
   position: absolute;
   top: -26px;
   font-size: 10px;
-  color: var(--primary-text-color, #e5e5e7);
-  background: var(--pulse-glass-bg, var(--ha-card-background, var(--card-background-color, rgba(255, 255, 255, 0.75))));
-  backdrop-filter: blur(var(--pulse-glass-blur, 8px));
-  -webkit-backdrop-filter: blur(var(--pulse-glass-blur, 8px));
-  border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+  color: var(--pulse-text-primary, #e5e5e7);
+  background: var(--pulse-glass-bg);
+  backdrop-filter: blur(var(--pulse-glass-blur));
+  -webkit-backdrop-filter: blur(var(--pulse-glass-blur));
+  border: 1px solid var(--pulse-glass-border);
   padding: 2px 8px;
   border-radius: 4px;
   white-space: nowrap;
@@ -603,10 +605,10 @@ ha-card {
   transform: translate(-50%, -50%);
   text-align: center;
   transition: opacity 0.25s;
-  background: var(--pulse-glass-bg, var(--ha-card-background, var(--card-background-color, rgba(255, 255, 255, 0.75))));
-  backdrop-filter: blur(var(--pulse-glass-blur, 8px));
-  -webkit-backdrop-filter: blur(var(--pulse-glass-blur, 8px));
-  border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+  background: var(--pulse-glass-bg);
+  backdrop-filter: blur(var(--pulse-glass-blur));
+  -webkit-backdrop-filter: blur(var(--pulse-glass-blur));
+  border: 1px solid var(--pulse-glass-border);
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -707,10 +709,10 @@ ha-card {
   max-height: 240px;
   opacity: 1;
   padding: 14px 0 16px;
-  background: var(--pulse-glass-bg, var(--ha-card-background, var(--card-background-color, rgba(255, 255, 255, 0.75))));
-  backdrop-filter: blur(var(--pulse-glass-blur, 8px));
-  -webkit-backdrop-filter: blur(var(--pulse-glass-blur, 8px));
-  border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+  background: var(--pulse-glass-bg);
+  backdrop-filter: blur(var(--pulse-glass-blur));
+  -webkit-backdrop-filter: blur(var(--pulse-glass-blur));
+  border: 1px solid var(--pulse-glass-border);
   border-radius: 8px;
 }
 .detail-header {
@@ -802,11 +804,11 @@ ha-card {
   vertical-align: middle;
 }
 .pulse-dot.connected {
-  background: var(--label-badge-green, #4CAF50);
+  background: var(--pulse-status-green);
   animation: pulse-glow 2s ease-in-out infinite;
 }
 .pulse-dot.disconnected {
-  background: var(--label-badge-red, #F44336);
+  background: var(--pulse-status-red);
 }
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; }
@@ -860,7 +862,7 @@ ha-card {
   background: color-mix(in srgb, var(--primary-color, #03A9F4) 6%, transparent);
 }
 .home-status-row:focus-visible {
-  outline: 2px solid var(--primary-color, #03A9F4);
+  outline: 2px solid var(--pulse-accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -990,7 +992,7 @@ ha-card {
   background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
 }
 .rank-row:focus-visible {
-  outline: 2px solid var(--primary-color, #03A9F4);
+  outline: 2px solid var(--pulse-accent);
   outline-offset: 2px;
 }
 .rank-num {

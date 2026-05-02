@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.1] - 2026-05-02
+
+**Shared design tokens across both cards, manual entity overrides on the Climate Card, and documentation improvements.**
+
+### New
+
+- **Manual entity overrides on the Climate Card** — you can now set `open_window_entity`, `battery_entity`, and `mold_risk_entity` per zone in your YAML config. This opens up chips to any climate integration — not just Tado CE. Tado CE users can also swap in dedicated sensors (e.g. a Zigbee window contact instead of Tado's built-in open window detection). Point each override to any entity in your system and the chip appears on that zone
+
+### Improvements
+
+- **Shared design tokens** — both cards (Bar and Climate) now share the same colour and typography tokens. If your HA theme sets `--primary-text-color` or `--primary-color`, every card picks it up consistently. This also means card-mod overrides using `--pulse-*` variables work across both cards
+
+- **Larger radial center pane** — the glass circle in the middle of the radial view now sits closer to the surrounding arcs, giving it a more filled-in, polished look
+
+- **Better Bar Card guide** — the configuration guide now documents per-entity `min`/`max` overrides with examples, making it clearer how to mix different ranges on the same card
+
 ## [1.3.0] - 2026-04-27
 
 **Two new sections — Home Status and Zone Ranking — plus visual polish and reliability fixes.**

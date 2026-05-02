@@ -283,6 +283,13 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
 
   // Resolve chips
   const chipFilter = zoneConfig.chips || cardConfig.chips || null;
+
+  // Merge manual entity overrides into discoveredEntities (YAML overrides take priority)
+  const mergedEntities = { ...discoveredEntities };
+  if (zoneConfig.open_window_entity) mergedEntities.open_window = zoneConfig.open_window_entity;
+  if (zoneConfig.battery_entity) mergedEntities.battery = zoneConfig.battery_entity;
+  if (zoneConfig.mold_risk_entity) mergedEntities.mold_risk = zoneConfig.mold_risk_entity;
+
   const zoneState = {
     entityId, name, icon, isUnavailable,
     currentTemp, targetTemp, humidity,
@@ -291,7 +298,7 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
     minTemp, maxTemp, tempStep, unit,
     chips: /** @type {import('./types.js').ChipData[]} */ ([]),
   };
-  zoneState.chips = resolveChips(zoneState, discoveredEntities, states, chipFilter);
+  zoneState.chips = resolveChips(zoneState, mergedEntities, states, chipFilter);
 
   return zoneState;
 }

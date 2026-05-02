@@ -4,7 +4,9 @@
  * literal string for Shadow DOM encapsulation.
  */
 
-export const STYLES = `
+import { SHARED_STYLES } from '../shared/styles.js';
+
+export const STYLES = `${SHARED_STYLES}
   /* ================================================================
    * Host & Card Shell
    * ================================================================ */
@@ -67,7 +69,7 @@ export const STYLES = `
   }
 
   .port-tile:focus-visible {
-    outline: 2px solid var(--primary-color, #03A9F4);
+    outline: 2px solid var(--pulse-accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
