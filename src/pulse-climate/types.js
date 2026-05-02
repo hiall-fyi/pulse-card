@@ -24,6 +24,9 @@ export {};
  * @property {string} [icon] - Override zone icon.
  * @property {string} [temperature_entity] - Override temperature sensor entity (e.g. sensor.living_room_temperature). Used for history sparklines when auto-discovery fails.
  * @property {string} [humidity_entity] - Override humidity sensor entity (e.g. sensor.living_room_humidity). Used for comfort heatmap when auto-discovery fails.
+ * @property {string} [open_window_entity] - Override open window binary sensor (e.g. binary_sensor.living_room_window). Shown as chip when window state changes.
+ * @property {string} [battery_entity] - Override battery sensor (e.g. sensor.living_room_battery). Shown as chip with state icon.
+ * @property {string} [mold_risk_entity] - Override mold risk sensor (e.g. sensor.living_room_mold_risk). Shown as chip when risk is detected.
  * @property {string[]} [chips] - Explicit chip list (overrides auto-detect).
  * @property {string} [color] - Override bar color.
  * @property {boolean} [show_temp_bar] - Show temperature gauge bar.

@@ -220,8 +220,8 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   html += `</svg>`;
 
   // Center info — fixed circular size based on inner arc radius
-  // Smallest inner radius = baseOuterR - 28 (at max power). Leave 8px gap.
-  const centerDiameter = Math.round((baseOuterR - 28 - 8) * 2);
+  // Smallest inner radius = baseOuterR - 28 (at max power). No gap — glass border provides separation.
+  const centerDiameter = Math.round((baseOuterR - 28) * 2);
   html += `<div class="center-info" id="radial-center" style="width:${centerDiameter}px;height:${centerDiameter}px">`;
   html += `<div class="center-sheen" id="radial-sheen"></div>`;
   html += `<div class="center-value">${centerValue}</div>`;

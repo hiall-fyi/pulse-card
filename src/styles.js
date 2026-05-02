@@ -4,7 +4,9 @@
  * string for Shadow DOM encapsulation.
  */
 
-export const STYLES = `
+import { SHARED_STYLES } from './shared/styles.js';
+
+export const STYLES = `${SHARED_STYLES}
   :host {
     display: block;
   }
@@ -157,13 +159,13 @@ export const STYLES = `
     font-weight: 500;
     color: var(--pulse-indicator-color);
   }
-  .bar-indicator.up { color: var(--pulse-indicator-color, var(--label-badge-green, #4CAF50)); }
-  .bar-indicator.down { color: var(--pulse-indicator-color, var(--label-badge-red, #F44336)); }
-  .bar-indicator.neutral { color: var(--pulse-indicator-color, var(--secondary-text-color)); }
+  .bar-indicator.up { color: var(--pulse-indicator-color, var(--pulse-status-green)); }
+  .bar-indicator.down { color: var(--pulse-indicator-color, var(--pulse-status-red)); }
+  .bar-indicator.neutral { color: var(--pulse-indicator-color, var(--pulse-text-secondary)); }
 
   /* Inverted indicator — up is bad, down is good (CPU, memory, disk usage) */
-  .bar-indicator.inverted.up { color: var(--pulse-indicator-color, var(--label-badge-red, #F44336)); }
-  .bar-indicator.inverted.down { color: var(--pulse-indicator-color, var(--label-badge-green, #4CAF50)); }
+  .bar-indicator.inverted.up { color: var(--pulse-indicator-color, var(--pulse-status-red)); }
+  .bar-indicator.inverted.down { color: var(--pulse-indicator-color, var(--pulse-status-green)); }
 
   /* Icon */
   .bar-icon {
@@ -181,7 +183,7 @@ export const STYLES = `
 
   /* Unavailable state */
   .bar-row.unavailable .bar-fill {
-    background: var(--disabled-color, #bdbdbd) !important;
+    background: var(--pulse-disabled) !important;
     width: 100% !important;
     opacity: 0.2;
   }
@@ -224,7 +226,7 @@ export const STYLES = `
 
   /* Keyboard focus indicator */
   .bar-row:focus-visible {
-    outline: 2px solid var(--primary-color, #03A9F4);
+    outline: 2px solid var(--pulse-accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -241,7 +243,7 @@ export const STYLES = `
   .bar-secondary {
     font-size: 0.75em;
     opacity: 0.85;
-    color: var(--pulse-secondary-color, var(--secondary-text-color));
+    color: var(--pulse-secondary-color, var(--pulse-text-secondary));
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
