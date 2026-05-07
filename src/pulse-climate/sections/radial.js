@@ -6,7 +6,7 @@
  * Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue, isReducedMotion } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } from '../../shared/utils.js';
 import { temperatureToColor, humidityToColor } from '../chart-primitives.js';
 import { resolveZoneState, computeGlowStdDev, computeShimmerScale } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
@@ -156,7 +156,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
 
     // Build title text
     const titleParts = [escapeHtml(z.name)];
-    if (showTemp) titleParts.push(z.temp !== null ? `${z.temp}${z.unit}` : '--');
+    if (showTemp) titleParts.push(z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--');
     if (showHumidity && z.humidity !== null) titleParts.push(`${Math.round(z.humidity)}%`);
     titleParts.push(isActive ? `${z.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${z.power}%` : 'Idle');
     const titleText = titleParts.join(', ');
@@ -241,7 +241,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       ? (z.humidity !== null ? humidityToColor(z.humidity) : 'var(--disabled-color, #9E9E9E)')
       : (z.temp !== null ? temperatureToColor(z.temp) : 'var(--disabled-color, #9E9E9E)');
     let valueText = '';
-    if (showTemp) valueText += z.temp !== null ? `${z.temp}${z.unit}` : '--';
+    if (showTemp) valueText += z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--';
     if (showTemp && showHumidity) valueText += ' · ';
     if (showHumidity) valueText += z.humidity !== null ? `${Math.round(z.humidity)}%` : '--';
     html += `<div class="legend-item" data-idx="${i}">`;

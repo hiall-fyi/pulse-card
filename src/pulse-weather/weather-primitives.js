@@ -17,7 +17,8 @@ import {
   CONDITION_ICONS,
 } from './constants.js';
 
-export { escapeHtml, sanitizeCssValue } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue } from '../shared/utils.js';
+export { escapeHtml, sanitizeCssValue };
 
 // ── Color Mapping ───────────────────────────────────────────────────
 
@@ -159,6 +160,73 @@ export function capeColor(cape) {
   return CAPE_TIERS[CAPE_TIERS.length - 1].color;
 }
 
+// ── Cloud / Humidity / Comfort ───────────────────────────────────────
+
+/**
+ * Map cloud cover percentage to WMO okta-aligned tier colour.
+ * @param {number} pct - Cloud cover 0–100%.
+ * @returns {string} Hex colour.
+ */
+export function cloudCoverColor(pct) {
+  if (pct <= 12) return '#30d158';
+  if (pct <= 50) return '#5ac8fa';
+  if (pct <= 87) return '#ff9f0a';
+  return '#ff453a';
+}
+
+/**
+ * Map dew point to Atmos CE 5-tier comfort colour.
+ * @param {number} dp - Dew point in °C.
+ * @returns {string} Hex colour.
+ */
+export function dewPointComfortColor(dp) {
+  if (dp < 10) return '#5ac8fa';
+  if (dp < 16) return '#30d158';
+  if (dp < 19) return '#ffd60a';
+  if (dp < 22) return '#ff9f0a';
+  return '#ff453a';
+}
+
+// ── Sky Phase ───────────────────────────────────────────────────────
+
+/** @type {ReadonlyArray<{name: string, gradient: string, labelColor: string, stars: boolean, isDay: boolean}>} */
+export const SKY_THEMES = [
+  { name: 'Night',       gradient: 'linear-gradient(180deg, #050510, #0a0a1a 50%, transparent)', labelColor: '#636366', stars: true, isDay: false },
+  { name: 'Blue Hour',   gradient: 'linear-gradient(180deg, #0a1628, #1a3050 60%, transparent)', labelColor: '#5ac8fa', stars: true, isDay: false },
+  { name: 'Golden Hour', gradient: 'linear-gradient(180deg, #1a2a4a, #3a4a5a 40%, #6a4a30)', labelColor: '#ff9f0a', stars: false, isDay: true },
+  { name: 'Daytime',     gradient: 'linear-gradient(180deg, #1a3a5f, #2c5a8e 50%, transparent)', labelColor: '#ffd60a', stars: false, isDay: true },
+  { name: 'Golden Hour', gradient: 'linear-gradient(180deg, #2a2a3a, #5a3a2a 50%, #8a4a1a)', labelColor: '#ff6b35', stars: false, isDay: true },
+  { name: 'Blue Hour',   gradient: 'linear-gradient(180deg, #0a1020, #1a2a40 60%, transparent)', labelColor: '#5ac8fa', stars: true, isDay: false },
+];
+
+/**
+ * Determine current sky phase index from time and astronomical boundaries.
+ * @param {Date} now - Current time.
+ * @param {Date} sunrise - Today's sunrise.
+ * @param {Date} sunset - Today's sunset.
+ * @param {Date|null} goldenAmStart - Golden hour morning start (null = estimate).
+ * @param {Date|null} goldenPmEnd - Golden hour evening end (null = estimate).
+ * @param {Date|null} blueAm - Blue hour morning start (null = estimate).
+ * @param {Date|null} bluePm - Blue hour evening start (null = estimate).
+ * @param {Date|null} [goldenPmStart] - Golden hour evening start (null = estimate from sunset).
+ * @returns {number} Theme index 0–5.
+ */
+export function getSkyTheme(now, sunrise, sunset, goldenAmStart, goldenPmEnd, blueAm, bluePm, goldenPmStart) {
+  const t = now.getTime(), sr = sunrise.getTime(), ss = sunset.getTime();
+  const blueAmT = blueAm ? blueAm.getTime() : sr - 3600000;
+  const goldenAmT = goldenAmStart ? goldenAmStart.getTime() : sr - 1800000;
+  const goldenPmStartT = goldenPmStart ? goldenPmStart.getTime() : ss - 1800000;
+  const goldenPmT = goldenPmEnd ? goldenPmEnd.getTime() : ss + 1800000;
+  const bluePmT = goldenPmEnd ? goldenPmEnd.getTime() + 3600000 : (bluePm ? bluePm.getTime() + 1800000 : ss + 3600000);
+  if (t < blueAmT) return 0;
+  if (t < goldenAmT) return 1;
+  if (t < sr) return 2;
+  if (t < goldenPmStartT) return 3;
+  if (t < goldenPmT) return 4;
+  if (t < bluePmT) return 5;
+  return 0;
+}
+
 // ── SVG Helpers ─────────────────────────────────────────────────────
 
 /**
@@ -202,4 +270,78 @@ export function circlePoint(cx, cy, rad, radius) {
  */
 export function conditionIcon(condition) {
   return CONDITION_ICONS[condition] || '🌤️';
+}
+
+// ── Stat HTML Helper ────────────────────────────────────────────────
+
+/**
+ * Build a stat cell with optional tier colour text and 8% opacity background tint.
+ * Shared across all Pulse Weather sections for visual consistency.
+ * @param {string} value - Pre-escaped HTML value string.
+ * @param {string} label - Stat label text (will be escaped).
+ * @param {string} color - Hex tier colour (empty string = no colour/tint).
+ * @returns {string} HTML string for stat div.
+ */
+export function statHtml(value, label, color) {
+  const colorStyle = color ? ` style="color:${sanitizeCssValue(color)}"` : '';
+  const bgStyle = color ? ` style="background:${sanitizeCssValue(color)}14; border-radius:6px"` : '';
+  return `<div class="stat"${bgStyle}>
+          <div class="pw-stat-value"${colorStyle}>${value}</div>
+          <div class="pw-stat-label">${escapeHtml(label)}</div>
+        </div>`;
+}
+
+/**
+ * Display names for known HA weather conditions.
+ * Explicit mapping avoids regex issues with concatenated compounds (e.g. "partlycloudy").
+ * @type {Readonly<Record<string, string>>}
+ */
+const CONDITION_DISPLAY = /** @type {const} */ ({
+  'clear-night': 'Clear Night',
+  'cloudy': 'Cloudy',
+  'exceptional': 'Exceptional',
+  'fog': 'Fog',
+  'hail': 'Hail',
+  'lightning': 'Lightning',
+  'lightning-rainy': 'Lightning Rainy',
+  'partlycloudy': 'Partly Cloudy',
+  'pouring': 'Pouring',
+  'rainy': 'Rainy',
+  'snowy': 'Snowy',
+  'snowy-rainy': 'Snowy Rainy',
+  'sunny': 'Sunny',
+  'windy': 'Windy',
+  'windy-variant': 'Windy Variant',
+});
+
+/**
+ * Format a HA weather condition string for display.
+ * Uses explicit mapping for known conditions, falls back to hyphen-split + title-case.
+ * @param {string} condition - HA weather condition string.
+ * @returns {string} Formatted display string.
+ */
+export function formatCondition(condition) {
+  if (Object.hasOwn(CONDITION_DISPLAY, condition)) return CONDITION_DISPLAY[condition];
+  return condition.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** @type {Readonly<Record<string, string>>} */
+const MOON_PHASE_ICONS = {
+  'New Moon': '🌑',
+  'Waxing Crescent': '🌒',
+  'First Quarter': '🌓',
+  'Waxing Gibbous': '🌔',
+  'Full Moon': '🌕',
+  'Waning Gibbous': '🌖',
+  'Last Quarter': '🌗',
+  'Waning Crescent': '🌘',
+};
+
+/**
+ * Get moon phase emoji for a phase name.
+ * @param {string|null} phaseName - Moon phase name (e.g. "Full Moon").
+ * @returns {string} Moon phase emoji, or '🌙' fallback.
+ */
+export function moonPhaseIcon(phaseName) {
+  return MOON_PHASE_ICONS[phaseName || ''] || '🌙';
 }

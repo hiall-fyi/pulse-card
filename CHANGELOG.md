@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+
+## [1.3.2] - 2026-05-07
+
+**Colour token sweep — chip colours, ranking highlights, and comfort bars now follow your HA theme automatically.**
+
+### Improvements
+
+- **Chip colours now follow your HA theme** — remaining hardcoded chip colours (window open, battery, mold risk, preheat, valve) have been migrated to CSS variables. If you use a custom HA theme or card-mod, these chips now adapt automatically
+
+### Bug Fixes
+
+- **Fixed floating-point noise in temperature displays** ([#45](https://github.com/hiall-fyi/pulse-card/issues/45) - @Si-Hill) — Values like `18.700000000000003°C` could appear in the valve control chip and other temperature displays when an integration passed through raw floating-point arithmetic results. All numeric temperature displays now round to one decimal place, showing clean values like `18.7°C`
+- **Valve chip now shows "Idle" for SVC-enabled zones** ([#45](https://github.com/hiall-fyi/pulse-card/issues/45) - @Si-Hill) — Zones with Smart Valve Control enabled but not actively intervening previously showed no valve chip at all, making it look like SVC wasn't running. You'll now see "Valve: Idle" on those zones so you can tell at a glance that SVC is monitoring. Requires Tado CE v4.0.0-beta.14+ (which exposes the idle state)
+
 ## [1.3.1] - 2026-05-02
 
 **Shared design tokens across both cards, manual entity overrides on the Climate Card, and documentation improvements.**

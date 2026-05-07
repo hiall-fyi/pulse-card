@@ -1,10 +1,13 @@
 /**
  * @module pulse-weather/sections/overview
- * @description Hero temperature, atmospheric FX, stats grid, UV/pressure bars.
+ * @description Hero temperature, atmospheric FX, stats grid, UV/pressure bars,
+ * contextual weather summary, day progress arc, and tier-coloured stats.
  */
 
-import { tempToColor, uvColor, uvLabel, escapeHtml, sanitizeCssValue } from '../weather-primitives.js';
+import { tempToColor, uvColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, statHtml, cloudCoverColor, dewPointComfortColor, getSkyTheme, SKY_THEMES } from '../weather-primitives.js';
 import { intensityRatio, tensionGlow, tensionVignette } from '../../shared/visual-tension.js';
+import { ATMOS_CE_TIER_MAP } from './atmosphere.js';
+import { LIFTED_INDEX_TIERS } from '../constants.js';
 
 /**
  * Condition-to-gradient mapping for atmospheric backgrounds.
@@ -29,6 +32,152 @@ const CONDITION_GRADIENTS = {
 };
 
 const DEFAULT_GRADIENT = 'linear-gradient(180deg, #1a2a3a 0%, #2a3a4a 50%, transparent 100%)';
+
+/**
+ * Insight tier colour map for visibility and dew-point comfort labels.
+ * @type {Readonly<Record<string, string>>}
+ */
+const INSIGHT_TIER_COLORS = /** @type {const} */ ({
+  dry: '#30d158', comfortable: '#30d158',
+  slightly_humid: '#ffd60a', humid: '#ff9f0a', oppressive: '#ff453a',
+  clear: '#30d158', good: '#30d158',
+  moderate: '#ffd60a', poor: '#ff9f0a', fog: '#ff453a',
+});
+
+// ── Pure Tier Colour Functions ───────────────────────────────────────
+// cloudCoverColor moved to weather-primitives.js for shared access
+
+/**
+ * Map relative humidity to NWS-aligned comfort tier colour.
+ * @param {number} rh - Relative humidity 0–100%.
+ * @returns {string} Hex colour.
+ */
+export function humidityColor(rh) {
+  if (rh <= 30) return '#5ac8fa';
+  if (rh <= 60) return '#30d158';
+  if (rh <= 80) return '#ff9f0a';
+  return '#ff453a';
+}
+
+// dewPointComfortColor moved to weather-primitives.js for shared access
+
+/**
+ * Map 3h pressure change to WMO SYNOP tendency description.
+ * @param {number|null|undefined} change3h - 3h pressure change in hPa.
+ * @param {string} trendState - Sensor state: 'rising'|'falling'|'steady'.
+ * @returns {string} WMO tendency description or 'Press' fallback.
+ */
+export function pressureTendencyLabel(change3h, trendState) {
+  if (change3h === null || change3h === undefined) return 'Press';
+  const abs = Math.abs(Number(change3h));
+  if (abs <= 1.0) return 'Press';
+  const dir = trendState === 'rising' ? 'Rising' : trendState === 'falling' ? 'Falling' : 'Press';
+  if (abs > 3.0) return `${dir} rapidly`;
+  return dir;
+}
+
+/**
+ * Build contextual weather summary sentence with NWS terminology.
+ * @param {object} params - Summary input data.
+ * @param {number} params.precipNow - Current precipitation value.
+ * @param {string} params.precipLabel - Pre-built precipitation label.
+ * @param {Array<Record<string, unknown>>} params.slots - Hourly forecast slots.
+ * @param {number} params.windSpeed - Wind speed in km/h.
+ * @param {number} params.uvIndex - UV index value.
+ * @param {string} params.stabilityState - Atmos CE stability_assessment state.
+ * @returns {{icon: string, text: string}} Summary icon and text.
+ */
+export function buildWeatherSummary({ precipNow, precipLabel, slots, windSpeed, uvIndex, stabilityState }) {
+  if (precipNow > 0) return { icon: '\u{1F327}', text: precipLabel };
+  const next2h = slots.slice(0, 2);
+  for (const h of next2h) {
+    if ((Number(h.precipitation_probability) || 0) >= 60) {
+      const type = Number(h.snowfall) > 0 ? 'Snow' : 'Rain';
+      return { icon: '\u{1F327}', text: `${type} likely within ${next2h.indexOf(h) + 1}h` };
+    }
+  }
+  for (const h of next2h) {
+    if ((Number(h.precipitation_probability) || 0) >= 40) {
+      const type = Number(h.snowfall) > 0 ? 'Snow' : 'Rain';
+      return { icon: '\u{1F327}', text: `${type} possible within ${next2h.indexOf(h) + 1}h` };
+    }
+  }
+  const stormTiers = ['slight', 'enhanced', 'moderate', 'high'];
+  if (stabilityState && stormTiers.includes(stabilityState)) {
+    const peakCape = Math.max(...next2h.map((h) => Number(h.cape) || 0));
+    if (peakCape > 1000) return { icon: '\u26A1', text: `Thunderstorms possible \u2014 CAPE ${peakCape}J/kg` };
+  }
+  if (windSpeed >= 39) return { icon: '\u{1F4A8}', text: `Strong winds ${Math.round(windSpeed)} km/h` };
+  if (uvIndex >= 6) return { icon: '\u2600\uFE0F', text: 'High UV \u2014 protection needed' };
+  let clearHours = 0;
+  for (const h of slots) {
+    if ((Number(h.precipitation_probability) || 0) < 20) clearHours++;
+    else break;
+  }
+  if (clearHours >= 2) return { icon: '\u2713', text: `Clear for the next ${clearHours}h` };
+  return { icon: '', text: '' };
+}
+
+/**
+ * Build SVG path data for hourly CAPE sparkline.
+ * @param {Array<Record<string, unknown>>} slots - Hourly forecast slots with cape values.
+ * @param {number} width - SVG width in pixels.
+ * @param {number} height - SVG height in pixels.
+ * @returns {{svgPath: string, areaPath: string, peakValue: number, peakIndex: number, maxCape: number}} Sparkline data.
+ */
+export function buildCapeSparklineSvg(slots, width, height) {
+  const values = slots.map((h) => Number(h.cape) || 0);
+  const maxCape = Math.max(...values, 300);
+  const peakValue = Math.max(...values);
+  const peakIndex = values.indexOf(peakValue);
+  const points = values.map((v, i) => ({
+    x: (i / Math.max(slots.length - 1, 1)) * width,
+    y: height - (v / maxCape) * height,
+  }));
+  const svgPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaPath = `${svgPath} L${width},${height} L0,${height} Z`;
+  return { svgPath, areaPath, peakValue, peakIndex, maxCape };
+}
+
+/**
+ * Build precipitation type label with snow-first ordering.
+ * @param {number} precipNow - Total precipitation value.
+ * @param {string} precipUnit - Total precipitation unit.
+ * @param {number} rainNow - Rain value.
+ * @param {string} rainUnit - Rain unit.
+ * @param {number} showersNow - Showers value.
+ * @param {string} showersUnit - Showers unit.
+ * @param {number} snowfallNow - Snowfall value.
+ * @param {string} snowfallUnit - Snowfall unit.
+ * @returns {string} Escaped HTML label.
+ */
+export function buildPrecipLabel(precipNow, precipUnit, rainNow, rainUnit, showersNow, showersUnit, snowfallNow, snowfallUnit) {
+  const types = [];
+  if (snowfallNow > 0) types.push({ name: 'Snow', value: snowfallNow, unit: snowfallUnit });
+  if (rainNow > 0) types.push({ name: 'Rain', value: rainNow, unit: rainUnit });
+  if (showersNow > 0) types.push({ name: 'Showers', value: showersNow, unit: showersUnit });
+
+  if (types.length > 0) {
+    const parts = types.map((t) => `${escapeHtml(t.name)} ${escapeHtml(t.value.toFixed(1))} ${escapeHtml(t.unit)}`);
+    return `${parts.join(' \u00b7 ')} now`;
+  }
+  if (precipNow > 0) {
+    return `Precipitation \u2014 next 12h \u00b7 ${escapeHtml(precipNow.toFixed(1))} ${escapeHtml(precipUnit)} now`;
+  }
+  return 'Precipitation \u2014 next 12h';
+}
+
+
+/**
+ * Format a Date as HH:MM string, or empty string for null/invalid dates.
+ * @param {Date|null} date - Date to format.
+ * @returns {string} HH:MM string or empty string.
+ */
+function fmtTime(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 
 /**
  * Render the overview section.
@@ -62,6 +211,7 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
   const humidity = val('humidity', 'humidity');
   const windSpeed = val('wind_speed', 'wind_speed');
   const windBearing = val('wind_direction', 'wind_bearing');
+  const windGusts = val('wind_gusts', 'wind_gusts');
   const dewPoint = val('dew_point', 'dew_point');
   const visibility = val('visibility', 'visibility');
   const pressure = val('pressure', 'pressure');
@@ -93,11 +243,38 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
     ? Number(hass.states[uvSensor]?.state) || 0
     : Number(attrs.uv_index ?? 0);
 
-  // UV clear-sky ghost marker
-  const uvClearSkySensor = discovery.atmosCe.uv_index_clear_sky;
-  const uvClearSky = uvClearSkySensor
-    ? Number(hass.states[uvClearSkySensor]?.state)
-    : null;
+  // Real-time precipitation from Atmos CE
+  const precipSensor = ce.precipitation ? hass.states[ce.precipitation] : null;
+  const precipNow = precipSensor ? Number(precipSensor.state) || 0 : 0;
+  const precipUnit = /** @type {string} */ (precipSensor?.attributes?.unit_of_measurement || 'mm');
+
+  // Precipitation type breakdown
+  const rainSensor = ce.rain ? hass.states[ce.rain] : null;
+  const showersSensor = ce.showers ? hass.states[ce.showers] : null;
+  const snowfallSensor = ce.snowfall ? hass.states[ce.snowfall] : null;
+  const rainNow = rainSensor ? Number(rainSensor.state) || 0 : 0;
+  const showersNow = showersSensor ? Number(showersSensor.state) || 0 : 0;
+  const snowfallNow = snowfallSensor ? Number(snowfallSensor.state) || 0 : 0;
+  const rainUnit = /** @type {string} */ (rainSensor?.attributes?.unit_of_measurement || 'mm');
+  const showersUnit = /** @type {string} */ (showersSensor?.attributes?.unit_of_measurement || 'mm');
+  const snowfallUnit = /** @type {string} */ (snowfallSensor?.attributes?.unit_of_measurement || 'cm');
+
+  // Clear-sky UV
+  const uvClearSkySensor = ce.uv_index_clear_sky ? hass.states[ce.uv_index_clear_sky] : null;
+  const uvClearSky = uvClearSkySensor ? Number(uvClearSkySensor.state) || 0 : 0;
+
+  // Derived insight sensors
+  const dewComfortSensor = ce.dew_point_comfort ? hass.states[ce.dew_point_comfort] : null;
+  const visibilityCatSensor = ce.visibility_category ? hass.states[ce.visibility_category] : null;
+  const feelsContextSensor = ce.feels_like_context ? hass.states[ce.feels_like_context] : null;
+  const pressureTrendSensor = ce.pressure_trend ? hass.states[ce.pressure_trend] : null;
+
+  // Golden hour / blue hour sensors for phase-aware day arc
+  const goldenAmStart = ce.golden_hour_morning_start ? new Date(String(hass.states[ce.golden_hour_morning_start]?.state)) : null;
+  const goldenPmStart = ce.golden_hour_evening_start ? new Date(String(hass.states[ce.golden_hour_evening_start]?.state)) : null;
+  const goldenPmEnd = ce.golden_hour_evening_end ? new Date(String(hass.states[ce.golden_hour_evening_end]?.state)) : null;
+  const blueAmRaw = ce.blue_hour_morning_start ? new Date(String(hass.states[ce.blue_hour_morning_start]?.state)) : null;
+  const bluePmRaw = ce.blue_hour_evening_start ? new Date(String(hass.states[ce.blue_hour_evening_start]?.state)) : null;
 
   // Cloud cover from Atmos CE
   let cloudCover = null;
@@ -110,25 +287,26 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
     };
   }
 
+  // ── New sensor reads (Task 2.2) ─────────────────────────────────
+  const freezeSensor = ce.freezing_level_height ? hass.states[ce.freezing_level_height] : null;
+  const freezeLevel = freezeSensor ? Number(freezeSensor.state) || 0 : 0;
+
+  const stabilitySensor = ce.stability_assessment ? hass.states[ce.stability_assessment] : null;
+  const stabilityState = stabilitySensor?.state || '';
+
+  const liSensor = ce.lifted_index ? hass.states[ce.lifted_index] : null;
+  const liValue = liSensor ? Number(liSensor.state) || 0 : 0;
+
   const gradient = sanitizeCssValue(CONDITION_GRADIENTS[condition] || DEFAULT_GRADIENT);
 
   // Temperature arc position
   const range = Math.max(tempHigh - tempLow, 1);
   const arcPct = Math.max(0, Math.min(100, ((temp - tempLow) / range) * 100));
 
-  // UV bar position
-  const uvPct = Math.min(100, (uvIndex / 11) * 100);
-  const uvGhostPct = uvClearSky !== null ? Math.min(100, (uvClearSky / 11) * 100) : null;
+  // Compass direction (16-point via compassLabel, 8-point fallback)
+  const dirLabel = compassLabel(windBearing);
 
-  // Pressure bar (950–1050 hPa range)
-  const pressurePct = Math.max(0, Math.min(100, ((pressure - 950) / 100) * 100));
-
-  // Compass direction label
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const dirLabel = dirs[Math.round(windBearing / 45) % 8] || '';
-
-  // FX layer — build in card shell via replaceChildren for live cards,
-  // but for HTML string output we note the condition for the card shell
+  // FX layer
   const fxAttr = `data-condition="${escapeHtml(condition)}" data-night="${isNight}" data-cloud='${escapeHtml(JSON.stringify(cloudCover || ''))}'`;
 
   // ── Temperature tension ───────────────────────────────────────────
@@ -140,25 +318,342 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
   const vignetteGrad = tensionVignette(tempIntensity);
   const vignetteHtml = vignetteGrad ? `<div class="pw-tension-vignette" style="background: ${sanitizeCssValue(vignetteGrad)}"></div>` : '';
 
-  // ── Precipitation bar (Dark Sky signature) ────────────────────────
-  let precipBarHtml = '';
-  const hourly = forecastData?.hourly || [];
-  if (hourly.length > 0) {
-    // Take first 12 entries for next-hour view
-    const slots = hourly.slice(0, 12);
-    const hasAnyPrecip = slots.some((h) => Number(h.precipitation_probability) > 0);
-    if (hasAnyPrecip) {
-      const slotHtml = slots.map((h) => {
-        const prob = Math.min(100, Math.max(0, Number(h.precipitation_probability) || 0));
-        return `<div class="pulse-precip-slot"><div class="pulse-precip-fill" style="height: ${prob}%"></div></div>`;
-      }).join('');
-      precipBarHtml = `
-      <div style="position: relative; z-index: 2; margin: 16px 20px 0;">
-        <div class="pw-precip-label">Precipitation — next hours</div>
-        <div class="pulse-precip-bar" role="img" aria-label="Precipitation probability">${slotHtml}</div>
+  // ── Snowfall badge ─────────────────────────────────────────────────
+  const snowBadgeHtml = snowfallNow > 0
+    ? `<div class="pw-snow-badge" style="color:var(--pw-color-freeze, #5ac8fa)">\u2744 ${escapeHtml(snowfallNow.toFixed(1))} ${escapeHtml(snowfallUnit)}</div>`
+    : '';
+
+  // ── Feels like context ────────────────────────────────────────────
+  const feelsContext = feelsContextSensor?.state || '';
+  const feelsDiff = feelsContextSensor?.attributes?.difference;
+  let feelsContextHtml = '';
+  if (feelsContext === 'wind_chill' && feelsDiff !== null && feelsDiff !== undefined) {
+    feelsContextHtml = `<div class="pw-feels-context">Wind chill ${escapeHtml(String(Math.round(Number(feelsDiff))))}\u00b0</div>`;
+  } else if (feelsContext === 'heat_index' && feelsDiff !== null && feelsDiff !== undefined) {
+    feelsContextHtml = `<div class="pw-feels-context">Heat index +${escapeHtml(String(Math.round(Number(feelsDiff))))}\u00b0</div>`;
+  }
+
+  // ── Stability quick badge (Task 3) ────────────────────────────────
+  const badgeTiers = ['marginal', 'slight', 'enhanced', 'moderate', 'high'];
+  let stabilityBadgeHtml = '';
+  if (stabilityState && badgeTiers.includes(stabilityState)) {
+    const tierInfo = ATMOS_CE_TIER_MAP[stabilityState];
+    if (tierInfo) {
+      const badgeColor = sanitizeCssValue(tierInfo.color);
+      let badgeText = `\u26A1 ${escapeHtml(tierInfo.label)}`;
+      // LI value in badge — only when LI itself indicates instability (negative = unstable)
+      if (liSensor && liValue < 0) {
+        const liTier = LIFTED_INDEX_TIERS.find((t) => liValue >= t.min) || LIFTED_INDEX_TIERS[LIFTED_INDEX_TIERS.length - 1];
+        badgeText += ` \u00b7 <span style="color:${sanitizeCssValue(liTier.color)}">LI ${escapeHtml(String(liValue))}</span>`;
+      }
+      stabilityBadgeHtml = ` <span class="pw-stability-badge" style="background:${badgeColor}33; color:${badgeColor}">${badgeText}</span>`;
+    }
+  }
+
+  // ── Stats row computed values ─────────────────────────────────────
+  const visCat = visibilityCatSensor?.state || '';
+  const visCatColor = visCat && !['unavailable', 'unknown'].includes(visCat)
+    ? INSIGHT_TIER_COLORS[visCat] || ''
+    : '';
+
+  const dewComfort = dewComfortSensor?.state || '';
+  const dewColor = dewComfort && !['unavailable', 'unknown'].includes(dewComfort)
+    ? INSIGHT_TIER_COLORS[dewComfort] || ''
+    : '';
+
+  const trendSymbol = pressureTrendSensor?.attributes?.trend_symbol || '';
+  const trendColor = pressureTrendSensor?.state === 'rising' ? '#30d158'
+    : pressureTrendSensor?.state === 'falling' ? '#ff9f0a'
+    : pressureTrendSensor?.state === 'steady' ? '#5ac8fa' : '';
+  const showClearSky = uvClearSkySensor && Math.abs(uvClearSky - uvIndex) >= 0.5;
+
+  // ── Pressure tendency label (Task 9.3) ────────────────────────────
+  const change3h = pressureTrendSensor?.attributes?.change_3h;
+  let pressLabel = pressureTendencyLabel(
+    change3h !== null && change3h !== undefined ? Number(change3h) : null,
+    pressureTrendSensor?.state || '',
+  );
+  // Fallback: if change_3h unavailable but sensor state is valid, use state directly
+  if (pressLabel === 'Press' && pressureTrendSensor?.state) {
+    const st = pressureTrendSensor.state;
+    if (st === 'rising') pressLabel = 'Rising';
+    else if (st === 'falling') pressLabel = 'Falling';
+  }
+
+  // Pressure stat colour — trend-based with neutral fallback
+  const pressColor = trendColor || (pressureTrendSensor ? '#5ac8fa' : '');
+
+  // ── Wind consolidation (Task 7) ───────────────────────────────────
+  const windColor = windTierColor(windSpeed);
+  const bft = beaufort(windSpeed);
+  const showGust = windGusts > windSpeed + 5;
+  const gustBold = windSpeed > 0 && windGusts / windSpeed > 1.5;
+  const gustStr = showGust
+    ? (gustBold ? ` / <b>${escapeHtml(Math.round(windGusts))}</b>` : ` / ${escapeHtml(Math.round(windGusts))}`)
+    : '';
+  const compassSvg = `<svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;transform:rotate(${Number(windBearing)}deg)"><polygon points="5,0 3,8 5,6 7,8" fill="${sanitizeCssValue(windColor)}" opacity="0.8"/></svg>`;
+  const windValue = `${escapeHtml(Math.round(windSpeed))}${gustStr} ${compassSvg}${escapeHtml(dirLabel)}`;
+
+  // ── Dynamic temp arc (Task 4) ─────────────────────────────────────
+  const arcGradient = `linear-gradient(to right, ${sanitizeCssValue(tempToColor(tempLow))}, ${sanitizeCssValue(tempToColor(tempHigh))})`;
+
+  // Freezing level marker on temp arc (Task 4.3)
+  let freezeMarkerHtml = '';
+  if (freezeSensor && freezeLevel < 5000 && tempLow <= 0) {
+    const freezePct = Math.max(0, Math.min(100, ((0 - tempLow) / range) * 100));
+    const frzUnit = /** @type {string} */ (freezeSensor?.attributes?.unit_of_measurement || 'm');
+    freezeMarkerHtml = `<div class="pw-arc-freeze" style="left:${Number(freezePct)}%">
+            <div class="pw-arc-freeze-label">\u2744 ${escapeHtml(String(Math.round(freezeLevel)))}${escapeHtml(frzUnit)}</div>
+            <div class="pw-arc-freeze-line"></div>
+          </div>`;
+  }
+
+  // ── Phase-aware day arc ─────────────────────────────────────────
+  let dayArcHtml = '';
+  const sunEntity = hass.states['sun.sun'];
+  if (sunEntity) {
+    const nextRising = sunEntity.attributes?.next_rising;
+    const nextSetting = sunEntity.attributes?.next_setting;
+    if (nextRising && nextSetting) {
+      const nextRise = new Date(/** @type {string} */ (nextRising));
+      const nextSet = new Date(/** @type {string} */ (nextSetting));
+      const now = new Date();
+
+      // Derive today's sunrise/sunset from next_rising/next_setting.
+      // Same logic as astro.js — next_rising is tomorrow when sun is up.
+      let todaySunrise = nextRise.getTime() > now.getTime()
+        ? new Date(nextRise.getTime() - 86400000)
+        : nextRise;
+      let todaySunset = nextSet.getTime() > now.getTime()
+        ? nextSet
+        : new Date(nextSet.getTime() - 86400000);
+      if (todaySunset.getTime() > todaySunrise.getTime() + 86400000) {
+        todaySunset = new Date(todaySunset.getTime() - 86400000);
+      }
+      if (todaySunrise.getTime() > todaySunset.getTime()) {
+        todaySunrise = new Date(todaySunrise.getTime() - 86400000);
+      }
+
+      const themeIdx = getSkyTheme(now, todaySunrise, todaySunset, goldenAmStart, goldenPmEnd, blueAmRaw, bluePmRaw, goldenPmStart);
+      const theme = SKY_THEMES[themeIdx];
+      const isDaytime = sunEntity.state === 'above_horizon';
+
+      // Phase-aware fill percentage — progress within current phase boundaries
+      let fillPct = 0;
+      const srMs = todaySunrise.getTime();
+      const ssMs = todaySunset.getTime();
+      const nowMs = now.getTime();
+      if (themeIdx === 3) {
+        // Daytime: sunrise → sunset
+        const dayLength = ssMs - srMs;
+        if (dayLength > 0) fillPct = Math.max(0, Math.min(100, ((nowMs - srMs) / dayLength) * 100));
+      } else if (themeIdx === 1) {
+        // Blue Hour AM
+        const start = blueAmRaw ? blueAmRaw.getTime() : srMs - 3600000;
+        const end = goldenAmStart ? goldenAmStart.getTime() : srMs - 1800000;
+        const dur = end - start;
+        if (dur > 0) fillPct = Math.max(0, Math.min(100, ((nowMs - start) / dur) * 100));
+      } else if (themeIdx === 2) {
+        // Golden Hour AM
+        const start = goldenAmStart ? goldenAmStart.getTime() : srMs - 1800000;
+        const dur = srMs - start;
+        if (dur > 0) fillPct = Math.max(0, Math.min(100, ((nowMs - start) / dur) * 100));
+      } else if (themeIdx === 4) {
+        // Golden Hour PM
+        const end = goldenPmEnd ? goldenPmEnd.getTime() : ssMs + 1800000;
+        const dur = end - ssMs;
+        if (dur > 0) fillPct = Math.max(0, Math.min(100, ((nowMs - ssMs) / dur) * 100));
+      } else if (themeIdx === 5) {
+        // Blue Hour PM
+        const start = goldenPmEnd ? goldenPmEnd.getTime() : ssMs + 1800000;
+        const end = goldenPmEnd ? goldenPmEnd.getTime() + 3600000 : (bluePmRaw ? bluePmRaw.getTime() + 1800000 : ssMs + 3600000);
+        const dur = end - start;
+        if (dur > 0) fillPct = Math.max(0, Math.min(100, ((nowMs - start) / dur) * 100));
+      }
+      // themeIdx 0 (Night): fillPct stays 0
+
+      // Phase-aware fill colour
+      let fillStyle = '';
+      switch (themeIdx) {
+        case 1: fillStyle = `background: #5ac8fa`; break;
+        case 2: fillStyle = `background: #ff9f0a`; break;
+        case 3: fillStyle = `background: linear-gradient(to right, #ff9f0a, #ffd60a)`; break;
+        case 4: fillStyle = `background: #ff6b35`; break;
+        case 5: fillStyle = `background: #5ac8fa`; break;
+        // default (Night): fillStyle stays empty — CSS default applies
+      }
+
+      // Phase-aware labels — mirror astro.js horizon label logic
+      let leftLabel = '';
+      let rightLabel = '';
+      let labelColor = '';
+      switch (themeIdx) {
+        case 0: // Night — no labels
+          break;
+        case 1: // Blue Hour AM
+          leftLabel = fmtTime(blueAmRaw);
+          rightLabel = fmtTime(goldenAmStart);
+          labelColor = '#5ac8fa';
+          break;
+        case 2: // Golden Hour AM
+          leftLabel = fmtTime(goldenAmStart);
+          rightLabel = fmtTime(todaySunrise);
+          labelColor = '#ff9f0a';
+          break;
+        case 3: // Daytime
+          leftLabel = fmtTime(todaySunrise);
+          rightLabel = fmtTime(todaySunset);
+          break;
+        case 4: // Golden Hour PM
+          leftLabel = fmtTime(goldenPmStart || todaySunset);
+          rightLabel = fmtTime(goldenPmEnd);
+          labelColor = '#ff6b35';
+          break;
+        case 5: // Blue Hour PM
+          leftLabel = fmtTime(bluePmRaw);
+          rightLabel = fmtTime(goldenPmEnd ? new Date(goldenPmEnd.getTime() + 3600000) : null);
+          labelColor = '#5ac8fa';
+          break;
+      }
+
+      const markerLeft = fillPct;
+      const markerIcon = isDaytime ? '' : (themeIdx === 0 ? '\u{1F319}' : '');
+      const arcOpacity = themeIdx === 0 ? '0.7' : '1';
+      const markerStyle = `left:${Number(markerLeft)}%; background:${sanitizeCssValue(theme.labelColor)}; box-shadow: 0 0 6px ${sanitizeCssValue(theme.labelColor)}66`;
+      const labelStyle = labelColor ? ` style="color:${sanitizeCssValue(labelColor)}"` : '';
+
+      dayArcHtml = `
+      <div class="pw-day-arc" style="opacity:${arcOpacity}">
+        <span class="pw-day-arc-label"${labelStyle}>${escapeHtml(leftLabel)}</span>
+        <div class="pw-day-arc-bar">
+          <div class="pw-day-arc-fill" style="width:${Number(fillPct)}%${fillStyle ? '; ' + fillStyle : ''}"></div>
+          <div class="pw-day-arc-marker" style="${markerStyle}">${markerIcon}</div>
+        </div>
+        <span class="pw-day-arc-label"${labelStyle}>${escapeHtml(rightLabel)}</span>
       </div>`;
     }
   }
+
+  // ── Hourly data processing ────────────────────────────────────────
+  let precipBarHtml = '';
+  let capeBarHtml = '';
+  let comfortBarHtml = '';
+  let summaryHtml = '';
+  const hourly = forecastData?.hourly || [];
+  if (hourly.length > 0) {
+    const now = new Date();
+    const futureHourly = hourly.filter((h) => new Date(/** @type {string} */ (h.datetime)) >= now);
+    const slots = futureHourly.slice(0, 12);
+    const hasAnyPrecip = slots.some((h) => Number(h.precipitation_probability) > 0);
+
+    // ── Weather summary (Task 6) ──────────────────────────────────
+    const precipLabel = buildPrecipLabel(precipNow, precipUnit, rainNow, rainUnit, showersNow, showersUnit, snowfallNow, snowfallUnit);
+    const summary = buildWeatherSummary({
+      precipNow, precipLabel, slots, windSpeed, uvIndex, stabilityState,
+    });
+    if (summary.text) {
+      summaryHtml = `
+      <div class="pw-weather-summary" style="position:relative; z-index:2">
+        <span style="font-size:14px">${escapeHtml(summary.icon)}</span> ${escapeHtml(summary.text)}
+      </div>`;
+    }
+
+    // ── Precipitation bar (Task 10) ─────────────────────────────────
+    if (hasAnyPrecip) {
+      const slotHtml = slots.map((h) => {
+        const prob = Math.min(100, Math.max(0, Number(h.precipitation_probability) || 0));
+        const hourSnow = Number(h.snowfall) || 0;
+        const hourRain = (Number(h.rain) || 0) + (Number(h.showers) || 0);
+        const isSnow = hourSnow > 0;
+        const isMixed = isSnow && hourRain > 0;
+        if (isMixed) {
+          const total = hourSnow + hourRain;
+          const snowPct = Math.round(prob * hourSnow / total);
+          const rainPct = prob - snowPct;
+          return `<div class="pulse-precip-slot"><div class="pulse-precip-fill" style="height:${Number(rainPct)}%"></div><div class="pulse-precip-fill pw-precip-snow" style="height:${Number(snowPct)}%"></div></div>`;
+        }
+        const fillClass = isSnow ? 'pulse-precip-fill pw-precip-snow' : 'pulse-precip-fill';
+        return `<div class="pulse-precip-slot"><div class="${fillClass}" style="height: ${prob}%"></div></div>`;
+      }).join('');
+
+
+
+      // Time markers (Task 10.2)
+      const midSlot = slots[Math.floor(slots.length / 2)];
+      const midHours = midSlot ? `+${Math.floor(slots.length / 2)}h` : '';
+
+      precipBarHtml = `
+      <div style="position: relative; z-index: 2; margin: 16px 20px 0;">
+        <div class="pw-precip-label">${precipLabel}</div>
+        <div class="pulse-precip-bar" role="img" aria-label="Precipitation probability" style="position:relative">${slotHtml}</div>
+        <div class="pw-precip-times"><span>Now</span><span>${escapeHtml(midHours)}</span><span>+${escapeHtml(String(slots.length))}h</span></div>
+      </div>`;
+    }
+
+    // ── CAPE sparkline (Task 11) ────────────────────────────────────
+    const hasCapeData = slots.some((h) => Number(h.cape) > 300);
+    if (hasCapeData) {
+      const sparkW = 200;
+      const sparkH = 24;
+      const spark = buildCapeSparklineSvg(slots, sparkW, sparkH);
+      const peakX = (spark.peakIndex / Math.max(slots.length - 1, 1)) * sparkW;
+      const peakLabel = spark.peakValue >= 1000
+        ? `${(spark.peakValue / 1000).toFixed(1)}k`
+        : String(Math.round(spark.peakValue));
+      const peakDt = slots[spark.peakIndex]?.datetime
+        ? new Date(/** @type {string} */ (slots[spark.peakIndex].datetime))
+        : null;
+      const peakTime = peakDt
+        ? `${String(peakDt.getHours()).padStart(2, '0')}:${String(peakDt.getMinutes()).padStart(2, '0')}`
+        : '';
+
+      capeBarHtml = `
+      <div style="position: relative; z-index: 2; margin: 4px 20px 0;">
+        <div class="pw-precip-label" style="font-size:10px">Storm risk</div>
+        <div style="position:relative">
+          <svg class="pw-cape-sparkline" width="100%" height="${sparkH}" viewBox="0 0 ${sparkW} ${sparkH}" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="capeGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ff453a" stop-opacity="0.6"/>
+                <stop offset="33%" stop-color="#ff9f0a" stop-opacity="0.4"/>
+                <stop offset="66%" stop-color="#ffd60a" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#30d158" stop-opacity="0.2"/>
+              </linearGradient>
+            </defs>
+            <path d="${spark.areaPath}" fill="url(#capeGrad)"/>
+            <path d="${spark.svgPath}" fill="none" stroke="#ff9f0a" stroke-width="1.5"/>
+          </svg>
+          ${spark.peakValue > 0 ? `<div class="pw-cape-peak" style="left:${Number(peakX)}px">${escapeHtml(peakLabel)} ${escapeHtml(peakTime)}</div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    // ── Dew point comfort timeline (Task 12) ────────────────────────
+    const hasDewData = slots.some((h) => h.dew_point !== undefined && h.dew_point !== null);
+    if (hasDewData) {
+      const comfortSlots = slots.map((h) => {
+        const dp = Number(h.dew_point) || 0;
+        return `<div class="pw-comfort-slot" style="background:${sanitizeCssValue(dewPointComfortColor(dp))}"></div>`;
+      }).join('');
+      comfortBarHtml = `
+      <div style="position: relative; z-index: 2; margin: 2px 20px 0;">
+        <div class="pw-precip-label" style="font-size:10px">Comfort</div>
+        <div class="pw-comfort-bar">${comfortSlots}</div>
+      </div>`;
+    }
+  }
+
+  // ── Stats rows (Task 7, 8, 9) ─────────────────────────────────────
+  // Row 1: Wind (combined), Feels, Vis, Dew
+  const feelsColor = tempToColor(feelsLike);
+  const cloudColor = cloudCover !== null ? cloudCoverColor(cloudCover.total) : '';
+  const humidColor = humidityColor(humidity);
+
+  // Pressure value — number + unit + trend symbol
+  const pressValue = `${escapeHtml(Math.round(pressure))} ${escapeHtml(pressUnit)}${trendSymbol ? ` <span style="color:${sanitizeCssValue(trendColor)}">${escapeHtml(trendSymbol)}</span>` : ''}`;
+
+  // UV value with clear-sky comparison
+  const uvValue = `${escapeHtml(Math.round(uvIndex))}${showClearSky ? ` <span style="opacity:0.5">/ ${escapeHtml(String(Math.round(uvClearSky)))}</span>` : ''}`;
 
   return `
     <div class="pw-section pw-atmosphere" style="background: ${gradient}; min-height: 280px;">
@@ -169,55 +664,34 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
       </div>
       <div class="pw-hero">
         <div class="pw-hero-temp" style="color: ${sanitizeCssValue(tempToColor(temp))}; ${heroGlow}">${escapeHtml(temp.toFixed(1))}${escapeHtml(tempUnit)}</div>
-        <div class="pw-hero-condition">${escapeHtml(condition.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()))}</div>
-        <div class="pw-hero-feels">Feels like ${escapeHtml(feelsLike.toFixed(1))}${escapeHtml(tempUnit)}</div>
+        <div class="pw-hero-condition">${escapeHtml(formatCondition(condition))}${stabilityBadgeHtml}</div>
+        ${snowBadgeHtml}
+        ${feelsContextHtml}
       </div>
       <div class="pw-temp-arc">
-        <span class="pw-arc-label">${escapeHtml(Math.round(tempLow))}${escapeHtml(tempUnit)}</span>
-        <div class="pw-arc-bar" role="img" aria-label="Temperature range ${Math.round(tempLow)}${escapeHtml(tempUnit)} to ${Math.round(tempHigh)}${escapeHtml(tempUnit)}">
+        <span class="pw-arc-label" style="color:${sanitizeCssValue(tempToColor(tempLow))}">L:${escapeHtml(Math.round(tempLow))}\u00b0</span>
+        <div class="pw-arc-bar" style="background:${arcGradient}" role="img" aria-label="Temperature range ${Math.round(tempLow)}${escapeHtml(tempUnit)} to ${Math.round(tempHigh)}${escapeHtml(tempUnit)}">
           <div class="pw-arc-marker" style="left: ${Number(arcPct)}%"></div>
+          ${freezeMarkerHtml}
         </div>
-        <span class="pw-arc-label">${escapeHtml(Math.round(tempHigh))}${escapeHtml(tempUnit)}</span>
+        <span class="pw-arc-label" style="color:${sanitizeCssValue(tempToColor(tempHigh))}">H:${escapeHtml(Math.round(tempHigh))}\u00b0</span>
       </div>
-      <div class="pulse-stats-row" style="margin: 0 20px; position: relative; z-index: 2;" role="img" aria-label="Weather statistics">
-        <div class="stat">
-          <div class="pw-stat-value">${escapeHtml(Math.round(humidity))}%</div>
-          <div class="pw-stat-label">Humid</div>
-        </div>
-        <div class="stat">
-          <div class="pw-stat-value">${escapeHtml(Math.round(windSpeed))} ${escapeHtml(dirLabel)}</div>
-          <div class="pw-stat-label">Wind</div>
-        </div>
-        <div class="stat">
-          <div class="pw-stat-value">${escapeHtml(dewPoint.toFixed(1))}${escapeHtml(dewUnit)}</div>
-          <div class="pw-stat-label">Dew</div>
-        </div>
-        <div class="stat">
-          <div class="pw-stat-value">${escapeHtml(Math.round(visibility))} ${escapeHtml(visUnit)}</div>
-          <div class="pw-stat-label">Vis</div>
-        </div>
-      </div>
+      ${dayArcHtml}
+      ${summaryHtml}
       ${precipBarHtml}
-      <div class="pw-bottom-row" style="position: relative; z-index: 2; padding: 12px 20px 16px;">
-        <div class="pw-bottom-card">
-          <div class="pw-bottom-header">
-            <span class="pw-bottom-label">UV Index</span>
-            <span class="pw-bottom-value" style="color: ${sanitizeCssValue(uvColor(uvIndex))}">${escapeHtml(Math.round(uvIndex))} ${escapeHtml(uvLabel(uvIndex))}</span>
-          </div>
-          <div class="pw-mini-bar" role="img" aria-label="UV index ${Math.round(uvIndex)}">
-            <div class="pw-mini-fill" style="width: ${Number(uvPct)}%; background: ${sanitizeCssValue(uvColor(uvIndex))}"></div>
-          </div>
-          ${uvGhostPct !== null && uvClearSky !== null ? `<div class="pw-arc-ghost" style="left: ${Number(uvGhostPct)}%; position: relative; top: -8px;" title="Clear-sky UV: ${escapeHtml(String(Math.round(uvClearSky)))}"></div>` : ''}
-        </div>
-        <div class="pw-bottom-card">
-          <div class="pw-bottom-header">
-            <span class="pw-bottom-label">Pressure</span>
-            <span class="pw-bottom-value">${escapeHtml(Math.round(pressure))} ${escapeHtml(pressUnit)}</span>
-          </div>
-          <div class="pw-mini-bar" role="img" aria-label="Pressure ${Math.round(pressure)} ${escapeHtml(pressUnit)}">
-            <div class="pw-mini-fill" style="width: ${Number(pressurePct)}%; background: #5ac8fa"></div>
-          </div>
-        </div>
+      ${comfortBarHtml}
+      ${capeBarHtml}
+      <div class="pulse-stats-row" style="margin: 0 20px; position: relative; z-index: 2; border-top: none; padding-top: 8px;" role="img" aria-label="Wind and surface observations">
+        ${statHtml(windValue, bft.name, windColor)}
+        ${statHtml(`${escapeHtml(feelsLike.toFixed(1))}${escapeHtml(tempUnit)}`, 'Feels', feelsColor)}
+        ${statHtml(`${escapeHtml(Math.round(visibility))} ${escapeHtml(visUnit)}`, 'Vis', visCatColor)}
+        ${statHtml(`${escapeHtml(dewPoint.toFixed(1))}${escapeHtml(dewUnit)}`, 'Dew', dewColor)}
+      </div>
+      <div class="pulse-stats-row" style="margin: 0 20px; position: relative; z-index: 2; padding-bottom: 16px; border-top: none; padding-top: 4px;" role="img" aria-label="Atmospheric conditions">
+        ${statHtml(cloudCover !== null ? escapeHtml(Math.round(cloudCover.total) + '%') : '--', 'Cloud', cloudColor)}
+        ${statHtml(`${escapeHtml(Math.round(humidity))}%`, 'Humid', humidColor)}
+        ${statHtml(pressValue, pressLabel, pressColor)}
+        ${statHtml(uvValue, 'UV', uvColor(uvIndex))}
       </div>
     </div>`;
 }

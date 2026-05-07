@@ -8,7 +8,7 @@ Ideas and feature requests under consideration. No timelines — this is a "what
 
 ### Up Next
 
-- **Manual entity overrides** ([#28](https://github.com/hiall-fyi/pulse-card/issues/28) - @dragorex71) — let non-Tado CE users point the card at their own sensors for chips and sections. Phase 1: `heating_power_entity`, `battery_entity`, `mold_risk_entity`, `open_window_entity`. Phase 2: environment, thermal, and schedule section entities
+- **Manual entity overrides — Phase 2** ([#28](https://github.com/hiall-fyi/pulse-card/issues/28) - @dragorex71) — Phase 1 shipped in v1.3.1 (`open_window_entity`, `battery_entity`, `mold_risk_entity`). Remaining: `heating_power_entity`, and environment/thermal/schedule section entity overrides
 - **Visual editor refinements** — per-zone settings (name, icon, color, sparkline mode) directly in the GUI
 
 ### Exploring

@@ -6,7 +6,7 @@
  * Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue, isReducedMotion } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } from '../../shared/utils.js';
 import { HVAC_VISUALS } from '../constants.js';
 import { resolveZoneState, computeGlowStdDev, computeParticleCount, computeParticleDuration, computeParticleRadius } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
@@ -208,8 +208,8 @@ export function renderEnergyFlowSection(zones, states, discovery) {
     // Sub-text — heating color for active zones
     const subFill = active ? sanitizeCssValue(heatingColor) : 'var(--secondary-text-color, #8e8e93)';
     const subText = active
-      ? `${zone.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(zone.power)}%${zone.temp !== null ? ` · ${zone.temp}${zone.unit}` : ''}`
-      : `Idle${zone.temp !== null ? ` · ${zone.temp}${zone.unit}` : ''}`;
+      ? `${zone.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(zone.power)}%${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`
+      : `Idle${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`;
     html += `<text x="${destX}" y="${(destY + 12).toFixed(1)}" font-size="9" fill="${subFill}">${escapeHtml(subText)}</text>`;
   }
 
@@ -376,8 +376,8 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
 
     if (subEl) {
       const subText = active
-        ? `${zone.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(zone.power)}%${zone.temp !== null ? ` · ${zone.temp}${zone.unit}` : ''}`
-        : `Idle${zone.temp !== null ? ` · ${zone.temp}${zone.unit}` : ''}`;
+        ? `${zone.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(zone.power)}%${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`
+        : `Idle${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`;
       subEl.textContent = subText;
       subEl.setAttribute('fill', active ? heatingColor : 'var(--secondary-text-color, #8e8e93)');
     }

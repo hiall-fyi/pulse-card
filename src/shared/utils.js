@@ -65,3 +65,18 @@ export function isReducedMotion() {
   if (typeof window === 'undefined') return false;
   return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
 }
+
+/**
+ * Format a numeric value for display, removing floating-point noise.
+ * Rounds to the specified number of decimal places (default 1) and strips
+ * trailing zeros. Non-numeric values pass through unchanged.
+ * @param {*} value - Value to format.
+ * @param {number} [decimals=1] - Maximum decimal places to show.
+ * @returns {string} Formatted string.
+ */
+export function formatNumericDisplay(value, decimals = 1) {
+  if (value === null || value === undefined) return '--';
+  if (typeof value !== 'number') return String(value);
+  if (!isFinite(value)) return '--';
+  return String(parseFloat(value.toFixed(decimals)));
+}

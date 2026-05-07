@@ -3,12 +3,10 @@
  * @description Main card element — lifecycle, section dispatch, and DOM management.
  */
 
-import { VERSION, CARD_NAME, EDITOR_NAME } from './constants.js';
+import { VERSION, CARD_NAME, EDITOR_NAME, FORECAST_REFRESH_MS } from './constants.js';
 import { STYLES } from './styles.js';
 import { normalizeWeatherConfig } from './utils.js';
-// escapeHtml imported for innerHTML safety — section renderers handle escaping,
-// but having it available in the card shell satisfies the security audit.
-import { escapeHtml } from '../shared/utils.js'; // eslint-disable-line no-unused-vars
+import { escapeHtml } from '../shared/utils.js'; // eslint-disable-line no-unused-vars -- audit: innerHTML present, escaping delegated to section renderers
 import { discoverWeatherEntities } from './weather-resolver.js';
 import { buildConditionFx, addAirHaze, addStars, addRays, addClouds } from './weather-fx.js';
 import { renderOverview } from './sections/overview.js';
@@ -18,6 +16,7 @@ import { renderAirQuality } from './sections/air-quality.js';
 import { renderAstro } from './sections/astro.js';
 import { renderAlerts } from './sections/alerts.js';
 import { renderAtmosphere, buildThermalParticles } from './sections/atmosphere.js';
+import { renderMeteogram } from './sections/meteogram.js';
 
 /**
  * Section renderer dispatch map.
@@ -31,6 +30,7 @@ const SECTION_RENDERERS = {
   astro: renderAstro,
   alerts: renderAlerts,
   atmosphere: renderAtmosphere,
+  meteogram: renderMeteogram,
 };
 
 /**
@@ -47,12 +47,26 @@ class PulseWeatherCard extends HTMLElement {
     this._hass = null;
     /** @type {string|null} */
     this._lastWeatherState = null;
+    /** @type {boolean} */
+    this._atmosExpanded = false;
     /** @type {object|null} */
     this._forecastData = null;
+    /** @type {number} */
+    this._forecastLastFetch = 0;
     /** @type {string|null} */
     this._subscribedEntityId = null;
+    /** @type {string|null} */
+    this._atmosConfigEntryId = null;
+    /** @type {import('./types.js').WeatherDiscovery|null} */
+    this._discovery = null;
+    /** @type {boolean} */
+    this._forecastFetching = false;
     /** @type {number|null} */
     this._phaseTimer = null;
+    /** @type {number|null} */
+    this._countdownTimer = null;
+    /** @type {number|null} */
+    this._minuteTimer = null;
   }
 
   /**
@@ -82,62 +96,111 @@ class PulseWeatherCard extends HTMLElement {
 
     // Differential update: only re-render when weather state changes
     const stateKey = `${weatherEntity.state}|${JSON.stringify(weatherEntity.attributes)}`;
-    if (stateKey === this._lastWeatherState) return;
-    this._lastWeatherState = stateKey;
+    const stateChanged = stateKey !== this._lastWeatherState;
+    if (stateChanged) {
+      this._lastWeatherState = stateKey;
+      this._fullRender();
+    }
 
-    this._fullRender();
+    // Always check forecast staleness — independent of weather state changes
     this._subscribeForecast(hass, weatherId);
   }
 
   /**
-   * Fetch forecast data once. Uses weather.get_forecasts service call
-   * (one-shot) instead of subscribe_forecast (subscription) to avoid
-   * subscription leaks in the HA WebSocket connection.
+   * Fetch forecast data once. Prefers Atmos CE extended forecast (22 fields
+   * including dew_point, cape) when available, falls back to standard
+   * weather.get_forecasts (7 fields).
    * @param {Hass} hass - Home Assistant hass object.
    * @param {string} entityId - Weather entity ID.
    */
   async _subscribeForecast(hass, entityId) {
-    // Only fetch once per entity — re-fetch on entity change
-    if (this._subscribedEntityId === entityId && this._forecastData) return;
+    // Re-fetch when entity changes or data is stale
+    const isStale = (Date.now() - this._forecastLastFetch) >= FORECAST_REFRESH_MS;
+    if (this._subscribedEntityId === entityId && this._forecastData && !isStale) return;
+    // Guard against concurrent async calls
+    if (this._forecastFetching) return;
+    this._forecastFetching = true;
     this._subscribedEntityId = entityId;
 
     if (!hass.callWS) return;
 
     try {
-      // Use callWS with call_service type + return_response for get_forecasts
-      const dailyResult = await hass.callWS({
-        type: 'call_service',
-        domain: 'weather',
-        service: 'get_forecasts',
-        target: { entity_id: entityId },
-        service_data: { type: 'daily' },
-        return_response: true,
-      }).catch(() => null);
+      // Try Atmos CE extended forecast first (22 fields including dew_point, cape)
+      let extendedHourly = null;
+      if (this._discovery?.atmosSource) {
+        try {
+          // Find config entry ID from any Atmos CE entity (cached after first lookup)
+          if (!this._atmosConfigEntryId) {
+            const entityReg = /** @type {Array<Record<string, unknown>>} */ (
+              await hass.callWS({ type: 'config/entity_registry/list' }).catch(() => [])
+            );
+            const atmosEntity = entityReg.find((e) => e.platform === 'atmos_ce');
+            this._atmosConfigEntryId = /** @type {string|null} */ (atmosEntity?.config_entry_id || null);
+          }
+          if (this._atmosConfigEntryId) {
+            const extResult = await hass.callWS({
+              type: 'call_service',
+              domain: 'atmos_ce',
+              service: 'get_extended_forecast',
+              service_data: { config_entry_id: this._atmosConfigEntryId, type: 'hourly' },
+              return_response: true,
+            }).catch(() => null);
+            const extResp = /** @type {Record<string, unknown>|null} */ (extResult);
+            const extResponse = /** @type {Record<string, unknown>|undefined} */ (extResp?.response);
+            if (extResponse?.forecast) {
+              extendedHourly = /** @type {Array<Record<string, unknown>>} */ (extResponse.forecast);
+            }
+          }
+        } catch {
+          // Extended forecast unavailable — fall through to standard
+        }
+      }
 
-      const hourlyResult = await hass.callWS({
-        type: 'call_service',
-        domain: 'weather',
-        service: 'get_forecasts',
-        target: { entity_id: entityId },
-        service_data: { type: 'hourly' },
-        return_response: true,
-      }).catch(() => null);
+      // Standard weather.get_forecasts — only if entity exists in HA
+      let dailyResult = null;
+      if (entityId && hass.states[entityId]) {
+        dailyResult = await hass.callWS({
+          type: 'call_service',
+          domain: 'weather',
+          service: 'get_forecasts',
+          target: { entity_id: entityId },
+          service_data: { type: 'daily' },
+          return_response: true,
+        }).catch(() => null);
+      }
 
-      // Response shape: { response: { "weather.entity_id": { forecast: [...] } } }
+      // Only fetch standard hourly if extended not available
+      let standardHourly = null;
+      if (!extendedHourly && entityId && hass.states[entityId]) {
+        const hourlyResult = await hass.callWS({
+          type: 'call_service',
+          domain: 'weather',
+          service: 'get_forecasts',
+          target: { entity_id: entityId },
+          service_data: { type: 'hourly' },
+          return_response: true,
+        }).catch(() => null);
+        const hResp = /** @type {Record<string, unknown>|null} */ (hourlyResult);
+        const hResponse = /** @type {Record<string, unknown>|undefined} */ (hResp?.response);
+        const hourlyEntry = /** @type {Record<string, unknown>|undefined} */ (hResponse?.[entityId]);
+        standardHourly = /** @type {Array<Record<string, unknown>>} */ (hourlyEntry?.forecast || []);
+      }
+
       const dResp = /** @type {Record<string, unknown>|null} */ (dailyResult);
-      const hResp = /** @type {Record<string, unknown>|null} */ (hourlyResult);
       const dResponse = /** @type {Record<string, unknown>|undefined} */ (dResp?.response);
-      const hResponse = /** @type {Record<string, unknown>|undefined} */ (hResp?.response);
       const dailyEntry = /** @type {Record<string, unknown>|undefined} */ (dResponse?.[entityId]);
-      const hourlyEntry = /** @type {Record<string, unknown>|undefined} */ (hResponse?.[entityId]);
 
       this._forecastData = {
-        hourly: /** @type {Array<Record<string, unknown>>} */ (hourlyEntry?.forecast || []),
+        hourly: extendedHourly || standardHourly || [],
         daily: /** @type {Array<Record<string, unknown>>} */ (dailyEntry?.forecast || []),
       };
+      this._forecastLastFetch = Date.now();
+      this._forecastFetching = false;
       this._fullRender();
     } catch {
-      // Forecast fetch failed — render without forecast data
+      // Forecast fetch failed — set timestamp to prevent retry spam
+      this._forecastLastFetch = Date.now();
+      this._forecastFetching = false;
     }
   }
 
@@ -146,6 +209,7 @@ class PulseWeatherCard extends HTMLElement {
    */
   _unsubscribeForecasts() {
     this._subscribedEntityId = null;
+    this._forecastLastFetch = 0;
   }
 
   /**
@@ -154,6 +218,8 @@ class PulseWeatherCard extends HTMLElement {
   disconnectedCallback() {
     this._unsubscribeForecasts();
     if (this._phaseTimer) { clearTimeout(this._phaseTimer); this._phaseTimer = null; }
+    if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
+    if (this._minuteTimer) { clearInterval(this._minuteTimer); this._minuteTimer = null; }
   }
 
   /**
@@ -163,6 +229,7 @@ class PulseWeatherCard extends HTMLElement {
     if (!this._hass || !this._config || !this.shadowRoot) return;
 
     const discovery = discoverWeatherEntities(this._hass.states, this._config);
+    this._discovery = discovery;
     const weatherEntity = this._hass.states[discovery.weatherEntityId];
     if (!weatherEntity) return;
 
@@ -192,6 +259,29 @@ class PulseWeatherCard extends HTMLElement {
 
     // Schedule re-render at next sky phase boundary (golden/blue hour transitions)
     this._schedulePhaseTransition();
+
+    // Periodic 60s re-render for arc progress and time-dependent elements
+    if (this._minuteTimer) { clearInterval(this._minuteTimer); this._minuteTimer = null; }
+    this._minuteTimer = setInterval(() => {
+      this._lastWeatherState = null;
+      if (this._hass) this._fullRender();
+    }, 60000);
+
+    // Countdown timer — update only the countdown text, not full render
+    if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
+    if (this.shadowRoot.querySelector('.pw-astro-countdown')) {
+      this._countdownTimer = setInterval(() => {
+        const el = /** @type {HTMLElement|null} */ (this.shadowRoot?.querySelector('.pw-astro-countdown'));
+        if (!el) { clearInterval(/** @type {number} */ (this._countdownTimer)); this._countdownTimer = null; return; }
+        const ms = Number(el.dataset.target) - Date.now();
+        if (ms <= 0) { clearInterval(/** @type {number} */ (this._countdownTimer)); this._countdownTimer = null; this._lastWeatherState = null; this._fullRender(); return; }
+        const sec = Math.floor(ms / 1000);
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        el.textContent = (h > 0 ? h + 'h ' + m + 'm' : m + 'm ' + s + 's') + (el.dataset.suffix || '');
+      }, 1000);
+    }
   }
 
   /**
@@ -217,7 +307,7 @@ class PulseWeatherCard extends HTMLElement {
     if (nextSet > now) boundaries.push(nextSet);
 
     // Golden/blue hour boundaries from Atmos CE
-    for (const key of ['golden_hour_morning_start', 'golden_hour_morning_end', 'golden_hour_evening_start', 'golden_hour_evening_end', 'blue_hour_morning', 'blue_hour_evening']) {
+    for (const key of ['golden_hour_morning_start', 'golden_hour_morning_end', 'golden_hour_evening_start', 'golden_hour_evening_end', 'blue_hour_morning_start', 'blue_hour_morning_end', 'blue_hour_evening_start', 'blue_hour_evening_end']) {
       if (ce[key]) {
         const t = new Date(String(this._hass.states[ce[key]]?.state || '')).getTime();
         if (t > now) boundaries.push(t);
@@ -363,6 +453,30 @@ class PulseWeatherCard extends HTMLElement {
           /** @type {HTMLElement} */ (strip).scrollLeft += we.deltaY;
         }
       }, { passive: false });
+    }
+
+    // 7. Bind atmosphere column tap-to-expand
+    const atmosWrap = this.shadowRoot.querySelector('.pw-atmos-column-wrap[data-has-detail]');
+    if (atmosWrap) {
+      const detailPanel = this.shadowRoot.querySelector('.pw-atmos-detail');
+      if (detailPanel) {
+        // Restore state from previous render
+        if (this._atmosExpanded) {
+          /** @type {HTMLElement} */ (detailPanel).style.maxHeight = `${detailPanel.scrollHeight}px`;
+          atmosWrap.setAttribute('aria-expanded', 'true');
+        }
+
+        atmosWrap.addEventListener('click', () => {
+          this._atmosExpanded = !this._atmosExpanded;
+          if (this._atmosExpanded) {
+            /** @type {HTMLElement} */ (detailPanel).style.maxHeight = `${detailPanel.scrollHeight}px`;
+            atmosWrap.setAttribute('aria-expanded', 'true');
+          } else {
+            /** @type {HTMLElement} */ (detailPanel).style.maxHeight = '0';
+            atmosWrap.setAttribute('aria-expanded', 'false');
+          }
+        });
+      }
     }
   }
 

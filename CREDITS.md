@@ -4,6 +4,10 @@ Community members who shaped Pulse Card through bug reports, feature requests, t
 
 ---
 
+### v1.3.2
+
+- **[@Si-Hill](https://github.com/Si-Hill)** — Reported floating-point noise in the valve chip display (`18.700000000000003°C`) and identified that SVC-enabled zones in idle state showed no valve chip at all, making it impossible to tell whether Smart Valve Control was running. Provided screenshots showing the issue across multiple zones ([#45](https://github.com/hiall-fyi/pulse-card/issues/45))
+
 ### v1.2.1
 
 - **[@driagi](https://github.com/driagi)** — Ran the targeted console debug that revealed `unique_id: undefined` across all entities, uncovering that HA removed `unique_id` from the frontend registry in 2023.3. This led to the full discovery rewrite using device grouping ([Discussion #20](https://github.com/hiall-fyi/pulse-card/discussions/20))

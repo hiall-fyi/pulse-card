@@ -27,6 +27,13 @@ export const STYLES = `${SHARED_STYLES}
   --pw-tier-strong: #ff9f0a;
   --pw-tier-gale: #ff453a;
 
+  /* Semantic colors */
+  --pw-color-freeze: #5ac8fa;
+  --pw-color-lcl: #d0d0d0;
+  --pw-color-stable: #30d158;
+  --pw-text-overlay: #d0d0d0;
+  --pw-shadow-overlay: 0 1px 3px rgba(0,0,0,0.6);
+
   /* Transitions */
   --pw-bg-transition: 0.8s;
   --pw-color-transition: 0.4s;
@@ -64,6 +71,25 @@ export const STYLES = `${SHARED_STYLES}
   text-transform: uppercase;
   color: var(--pulse-text-secondary);
   opacity: 0.7;
+}
+
+/* ── Shared Status Label ───────────────────────────────────────── */
+.pw-status-label {
+  font-size: 17px;
+  font-weight: 500;
+  text-align: center;
+  padding: 0 20px;
+  transition: color 0.4s;
+  position: relative;
+  z-index: 2;
+}
+
+.pw-status-desc {
+  font-size: 12px;
+  color: var(--pulse-text-secondary);
+  text-align: center;
+  margin-top: 2px;
+  padding: 0 20px;
 }
 
 /* ── Mode Tabs ─────────────────────────────────────────────────── */
@@ -161,10 +187,9 @@ export const STYLES = `${SHARED_STYLES}
 }
 
 .pw-hero-condition {
-  font-size: 15px;
-  font-weight: 400;
+  font-size: 17px;
+  font-weight: 500;
   color: var(--pulse-text-primary);
-  opacity: 0.7;
   margin-top: 4px;
 }
 
@@ -196,7 +221,7 @@ export const STYLES = `${SHARED_STYLES}
   height: 4px;
   border-radius: 2px;
   position: relative;
-  background: linear-gradient(to right, #5ac8fa, #30d158, #ff9f0a, #ff453a);
+  background: linear-gradient(to right, var(--pw-tier-calm), var(--pw-tier-moderate), var(--pw-tier-strong), var(--pw-tier-gale));
   opacity: 0.8;
 }
 
@@ -228,10 +253,52 @@ export const STYLES = `${SHARED_STYLES}
 
 /* Precipitation bar label */
 .pw-precip-label {
+  font-size: 12px;
+  color: var(--pulse-text-secondary);
+  margin-bottom: 6px;
+}
+
+/* Snow badge */
+.pw-snow-badge {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 4px;
+  position: relative;
+  z-index: 2;
+  text-shadow: var(--pw-shadow-overlay);
+}
+
+/* Feels like context */
+.pw-feels-context {
   font-size: 10px;
   color: var(--pulse-text-secondary);
-  opacity: 0.3;
-  margin-bottom: 6px;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+/* Snow precip fill — white gradient (bottom opaque → top transparent) */
+.pw-precip-snow {
+  background: linear-gradient(to top, var(--pw-text-overlay, #d0d0d0), transparent) !important;
+}
+
+/* Rain precip fill — gradient (bottom opaque → top fade) */
+.pulse-precip-fill {
+  background: linear-gradient(to top, #5ac8fa, rgba(90,200,250,0.15));
+}
+
+/* CAPE storm risk bar */
+.pw-cape-bar {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pw-cape-slot {
+  flex: 1;
+  border-radius: 1px;
 }
 
 .pw-bottom-row { display: flex; gap: 8px; }
@@ -298,7 +365,7 @@ export const STYLES = `${SHARED_STYLES}
 .pw-hour-time { font-size: 10px; color: var(--pulse-text-secondary); margin-bottom: 6px; }
 .pw-hour-icon { font-size: 20px; margin-bottom: 6px; }
 .pw-hour-temp { font-size: 14px; font-weight: 300; font-variant-numeric: tabular-nums; }
-.pw-hour-precip { font-size: 9px; color: #5ac8fa; margin-top: 4px; min-height: 12px; }
+.pw-hour-precip { font-size: 9px; color: var(--pw-color-freeze); margin-top: 4px; min-height: 12px; }
 
 .pw-sparkline-wrap {
   padding: 0 20px;
@@ -319,7 +386,7 @@ export const STYLES = `${SHARED_STYLES}
 
 .pw-daily-day { font-weight: 400; }
 .pw-daily-icon { font-size: 16px; text-align: center; }
-.pw-daily-precip { font-size: 10px; color: #5ac8fa; text-align: right; }
+.pw-daily-precip { font-size: 10px; color: var(--pw-color-freeze); text-align: right; }
 
 .pw-daily-bar-wrap {
   height: 4px;
@@ -393,19 +460,19 @@ export const STYLES = `${SHARED_STYLES}
 }
 
 .pw-wind-unit {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--pulse-text-secondary);
   margin-top: 2px;
 }
 
 .pw-wind-beaufort {
-  font-size: 11px;
+  font-size: 17px;
   font-weight: 500;
   margin-top: 4px;
 }
 
 .pw-wind-beaufort-desc {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--pulse-text-secondary);
 }
 
@@ -514,68 +581,101 @@ export const STYLES = `${SHARED_STYLES}
 .pw-astro > .pw-fx { z-index: 3; }
 
 .pw-arc-wrap {
+  width: 100%;
+  overflow: visible;
+}
+
+/* ── Astro Layout (three-column redesign) ─────────────────────── */
+.pw-astro-layout {
   display: flex;
-  justify-content: center;
-  padding: 20px 20px 8px;
+  align-items: stretch;
+}
+
+.pw-twilight-arc {
+  position: absolute;
+  width: 18px;
+  height: 89px;
+  top: 55px;
+}
+
+.pw-twilight-arc-am { left: 4px; }
+.pw-twilight-arc-pm { right: 4px; }
+
+.pw-twilight-col {
   position: relative;
+  width: 110px;
+  flex-shrink: 0;
+  padding-top: 42px;
 }
 
-.pw-astro-info {
-  text-align: center;
-  padding: 8px 20px;
+.pw-twilight-am .pw-twilight-time-golden { margin-left: 16px; }
+.pw-twilight-am .pw-twilight-label-golden { margin-top: 1px; margin-left: 14px; }
+.pw-twilight-am .pw-twilight-time-blue { margin-top: 2px; margin-left: 18px; }
+.pw-twilight-am .pw-twilight-label-blue { margin-top: 1px; margin-left: 24px; }
+.pw-twilight-am .pw-twilight-time-end { margin-top: 2px; margin-left: 29px; }
+
+.pw-twilight-pm { text-align: right; }
+.pw-twilight-pm .pw-twilight-time-golden { margin-right: 16px; }
+.pw-twilight-pm .pw-twilight-label-golden { margin-top: 1px; margin-right: 14px; }
+.pw-twilight-pm .pw-twilight-time-blue { margin-top: 2px; margin-right: 18px; }
+.pw-twilight-pm .pw-twilight-label-blue { margin-top: 1px; margin-right: 24px; }
+.pw-twilight-pm .pw-twilight-time-end { margin-top: 2px; margin-right: 29px; }
+
+.pw-twilight-time {
+  font-size: 17px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--primary-text-color);
 }
 
-.pw-astro-theme-label {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.pw-astro-countdown {
-  font-size: 11px;
-  color: var(--pulse-text-secondary);
-  margin-top: 2px;
-}
-
-.pw-astro-countdown-wrap {
-  text-align: center;
-  padding: 6px 20px 0;
-}
-
-.pw-astro-countdown-text {
+.pw-twilight-label {
   font-size: 13px;
-  font-weight: 400;
-}
-
-.pw-astro-progress {
-  margin-top: 6px;
-}
-
-.pw-astro-progress-bar {
-  height: 3px;
-  background: var(--pulse-bg-elevated);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 4px;
-}
-
-.pw-astro-progress-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.6s;
-}
-
-.pw-astro-progress-label {
-  font-size: 10px;
   color: var(--pulse-text-secondary);
-  opacity: 0.85;
+  font-weight: 400;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.pw-arc-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.pw-sunrise-sunset {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: -8px;
+}
+
+.pw-sun-time {
+  width: 84px;
   text-align: center;
 }
 
-.pw-astro-stats {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
-  margin: 8px 20px 0;
+.pw-sun-time-value {
+  font-size: 17px;
+  font-weight: 300;
+  color: var(--primary-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.pw-sun-time-label {
+  font-size: 14px;
+  color: var(--pulse-text-secondary);
+  text-transform: uppercase;
+}
+
+.pw-moon-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pulse-border-subtle, rgba(255,255,255,0.06));
 }
 
 /* ── Alerts ────────────────────────────────────────────────────── */
@@ -666,37 +766,20 @@ export const STYLES = `${SHARED_STYLES}
 .pw-all-clear {
   text-align: center;
   padding: 20px 0;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
-  color: #30d158;
+  color: var(--pw-color-stable);
 }
 
 /* ── Atmosphere Column ──────────────────────────────────────────── */
 .pw-atmos { padding: 0 0 16px; position: relative; overflow: hidden; }
 
-.pw-atmos-tier-label {
-  font-size: 10px;
-  font-weight: 500;
-}
-
 .pw-atmos-tier-desc {
-  font-size: 11px;
-  font-weight: 300;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--pulse-text-secondary);
-  opacity: 0.7;
   text-align: center;
   padding: 0 20px;
-  position: relative;
-  z-index: 2;
-}
-
-.pw-atmos-confidence {
-  font-size: 8px;
-  color: var(--pulse-text-secondary);
-  opacity: 0.4;
-  text-align: center;
-  margin-top: 4px;
-  font-variant-numeric: tabular-nums;
   position: relative;
   z-index: 2;
 }
@@ -721,9 +804,9 @@ export const STYLES = `${SHARED_STYLES}
 }
 
 .pw-atmos-scale-label {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--pulse-text-secondary);
-  opacity: 0.3;
+  opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
 
@@ -732,8 +815,8 @@ export const STYLES = `${SHARED_STYLES}
   position: relative;
   border-radius: 10px;
   overflow: hidden;
-  background: linear-gradient(to top, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%);
-  border: 1px solid rgba(255,255,255,0.03);
+  background: linear-gradient(to top, var(--pulse-bg-elevated) 0%, transparent 100%);
+  border: 1px solid var(--pulse-border-subtle);
 }
 
 /* CAPE energy fill */
@@ -800,13 +883,13 @@ export const STYLES = `${SHARED_STYLES}
 .pw-atmos-freeze-line {
   flex: 1;
   height: 1px;
-  background: #5ac8fa;
+  background: var(--pw-color-freeze);
   opacity: 0.4;
 }
 
 .pw-atmos-freeze-label {
-  font-size: 8px;
-  color: #5ac8fa;
+  font-size: 10px;
+  color: var(--pw-color-freeze);
   opacity: 0.6;
   padding: 0 6px;
   white-space: nowrap;
@@ -830,12 +913,12 @@ export const STYLES = `${SHARED_STYLES}
 }
 
 .pw-atmos-lcl-label {
-  font-size: 8px;
-  color: #a0a0a0;
-  opacity: 0.6;
+  font-size: 10px;
+  color: var(--pw-text-overlay);
   padding: 0 6px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  text-shadow: var(--pw-shadow-overlay);
 }
 
 .pw-atmos-ground-label {
@@ -844,48 +927,129 @@ export const STYLES = `${SHARED_STYLES}
   left: 0;
   right: 0;
   text-align: center;
-  font-size: 7px;
-  color: var(--pulse-text-secondary);
-  opacity: 0.2;
+  font-size: 10px;
+  color: var(--pw-text-overlay);
   text-transform: uppercase;
   letter-spacing: 1px;
+  text-shadow: var(--pw-shadow-overlay);
 }
 
-/* Info panel */
-.pw-atmos-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 20px;
-  width: 90px;
-  background: var(--pulse-bg-elevated);
+.pw-atmos-shear-arrow {
+  position: absolute;
+  right: 6px;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.pw-atmos-lapse-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
   border-radius: 10px;
-  padding: 12px 0;
+  z-index: 1;
 }
 
-.pw-atmos-metric { text-align: center; }
-
-.pw-atmos-metric-value {
-  font-size: 28px;
-  font-weight: var(--pulse-weight-hero, 100);
+.pw-atmos-lapse-label {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  white-space: nowrap;
+  text-shadow: var(--pw-shadow-overlay);
 }
 
-.pw-atmos-metric-unit {
-  font-size: 9px;
+/* Cloud layer bands */
+.pw-atmos-cloud-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+/* High cloud top-edge indicator */
+.pw-atmos-cloud-high {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 9px 9px 0 0;
+}
+
+/* Shear arrow value label */
+.pw-atmos-shear-label {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow: var(--pw-shadow-overlay);
+}
+
+/* Tap-to-expand detail panel */
+.pw-atmos-tappable {
+  cursor: pointer;
+}
+.pw-atmos-tappable:active {
+  opacity: 0.85;
+}
+
+.pw-atmos-detail {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+  margin: 0 20px;
+}
+
+.pw-atmos-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--pulse-border-subtle);
+}
+
+.pw-atmos-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pw-atmos-detail-indicator {
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.pw-atmos-detail-label {
+  font-size: 10px;
   color: var(--pulse-text-secondary);
-  opacity: 0.4;
-  margin-top: 2px;
-}
-
-.pw-atmos-metric-label {
-  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+.pw-atmos-detail-value {
+  font-size: 14px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+
+.pw-atmos-detail-desc {
+  font-size: 9px;
   color: var(--pulse-text-secondary);
-  opacity: 0.4;
-  margin-top: 2px;
+  opacity: 0.6;
 }
 
 /* ── Severity Dot ──────────────────────────────────────────────── */
@@ -1134,7 +1298,7 @@ export const STYLES = `${SHARED_STYLES}
   align-items: flex-start;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid var(--pulse-border-subtle);
 }
 .pw-alert-row:last-child { border-bottom: none; }
 .pw-alert-row.upcoming { opacity: 0.5; }
@@ -1196,10 +1360,44 @@ export const STYLES = `${SHARED_STYLES}
 .pw-all-clear {
   text-align: center;
   padding: 4px 0;
-  font-size: 13px;
-  font-weight: 400;
-  color: #30d158;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--pw-color-stable);
 }
+
+/* ── Weather Summary ────────────────────────────────────────────── */
+.pw-weather-summary { font-size: 13px; font-weight: 400; text-align: center; padding: 4px 20px 8px; color: var(--pulse-text-primary); position: relative; z-index: 2; opacity: 0.85; }
+
+/* ── Day Progress Arc ──────────────────────────────────────────── */
+.pw-day-arc { display: flex; align-items: center; gap: 8px; padding: 4px 20px 8px; position: relative; z-index: 2; }
+.pw-day-arc-label { font-size: 10px; color: var(--pulse-text-secondary); font-variant-numeric: tabular-nums; opacity: 0.6; }
+.pw-day-arc-bar { flex: 1; height: 2px; border-radius: 1px; background: var(--pulse-bg-elevated); position: relative; }
+.pw-day-arc-fill { height: 100%; border-radius: 1px; background: linear-gradient(to right, #ff9f0a, #ffd60a); }
+.pw-day-arc-marker { position: absolute; top: -3px; width: 8px; height: 8px; background: #ffd60a; border-radius: 50%; border: 1px solid rgba(0,0,0,0.2); transform: translateX(-50%); box-shadow: 0 0 6px rgba(255,214,10,0.4); }
+
+/* ── Stability Badge ───────────────────────────────────────────── */
+.pw-stability-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
+
+/* ── Precip Time Markers ───────────────────────────────────────── */
+.pw-precip-times { display: flex; justify-content: space-between; font-size: 9px; color: var(--pulse-text-secondary); opacity: 0.6; margin-top: 2px; }
+
+/* ── Rain Start Indicator ──────────────────────────────────────── */
+.pw-rain-start { position: absolute; top: -14px; transform: translateX(-50%); text-align: center; }
+.pw-rain-start-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--pw-color-freeze); margin: 0 auto 2px; }
+.pw-rain-start-label { font-size: 8px; color: var(--pw-color-freeze); white-space: nowrap; }
+
+/* ── Freezing Level Marker (Temp Arc) ──────────────────────────── */
+.pw-arc-freeze { position: absolute; top: -6px; bottom: -6px; width: 1px; transform: translateX(-50%); }
+.pw-arc-freeze-line { width: 1px; height: 100%; background: var(--pw-color-freeze); opacity: 0.5; }
+.pw-arc-freeze-label { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--pw-color-freeze); white-space: nowrap; }
+
+/* ── CAPE Sparkline ────────────────────────────────────────────── */
+.pw-cape-sparkline { display: block; border-radius: 2px; overflow: hidden; }
+.pw-cape-peak { position: absolute; top: -12px; transform: translateX(-50%); font-size: 8px; color: var(--pw-tier-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ── Comfort Bar (Dew Point) ───────────────────────────────────── */
+.pw-comfort-bar { display: flex; gap: 2px; height: 4px; border-radius: 2px; overflow: hidden; }
+.pw-comfort-slot { flex: 1; border-radius: 1px; }
 
 @media (prefers-reduced-motion: reduce) {
   .pw-streak,
@@ -1220,6 +1418,9 @@ export const STYLES = `${SHARED_STYLES}
   }
   .pw-atmos-column-glow.pulsing {
     box-shadow: inset 0 0 30px var(--glow-color, transparent) !important;
+  }
+  .pw-atmos-detail {
+    transition: none !important;
   }
 }
 
@@ -1246,4 +1447,13 @@ export const STYLES = `${SHARED_STYLES}
   0%, 100% { opacity: var(--vignette-min, 0.5); }
   50% { opacity: var(--vignette-max, 1); }
 }
+
+/* ── Meteogram ─────────────────────────────────────────────────── */
+.pw-meteogram { padding: 0 0 16px; position: relative; }
+.pw-meteogram-chart { display: block; width: 100%; height: auto; margin: 8px 0 0; }
+.pw-meteogram-footer { padding: 4px 20px 0; }
+.pw-meteogram-legend { display: flex; gap: 12px; justify-content: center; font-size: 8px; opacity: 0.5; padding: 4px 0; color: var(--pulse-text-secondary); }
+.pw-meteogram-strip { display: flex; gap: 0; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 6px; position: relative; }
+.pw-meteogram-strip::before { content: attr(data-label); position: absolute; left: -20px; top: -2px; font-size: 8px; opacity: 0.4; color: var(--pulse-text-secondary); }
+.pw-meteogram-strip > span { flex: 1; }
 `;

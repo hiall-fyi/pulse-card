@@ -14,6 +14,11 @@
  * @property {string} [speed_mode] - Wind display mode ('speed' or 'gust').
  * @property {string} [aqi_entity] - Override AQI entity ID.
  * @property {Array<string>} [alert_entities] - Override alert entity IDs.
+ * @property {number} [hours] - Meteogram: number of forecast hours to display.
+ * @property {boolean} [show_dots] - Meteogram: show temperature dots on curve.
+ * @property {string|boolean} [show_cloud] - Meteogram: cloud cover display ('auto', true, false).
+ * @property {string|boolean} [show_wind] - Meteogram: wind arrows display ('auto', true, false).
+ * @property {number|string} [meteogram_height] - Meteogram: custom chart height in px or 'auto'.
  */
 
 /**

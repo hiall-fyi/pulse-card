@@ -3,8 +3,8 @@
  * @description Sun/moon arc, sky-wash themes, moon phase rendering.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../weather-primitives.js';
-import { intensityRatio, tensionWash } from '../../shared/visual-tension.js';
+import { escapeHtml, sanitizeCssValue, statHtml, getSkyTheme, SKY_THEMES } from '../weather-primitives.js';
+import { tensionWash } from '../../shared/visual-tension.js';
 import { SYNODIC_MONTH, MOON_PHASES } from '../constants.js';
 
 // ── Arc geometry ────────────────────────────────────────────────────
@@ -20,30 +20,15 @@ const SUN_RAY_COUNT = 8;
 const SUN_RAY_R1 = 12;
 const SUN_RAY_R2 = 16;
 
-/** @type {ReadonlyArray<{name: string, gradient: string, labelColor: string, stars: boolean, isDay: boolean}>} */
-const SKY_THEMES = [
-  { name: 'Night',       gradient: 'linear-gradient(180deg, #050510, #0a0a1a 50%, transparent)', labelColor: '#636366', stars: true, isDay: false },
-  { name: 'Blue Hour',   gradient: 'linear-gradient(180deg, #0a1628, #1a3050 60%, transparent)', labelColor: '#5ac8fa', stars: true, isDay: false },
-  { name: 'Golden Hour', gradient: 'linear-gradient(180deg, #1a2a4a, #3a4a5a 40%, #6a4a30)', labelColor: '#ff9f0a', stars: false, isDay: true },
-  { name: 'Daytime',     gradient: 'linear-gradient(180deg, #1a3a5f, #2c5a8e 50%, transparent)', labelColor: '#ffd60a', stars: false, isDay: true },
-  { name: 'Golden Hour', gradient: 'linear-gradient(180deg, #2a2a3a, #5a3a2a 50%, #8a4a1a)', labelColor: '#ff6b35', stars: false, isDay: true },
-  { name: 'Blue Hour',   gradient: 'linear-gradient(180deg, #0a1020, #1a2a40 60%, transparent)', labelColor: '#5ac8fa', stars: true, isDay: false },
+// ── Phase-aware arc fill gradients ──────────────────────────────────
+const ARC_FILLS = [
+  { top: '#0a0a2a', bottom: '#1a1a3a' },   // 0: Night
+  { top: '#1a2a5a', bottom: '#3a5a8a' },   // 1: Blue Hour AM
+  { top: '#8a4a1a', bottom: '#cc7a2a' },   // 2: Golden Hour AM
+  { top: '#2a5a9a', bottom: '#6aacdc' },   // 3: Daytime
+  { top: '#8a3a1a', bottom: '#cc5a2a' },   // 4: Golden Hour PM
+  { top: '#1a2050', bottom: '#3a4a7a' },   // 5: Blue Hour PM
 ];
-
-function getSkyTheme(/** @type {Date} */ now, /** @type {Date} */ sunrise, /** @type {Date} */ sunset, /** @type {Date|null} */ goldenAmStart, /** @type {Date|null} */ goldenPmEnd, /** @type {Date|null} */ blueAm, /** @type {Date|null} */ bluePm) {
-  const t = now.getTime(), sr = sunrise.getTime(), ss = sunset.getTime();
-  const blueAmT = blueAm ? blueAm.getTime() : sr - 3600000;
-  const goldenAmT = goldenAmStart ? goldenAmStart.getTime() : sr - 1800000;
-  const goldenPmT = goldenPmEnd ? goldenPmEnd.getTime() : ss + 1800000;
-  const bluePmT = bluePm ? bluePm.getTime() : ss + 3600000;
-  if (t < blueAmT) return 0;
-  if (t < goldenAmT) return 1;
-  if (t < sr) return 2;
-  if (t < ss) return 3;
-  if (t < goldenPmT) return 4;
-  if (t < bluePmT) return 5;
-  return 0;
-}
 
 function arcPt(/** @type {number} */ prog) {
   const a = Math.PI * (1 - prog);
@@ -62,14 +47,86 @@ export function isWaxing(moonAge) {
   return age < SYNODIC_MONTH / 2;
 }
 
+/** @type {number} */
+const DAY_MS = 86400000;
+
+/**
+ * Compute moon visibility and arc progress from sensor times.
+ * Sensor always returns today's moonrise/moonset — this function handles
+ * cross-midnight transits where the moon rose yesterday.
+ *
+ * Truth table (all rows use sensor "today" times):
+ * | # | rise vs now | set vs now | rise vs set | visible | action |
+ * |---|-------------|------------|-------------|---------|--------|
+ * | 1 | past        | future     | rise < set  | yes     | normal same-day |
+ * | 2 | past        | past       | rise < set  | no      | already set |
+ * | 3 | past        | future     | rise > set  | yes     | cross-midnight, still up |
+ * | 4 | past        | past       | rise > set  | no      | cross-midnight, already set |
+ * | 5 | future      | future     | rise > set  | yes     | BUG FIX — shift rise back 24h |
+ * | 6 | future      | future     | rise < set  | no      | transit not started |
+ * | 7 | future      | past       | rise > set  | no      | moon set this morning |
+ *
+ * @param {Date} now - Current time.
+ * @param {Date} moonrise - Today's moonrise from sensor.
+ * @param {Date} moonset - Today's moonset from sensor.
+ * @returns {{ visible: boolean, progress: number }} Moon state.
+ */
+export function computeMoonVisibility(now, moonrise, moonset) {
+  const nowMs = now.getTime();
+  const riseMs = moonrise.getTime();
+  const setMs = moonset.getTime();
+
+  if (riseMs <= nowMs) {
+    // moonrise is in the past
+    if (setMs > riseMs && setMs >= nowMs) {
+      // Row 1: Normal same-day — rise(past) < now < set(future), rise < set
+      const dur = setMs - riseMs;
+      return { visible: true, progress: Math.max(0, Math.min(1, (nowMs - riseMs) / dur)) };
+    }
+    if (setMs < riseMs) {
+      // Cross-midnight: rise(past), set time-value < rise time-value
+      const effSet = setMs + DAY_MS;
+      if (nowMs <= effSet) {
+        // Row 3: Cross-midnight, moon still up
+        const dur = effSet - riseMs;
+        return { visible: true, progress: Math.max(0, Math.min(1, (nowMs - riseMs) / dur)) };
+      }
+      // Row 4: Cross-midnight, moon already set (nowMs > effSet)
+    }
+    // Row 2: past rise, past set, rise < set → already set
+    // Row 4: past rise, rise > set, nowMs > effSet → already set after cross-midnight
+    return { visible: false, progress: 0 };
+  }
+
+  // moonrise is in the future
+  if (setMs < riseMs && nowMs < setMs) {
+    // Row 5 — BUG FIX: cross-midnight pattern with future moonrise
+    // Moon is up from yesterday's rise. Shift moonrise back 24h.
+    const effRise = riseMs - DAY_MS;
+    const dur = setMs - effRise;
+    return { visible: true, progress: Math.max(0, Math.min(1, (nowMs - effRise) / dur)) };
+  }
+
+  // Row 6: Both future, rise < set → same-day transit not started yet
+  // Row 7: Future rise, past set, rise > set → moon already set from yesterday's transit
+  return { visible: false, progress: 0 };
+}
+
+/**
+ * Format hours as "X h XX min" for daylight duration display.
+ * @param {number} hours - Duration in decimal hours.
+ * @returns {string} Formatted duration string.
+ */
+export function fmtDaylightDuration(hours) {
+  if (!hours || isNaN(hours) || hours <= 0) return '--';
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return h + ' hr ' + String(m).padStart(2, '0') + ' min';
+}
+
 function fmtTime(/** @type {Date|null} */ date) {
   if (!date || isNaN(date.getTime())) return '--:--';
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-}
-
-function fmtDuration(/** @type {number|null} */ hours) {
-  if (hours === null || isNaN(hours)) return '--';
-  return hours.toFixed(1) + 'h';
 }
 
 /**
@@ -82,6 +139,85 @@ function fmtDuration(/** @type {number|null} */ hours) {
 function sv(tag, attrs, content) {
   const a = Object.entries(attrs).map(([k, v]) => ' ' + k + '="' + v + '"').join('');
   return content !== undefined ? '<' + tag + a + '>' + content + '</' + tag + '>' : '<' + tag + a + '/>';
+}
+
+/**
+ * Render a single twilight time entry (time + optional label).
+ * Returns empty string if date is invalid (sensor unavailable).
+ * @param {Date|null} date - Twilight time.
+ * @param {string} label - Label text (empty string for no label).
+ * @param {string} color - CSS colour for the time text.
+ * @returns {string} HTML string.
+ */
+export function renderTwilightEntry(date, label, color) {
+  if (!date || isNaN(date.getTime())) return '';
+  const timeHtml = '<span class="pw-twilight-time" style="color:' + sanitizeCssValue(color) + '">'
+    + escapeHtml(fmtTime(date)) + '</span>';
+  const labelHtml = label
+    ? '<span class="pw-twilight-label">' + escapeHtml(label) + '</span>'
+    : '';
+  return '<div class="pw-twilight-entry">' + timeHtml + labelHtml + '</div>';
+}
+
+// ── Twilight arc gradient (APK pixel-sampled, 12 stops) ─────────────
+/** @type {ReadonlyArray<{offset: string, color: string, opacity: number}>} */
+const TWILIGHT_ARC_GRADIENT_STOPS = [
+  { offset: '0%',   color: '#fe9d36', opacity: 0.05 },
+  { offset: '8%',   color: '#fe9d36', opacity: 0.3 },
+  { offset: '15%',  color: '#fe9d36', opacity: 0.6 },
+  { offset: '25%',  color: '#fe9d36', opacity: 0.8 },
+  { offset: '35%',  color: '#fe8d36', opacity: 0.8 },
+  { offset: '45%',  color: '#fc6540', opacity: 0.8 },
+  { offset: '55%',  color: '#df3de7', opacity: 0.8 },
+  { offset: '65%',  color: '#613be8', opacity: 0.8 },
+  { offset: '75%',  color: '#223fd3', opacity: 0.8 },
+  { offset: '85%',  color: '#183fd0', opacity: 0.7 },
+  { offset: '95%',  color: '#183fd0', opacity: 0.3 },
+  { offset: '100%', color: '#183fd0', opacity: 0.05 },
+];
+
+/**
+ * Determine twilight arc opacity based on sky phase.
+ * @param {number} themeIdx - Current sky theme index (0–5).
+ * @returns {number} Opacity value (0–1).
+ */
+export function getTwilightArcOpacity(themeIdx) {
+  switch (themeIdx) {
+    case 2: case 4: return 1.0;
+    case 1: case 5: return 1.0;
+    case 0: return 1.0;
+    default: return 1.0;
+  }
+}
+
+/**
+ * Render a curved twilight arc SVG (APK-accurate geometry).
+ * ViewBox 46×233, quadratic Bézier, 17px stroke with 12-stop gradient.
+ * @param {'am'|'pm'} side - Which side to render.
+ * @param {number} opacity - Overall arc opacity (from getTwilightArcOpacity).
+ * @returns {string} SVG markup string.
+ */
+export function renderTwilightArc(side, opacity) {
+  const gradId = 'pw-twi-grad-' + side;
+  const path = side === 'am'
+    ? 'M12,4 Q8,60 8,116 Q9,170 34,227'
+    : 'M34,4 Q38,60 38,116 Q37,170 12,227';
+
+  const stops = TWILIGHT_ARC_GRADIENT_STOPS
+    .map(function(s) {
+      return '<stop offset="' + s.offset + '" stop-color="' + s.color
+        + '" stop-opacity="' + s.opacity + '"/>';
+    })
+    .join('');
+
+  return '<svg class="pw-twilight-arc pw-twilight-arc-' + side
+    + '" viewBox="0 0 46 233" preserveAspectRatio="none"'
+    + ' style="opacity:' + opacity + '">'
+    + '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">'
+    + stops + '</linearGradient></defs>'
+    + '<path d="' + path + '" fill="none" stroke="url(#' + gradId
+    + ')" stroke-width="17" stroke-linecap="round"/>'
+    + '</svg>';
 }
 
 /**
@@ -98,28 +234,21 @@ export function renderAstro({ hass, config: _config, discovery }) {
   const nextSet = new Date(/** @type {string} */ (sunAttrs.next_setting || sunAttrs.sunset) || now.toISOString());
 
   // Derive today's sunrise/sunset from next_rising/next_setting.
-  // At night: next_rising = tomorrow, next_setting = tomorrow → subtract 1 day from both to get today's.
-  // During day: next_rising = tomorrow, next_setting = today → sunrise = next_rising - 1 day, sunset = next_setting.
-  // Key insight: sunrise is always the most recent past rising, sunset is the most recent past or upcoming setting.
   let sunrise = nextRise.getTime() > now.getTime()
     ? new Date(nextRise.getTime() - 86400000)
     : nextRise;
   let sunset = nextSet.getTime() > now.getTime()
-    ? nextSet  // upcoming sunset = today's sunset (we're before sunset)
-    : nextSet; // past sunset = today's sunset (we're after sunset)
+    ? nextSet
+    : new Date(nextSet.getTime() - 86400000);
 
-  // If sunset is tomorrow (both next_rising and next_setting are tomorrow at night),
-  // subtract 1 day to get today's sunset
   if (sunset.getTime() > sunrise.getTime() + 86400000) {
     sunset = new Date(sunset.getTime() - 86400000);
   }
-
-  // Ensure sunrise < sunset (same day pair)
   if (sunrise.getTime() > sunset.getTime()) {
     sunrise = new Date(sunrise.getTime() - 86400000);
   }
 
-  // Next-day sunrise/sunset for stats display after sunset
+  // Next-day sunrise/sunset for display after sunset
   const tomorrowSunrise = nextRise.getTime() > now.getTime() ? nextRise : new Date(nextRise.getTime() + 86400000);
   const tomorrowSunset = nextSet.getTime() > now.getTime() ? nextSet : new Date(nextSet.getTime() + 86400000);
 
@@ -128,13 +257,13 @@ export function renderAstro({ hass, config: _config, discovery }) {
   const goldenAmEnd = ce.golden_hour_morning_end ? new Date(String(hass.states[ce.golden_hour_morning_end]?.state)) : null;
   const goldenPmStart = ce.golden_hour_evening_start ? new Date(String(hass.states[ce.golden_hour_evening_start]?.state)) : null;
   const goldenPmEnd = ce.golden_hour_evening_end ? new Date(String(hass.states[ce.golden_hour_evening_end]?.state)) : null;
-  const blueAmRaw = ce.blue_hour_morning ? new Date(String(hass.states[ce.blue_hour_morning]?.state)) : null;
-  const bluePmRaw = ce.blue_hour_evening ? new Date(String(hass.states[ce.blue_hour_evening]?.state)) : null;
+  const blueAmRaw = ce.blue_hour_morning_start ? new Date(String(hass.states[ce.blue_hour_morning_start]?.state)) : null;
+  const blueAmEnd = ce.blue_hour_morning_end ? new Date(String(hass.states[ce.blue_hour_morning_end]?.state)) : null;
+  const bluePmRaw = ce.blue_hour_evening_start ? new Date(String(hass.states[ce.blue_hour_evening_start]?.state)) : null;
+  const bluePmEnd = ce.blue_hour_evening_end ? new Date(String(hass.states[ce.blue_hour_evening_end]?.state)) : null;
 
-  // Arc range: sunrise → sunset (golden hours are arc segments, blue hours are bar extensions)
+  // Arc range: sunrise → sunset
   const dayLen = sunset.getTime() - sunrise.getTime();
-
-  // Progress helper: time → arc progress (0=sunrise, 1=sunset)
   const toProg = function(/** @type {Date|null} */ t) {
     return t && dayLen > 0 ? Math.max(0, Math.min(1, (t.getTime() - sunrise.getTime()) / dayLen)) : -1;
   };
@@ -147,147 +276,32 @@ export function renderAstro({ hass, config: _config, discovery }) {
   const moonrise = ce.moonrise ? new Date(hass.states[ce.moonrise]?.state) : null;
   const moonset = ce.moonset ? new Date(hass.states[ce.moonset]?.state) : null;
 
-  const daylightEntity = ce.daylight_duration ? hass.states[ce.daylight_duration] : null;
-  const daylightHours = daylightEntity ? Number(daylightEntity.state) : (sunset.getTime() - sunrise.getTime()) / 3600000;
-
-  const themeIdx = getSkyTheme(now, sunrise, sunset, goldenAmStart, goldenPmEnd, blueAmRaw, bluePmRaw);
+  const themeIdx = getSkyTheme(now, sunrise, sunset, goldenAmStart, goldenPmEnd, blueAmRaw, bluePmRaw, goldenPmStart);
   const theme = SKY_THEMES[themeIdx];
   const sunProg = toProg(now);
   const isDay = now.getTime() >= sunrise.getTime() && now.getTime() <= sunset.getTime();
 
   // ── Arc SVG ───────────────────────────────────────────────────────
   const arcD = 'M' + ARC_LEFT + ',' + HORIZ_Y + ' A' + ARC_R + ',' + ARC_R + ' 0 0 1 ' + ARC_RIGHT + ',' + HORIZ_Y;
+  const fillD = arcD + ' Z';
   const parts = [];
 
-  // Countdown label — phase-aware
-  let countdownLabel = '';
-  let minutesUntilSunset = Infinity;
-  if (isDay) {
-    const msLeft = sunset.getTime() - now.getTime();
-    minutesUntilSunset = msLeft / 60000;
-    countdownLabel = Math.floor(msLeft / 3600000) + 'h ' + Math.floor((msLeft % 3600000) / 60000) + 'm until sunset';
-  } else if (themeIdx === 4 && goldenPmEnd) {
-    // Golden Hour PM
-    const msLeft = goldenPmEnd.getTime() - now.getTime();
-    if (msLeft > 0) {
-      countdownLabel = Math.floor(msLeft / 60000) + 'm of golden hour left';
-    }
-  } else if (themeIdx === 5 && bluePmRaw) {
-    // Blue Hour PM — estimate end as goldenPmEnd + 1h or bluePm + 30min
-    const blueEnd = goldenPmEnd ? new Date(goldenPmEnd.getTime() + 3600000) : new Date(bluePmRaw.getTime() + 1800000);
-    const msLeft = blueEnd.getTime() - now.getTime();
-    if (msLeft > 0) {
-      countdownLabel = Math.floor(msLeft / 60000) + 'm of blue hour left';
-    }
-  } else if (themeIdx === 1 && blueAmRaw) {
-    // Blue Hour AM
-    const msLeft = (goldenAmStart || sunrise).getTime() - now.getTime();
-    if (msLeft > 0) {
-      countdownLabel = Math.floor(msLeft / 60000) + 'm of blue hour left';
-    }
-  } else if (themeIdx === 2) {
-    // Golden Hour AM
-    const msLeft = sunrise.getTime() - now.getTime();
-    if (msLeft > 0) {
-      countdownLabel = Math.floor(msLeft / 60000) + 'm until sunrise';
-    }
-  } else {
-    // Night
-    const nextSr = sunrise.getTime() > now.getTime() ? sunrise : new Date(sunrise.getTime() + 86400000);
-    const msUntil = nextSr.getTime() - now.getTime();
-    if (msUntil > 0) {
-      countdownLabel = Math.floor(msUntil / 3600000) + 'h ' + Math.floor((msUntil % 3600000) / 60000) + 'm until sunrise';
-    }
-  }
+  // SVG gradient definition for filled arc
+  const gradId = 'pw-arc-fill';
+  const arcFill = ARC_FILLS[themeIdx];
+  parts.push('<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">'
+    + '<stop offset="0%" stop-color="' + arcFill.top + '"/>'
+    + '<stop offset="100%" stop-color="' + arcFill.bottom + '"/>'
+    + '</linearGradient></defs>');
 
-  // ── Horizon = progress bar + countdown ──────────────────────────────
-  const barX2 = ARC_LEFT;
-  const barW2 = ARC_RIGHT - ARC_LEFT;
-  const dayProg2 = isDay ? Math.max(0, Math.min(1, sunProg)) : 0;
-  // Track
-  parts.push(sv('rect', { x: barX2, y: HORIZ_Y - 1.5, width: barW2, height: 3, rx: 1.5, fill: 'rgba(255,255,255,0.06)' }));
-  // Fill
-  if (dayProg2 > 0) {
-    parts.push(sv('rect', { x: barX2, y: HORIZ_Y - 1.5, width: (barW2 * dayProg2).toFixed(1), height: 3, rx: 1.5, fill: theme.labelColor, opacity: 0.6 }));
-  }
-  // Countdown text below
-  if (countdownLabel) {
-    const sunsetUrgency = isDay ? intensityRatio(minutesUntilSunset, 180, 0) : 0;
-    const countdownSize = Math.round(10 + sunsetUrgency * 4);
-    const countdownFill = sunsetUrgency > 0.3 ? '#ff9f0a' : 'rgba(255,255,255,0.35)';
-    const countdownOpacity = (0.35 + sunsetUrgency * 0.55).toFixed(2);
-    parts.push(sv('text', { x: ARC_CX, y: HORIZ_Y + 14, 'text-anchor': 'middle', fill: countdownFill, 'font-size': countdownSize, opacity: countdownOpacity }, escapeHtml(countdownLabel)));
-  }
+  // Filled semicircle (background)
+  parts.push(sv('path', { d: fillD, fill: 'url(#' + gradId + ')' }));
 
-  // ── Arc track ─────────────────────────────────────────────────────
-  parts.push(sv('path', { d: arcD, fill: 'none', stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 2 }));
+  // Horizon line
+  parts.push(sv('line', { x1: ARC_LEFT, y1: HORIZ_Y, x2: ARC_RIGHT, y2: HORIZ_Y, stroke: 'rgba(255,255,255,0.2)', 'stroke-width': 1 }));
 
-  // ── Golden hour arc segments (prototype style) ────────────────────
-  const gamEndP = toProg(goldenAmEnd || goldenAmStart);
-  const gpmStartP = toProg(goldenPmStart || goldenPmEnd);
 
-  // Golden AM: sunrise (0) → golden AM end
-  if (gamEndP > 0) {
-    const len = gamEndP * HALF_CIRC;
-    const tip = 'Golden Hour AM: ' + fmtTime(sunrise) + ' \u2013 ' + fmtTime(goldenAmEnd || goldenAmStart);
-    parts.push('<g>' + sv('title', {}, escapeHtml(tip)) + sv('path', { d: arcD, fill: 'none', stroke: '#ff9f0a', 'stroke-width': 3, opacity: 0.5, 'stroke-dasharray': len.toFixed(1) + ' ' + HALF_CIRC }) + '</g>');
-  }
-
-  // Golden PM: golden PM start → sunset (1)
-  if (gpmStartP > 0 && gpmStartP < 1) {
-    const off = gpmStartP * HALF_CIRC;
-    const len = (1 - gpmStartP) * HALF_CIRC;
-    const tip = 'Golden Hour PM: ' + fmtTime(goldenPmStart || goldenPmEnd) + ' \u2013 ' + fmtTime(sunset);
-    parts.push('<g>' + sv('title', {}, escapeHtml(tip)) + sv('path', { d: arcD, fill: 'none', stroke: '#ff6b35', 'stroke-width': 3, opacity: 0.5, 'stroke-dasharray': '0 ' + off.toFixed(1) + ' ' + len.toFixed(1) + ' ' + HALF_CIRC }) + '</g>');
-  }
-
-  // Rise/set time labels — dynamic per sky phase
-  let horizLeftLabel = fmtTime(sunrise);
-  let horizRightLabel = fmtTime(sunset);
-  let horizLeftColor = '#ff9f0a';
-  let horizRightColor = '#ff6b35';
-
-  switch (themeIdx) {
-    case 0: // Night
-      horizLeftLabel = '';
-      horizRightLabel = '';
-      break;
-    case 1: // Blue Hour AM
-      horizLeftLabel = fmtTime(blueAmRaw);
-      horizRightLabel = fmtTime(goldenAmStart);
-      horizLeftColor = '#5ac8fa';
-      horizRightColor = '#5ac8fa';
-      break;
-    case 2: // Golden Hour AM
-      horizLeftLabel = fmtTime(goldenAmStart);
-      horizRightLabel = fmtTime(sunrise);
-      horizLeftColor = '#ff9f0a';
-      horizRightColor = '#ff9f0a';
-      break;
-    case 3: // Daytime — sunrise/sunset (default)
-      break;
-    case 4: // Golden Hour PM
-      horizLeftLabel = fmtTime(goldenPmStart || sunset);
-      horizRightLabel = fmtTime(goldenPmEnd);
-      horizLeftColor = '#ff6b35';
-      horizRightColor = '#ff6b35';
-      break;
-    case 5: // Blue Hour PM
-      horizLeftLabel = fmtTime(bluePmRaw);
-      horizRightLabel = fmtTime(goldenPmEnd ? new Date(goldenPmEnd.getTime() + 3600000) : null);
-      horizLeftColor = '#5ac8fa';
-      horizRightColor = '#5ac8fa';
-      break;
-  }
-
-  if (horizLeftLabel) {
-    parts.push(sv('text', { x: ARC_LEFT, y: HORIZ_Y - 6, 'text-anchor': 'middle', fill: horizLeftColor, 'font-size': 9, opacity: 0.8 }, escapeHtml(horizLeftLabel)));
-  }
-  if (horizRightLabel) {
-    parts.push(sv('text', { x: ARC_RIGHT, y: HORIZ_Y - 6, 'text-anchor': 'middle', fill: horizRightColor, 'font-size': 9, opacity: 0.8 }, escapeHtml(horizRightLabel)));
-  }
-
-  // Sun body with rays — show when sun is above horizon
+  // ── Sun body with rays ────────────────────────────────────────────
   if (isDay && sunProg >= 0) {
     const sp = arcPt(sunProg);
     const trailLen = sunProg * HALF_CIRC;
@@ -301,37 +315,125 @@ export function renderAstro({ hass, config: _config, discovery }) {
     parts.push('<g style="animation: pw-sunGlow 4s ease-in-out infinite">' + sun + '</g>');
   }
 
-  // Moon body — show when moon is above horizon (moonrise → moonset)
-  // Moon has its own arc progress independent of the sun
-  // Fallback: if moonrise/moonset sensors unavailable, show moon at night using sun arc
+  // ── Moon body (phase-aware) ────────────────────────────────────────
+  /**
+   * Render moon phase SVG at given center point.
+   * Uses two arcs: dark base circle + lit portion shaped by illumination.
+   * @param {number} cx - Center X.
+   * @param {number} cy - Center Y.
+   * @param {number} r - Radius.
+   * @param {number|null} illum - Illumination 0–100.
+   * @param {number|null} age - Moon age for waxing/waning.
+   * @returns {string} SVG markup.
+   */
+  function moonPhaseSvg(cx, cy, r, illum, age) {
+    if (illum === null || illum === undefined) {
+      return sv('circle', { cx: cx.toFixed(1), cy: cy.toFixed(1), r: r, fill: '#c8d0e0' });
+    }
+    const frac = Math.max(0, Math.min(1, illum / 100));
+    const waxing = age !== null ? isWaxing(age) : true;
+
+    // Dark side (base)
+    let moon = sv('circle', { cx: cx.toFixed(1), cy: cy.toFixed(1), r: r, fill: '#2a2a3a' });
+
+    if (frac >= 0.99) {
+      moon += sv('circle', { cx: cx.toFixed(1), cy: cy.toFixed(1), r: r, fill: '#e8e0d0' });
+    } else if (frac > 0.01) {
+      const top = cy - r;
+      const bot = cy + r;
+      const terminatorRx = (r * Math.abs(2 * frac - 1)).toFixed(1);
+      const litSweep = frac > 0.5 ? 1 : 0;
+
+      let litPath;
+      if (waxing) {
+        litPath = 'M' + cx.toFixed(1) + ',' + top.toFixed(1)
+          + ' A' + r + ',' + r + ' 0 0 1 ' + cx.toFixed(1) + ',' + bot.toFixed(1)
+          + ' A' + terminatorRx + ',' + r + ' 0 0 ' + litSweep + ' ' + cx.toFixed(1) + ',' + top.toFixed(1) + ' Z';
+      } else {
+        litPath = 'M' + cx.toFixed(1) + ',' + top.toFixed(1)
+          + ' A' + r + ',' + r + ' 0 0 0 ' + cx.toFixed(1) + ',' + bot.toFixed(1)
+          + ' A' + terminatorRx + ',' + r + ' 0 0 ' + (1 - litSweep) + ' ' + cx.toFixed(1) + ',' + top.toFixed(1) + ' Z';
+      }
+      moon += sv('path', { d: litPath, fill: '#e8e0d0' });
+    }
+    return moon;
+  }
+
   const hasMoonTimes = moonrise && moonset && !isNaN(moonrise.getTime()) && !isNaN(moonset.getTime());
   if (hasMoonTimes) {
-    // Handle cross-midnight: if moonset is before moonrise, it's tomorrow's moonset
-    const effectiveMoonset = moonset.getTime() < moonrise.getTime()
-      ? new Date(moonset.getTime() + 86400000)
-      : moonset;
-    const moonDayLen = effectiveMoonset.getTime() - moonrise.getTime();
-    const moonAbove = moonDayLen > 0
-      && now.getTime() >= moonrise.getTime()
-      && now.getTime() <= effectiveMoonset.getTime();
-    if (moonAbove) {
-      const moonProg = Math.max(0, Math.min(1, (now.getTime() - moonrise.getTime()) / moonDayLen));
-      const mp = arcPt(moonProg);
-      const mTrailLen = moonProg * HALF_CIRC;
+    const moonState = computeMoonVisibility(now, moonrise, moonset);
+    if (moonState.visible) {
+      const mp = arcPt(moonState.progress);
+      const mTrailLen = moonState.progress * HALF_CIRC;
       parts.push(sv('path', { d: arcD, fill: 'none', stroke: 'rgba(200,210,230,0.06)', 'stroke-width': 1.5, 'stroke-dasharray': mTrailLen.toFixed(1) + ' ' + HALF_CIRC }));
-      parts.push('<g style="animation: pw-moonGlow 4s ease-in-out infinite">' + sv('circle', { cx: mp.x.toFixed(1), cy: mp.y.toFixed(1), r: 8, fill: '#c8d0e0' }) + sv('circle', { cx: mp.x.toFixed(1), cy: mp.y.toFixed(1), r: 5, fill: '#e8e0d0', opacity: 0.5 }) + '</g>');
+      parts.push('<g style="animation: pw-moonGlow 4s ease-in-out infinite">' + moonPhaseSvg(mp.x, mp.y, 8, moonIllum, moonAge) + '</g>');
     }
   } else if (!isDay) {
-    // Fallback: no moonrise/moonset data — show moon at center of arc at night
     const mp = arcPt(0.5);
-    parts.push('<g style="animation: pw-moonGlow 4s ease-in-out infinite">' + sv('circle', { cx: mp.x.toFixed(1), cy: mp.y.toFixed(1), r: 8, fill: '#c8d0e0' }) + sv('circle', { cx: mp.x.toFixed(1), cy: mp.y.toFixed(1), r: 5, fill: '#e8e0d0', opacity: 0.5 }) + '</g>');
+    parts.push('<g style="animation: pw-moonGlow 4s ease-in-out infinite">' + moonPhaseSvg(mp.x, mp.y, 8, moonIllum, moonAge) + '</g>');
   }
+
+  // ── Daylight/Nighttime duration text inside arc ────────────────────
+  const labelY = HORIZ_Y - ARC_R * 0.48;
+  const durationY = HORIZ_Y - ARC_R * 0.28;
+
+  // Phase-aware: countdown to next transition
+  let arcLabel;
+  let countdownHours;
+  if (isDay) {
+    arcLabel = 'Daylight';
+    countdownHours = (sunset.getTime() - now.getTime()) / 3600000;
+  } else {
+    arcLabel = 'Nighttime';
+    countdownHours = (tomorrowSunrise.getTime() - now.getTime()) / 3600000;
+  }
+  const durationStr = fmtDaylightDuration(countdownHours);
+
+  parts.push(sv('text', { x: ARC_CX, y: labelY, 'text-anchor': 'middle', fill: 'rgba(255,255,255,0.9)', 'font-size': 18, 'font-weight': 400 }, arcLabel));
+  parts.push(sv('text', { x: ARC_CX, y: durationY, 'text-anchor': 'middle', fill: theme.labelColor, 'font-size': 22, 'font-weight': 500 }, escapeHtml(durationStr)));
 
   const arcSvg = '<svg style="display:block;width:100%;overflow:visible" viewBox="0 0 ' + ARC_W + ' ' + ARC_H + '" role="img" aria-label="Sun and moon arc">' + parts.join('') + '</svg>';
 
-  const moonHeader = moonPhaseName
-    ? escapeHtml(moonPhaseName) + (moonIllum !== null ? ' ' + Math.round(moonIllum) + '%' : '')
-    : '';
+  // ── Twilight arc indicators (APK-accurate curved gradient arcs) ──────
+  const twiArcOpacity = getTwilightArcOpacity(themeIdx);
+  const leftTwiArc = renderTwilightArc('am', twiArcOpacity);
+  const rightTwiArc = renderTwilightArc('pm', twiArcOpacity);
+
+  // ── Twilight columns (arc is absolutely positioned inside each panel) ──
+  // HTML matches prototype: individual entries with specific classes for margin positioning
+  function twiTime(/** @type {Date|null} */ date, /** @type {string} */ cls, /** @type {string} */ color) {
+    if (!date || isNaN(date.getTime())) return '';
+    return '<div class="' + cls + '"><span class="pw-twilight-time" style="color:' + sanitizeCssValue(color) + '">' + escapeHtml(fmtTime(date)) + '</span></div>';
+  }
+  function twiLabel(/** @type {string} */ text, /** @type {string} */ cls) {
+    return '<div class="' + cls + '"><span class="pw-twilight-label">' + escapeHtml(text) + '</span></div>';
+  }
+
+  const leftCol = '<div class="pw-twilight-col pw-twilight-am">'
+    + leftTwiArc
+    + twiTime(goldenAmEnd, 'pw-twilight-time-golden', '#ff9f0a')
+    + twiLabel('Golden hour', 'pw-twilight-label-golden')
+    + twiTime(blueAmEnd, 'pw-twilight-time-blue', '#5ac8fa')
+    + twiLabel('Blue hour', 'pw-twilight-label-blue')
+    + twiTime(blueAmRaw, 'pw-twilight-time-end', '#5ac8fa')
+    + '</div>';
+
+  const rightCol = '<div class="pw-twilight-col pw-twilight-pm">'
+    + rightTwiArc
+    + twiTime(goldenPmStart, 'pw-twilight-time-golden', '#ff9f0a')
+    + twiLabel('Golden hour', 'pw-twilight-label-golden')
+    + twiTime(bluePmRaw, 'pw-twilight-time-blue', '#5ac8fa')
+    + twiLabel('Blue hour', 'pw-twilight-label-blue')
+    + twiTime(bluePmEnd, 'pw-twilight-time-end', '#5ac8fa')
+    + '</div>';
+
+  // ── Sunrise/sunset below arc ──────────────────────────────────────
+  const displaySunrise = isDay ? sunrise : tomorrowSunrise;
+  const displaySunset = isDay ? sunset : tomorrowSunset;
+  const sunriseSunset = '<div class="pw-sunrise-sunset">'
+    + '<div class="pw-sun-time"><div class="pw-sun-time-value">' + escapeHtml(fmtTime(displaySunrise)) + '</div><div class="pw-sun-time-label">Sunrise</div></div>'
+    + '<div class="pw-sun-time"><div class="pw-sun-time-value">' + escapeHtml(fmtTime(displaySunset)) + '</div><div class="pw-sun-time-label">Sunset</div></div>'
+    + '</div>';
 
   // ── Time tension overlays ──────────────────────────────────────────
   const isGoldenHour = themeIdx === 2 || themeIdx === 4;
@@ -343,18 +445,25 @@ export function renderAstro({ hass, config: _config, discovery }) {
     tensionOverlay = '<div class="pw-tension-wash" style="background: ' + sanitizeCssValue(tensionWash('#5ac8fa', 0.1)) + '"></div>';
   }
 
+  // ── Moon stats row ────────────────────────────────────────────────
+  const moonStats = '<div class="pulse-stats-row pw-moon-stats" role="img" aria-label="Moon statistics">'
+    + (moonPhaseName ? statHtml(moonIllum !== null ? Math.round(moonIllum) + '%' : escapeHtml(moonPhaseName), 'Moon Phase', '') : '')
+    + statHtml(escapeHtml(fmtTime(moonrise)), 'Moonrise', '')
+    + statHtml(escapeHtml(fmtTime(moonset)), 'Moonset', '')
+    + '</div>';
+
+  // ── Final HTML assembly ───────────────────────────────────────────
   return '<div class="pw-section pw-astro">'
     + '<div class="pw-sky-wash" style="background: ' + sanitizeCssValue(theme.gradient) + '"></div>'
     + tensionOverlay
     + '<div class="pw-fx" data-astro-stars="' + theme.stars + '" data-astro-day="' + theme.isDay + '" role="img" aria-label="Sky atmospheric effects"></div>'
     + '<div class="pw-astro-content">'
-    + '<div class="pw-section-header"><span class="pw-section-title">Sun &amp; Moon</span><span style="font-size:10px;color:' + sanitizeCssValue(theme.labelColor) + '">' + moonHeader + '</span></div>'
-    + '<div class="pw-arc-wrap">' + arcSvg + '</div>'
-    + '<div class="pulse-stats-row" style="margin: 8px 20px 0" role="img" aria-label="Sun and moon statistics">'
-    + '<div class="stat"><div class="pw-stat-value">' + escapeHtml(fmtTime(isDay ? sunrise : tomorrowSunrise)) + '</div><div class="pw-stat-label">' + (isDay ? 'Sunrise' : 'Next Rise') + '</div></div>'
-    + '<div class="stat"><div class="pw-stat-value">' + escapeHtml(fmtTime(isDay ? sunset : tomorrowSunset)) + '</div><div class="pw-stat-label">' + (isDay ? 'Sunset' : 'Next Set') + '</div></div>'
-    + '<div class="stat"><div class="pw-stat-value">' + escapeHtml(fmtDuration(isDay ? daylightHours : (tomorrowSunset.getTime() - tomorrowSunrise.getTime()) / 3600000)) + '</div><div class="pw-stat-label">Daylight</div></div>'
-    + '<div class="stat"><div class="pw-stat-value">' + escapeHtml(fmtTime(moonrise)) + '</div><div class="pw-stat-label">Moonrise</div></div>'
-    + '<div class="stat"><div class="pw-stat-value">' + escapeHtml(fmtTime(moonset)) + '</div><div class="pw-stat-label">Moonset</div></div>'
-    + '</div></div></div>';
+    + '<div class="pw-section-header"><span class="pw-section-title">Sun &amp; Moon</span></div>'
+    + '<div class="pw-astro-layout">'
+    + leftCol
+    + '<div class="pw-arc-center"><div class="pw-arc-wrap">' + arcSvg + '</div>' + sunriseSunset + '</div>'
+    + rightCol
+    + '</div>'
+    + moonStats
+    + '</div></div>';
 }

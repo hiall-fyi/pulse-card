@@ -1003,7 +1003,7 @@ ha-card {
   color: var(--secondary-text-color, #9E9E9E);
   flex-shrink: 0;
 }
-.rank-num.top { color: #FFD60A; }
+.rank-num.top { color: var(--label-badge-yellow, #FFD60A); }
 .rank-name {
   flex: 1;
   font-size: 13px;

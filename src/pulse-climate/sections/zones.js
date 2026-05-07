@@ -5,7 +5,7 @@
  * Uses shared chart-primitives for consistent visual identity.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, formatNumericDisplay } from '../../shared/utils.js';
 import { resolveZoneState, resolveHvacVisual, tempToPosition, computeGlowStdDev } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor } from '../sensor-resolver.js';
@@ -29,10 +29,10 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
   const tempDisplay = zs.isUnavailable
     ? 'Unavailable'
     : zs.currentTemp !== null
-      ? `${zs.currentTemp}${escapeHtml(zs.unit)}`
+      ? `${formatNumericDisplay(zs.currentTemp)}${escapeHtml(zs.unit)}`
       : '--';
   const targetDisplay = (!zs.isUnavailable && zs.targetTemp !== null)
-    ? `<span class="zone-target">→ ${zs.targetTemp}${escapeHtml(zs.unit)}</span>`
+    ? `<span class="zone-target">→ ${formatNumericDisplay(zs.targetTemp)}${escapeHtml(zs.unit)}</span>`
     : '';
 
   // Humidity inline with zone name — e.g. "💧 53% Dining"
@@ -42,7 +42,7 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
 
   const ariaLabel = zs.isUnavailable
     ? `${escapeHtml(zs.name)}: Unavailable`
-    : `${escapeHtml(zs.name)}: ${tempDisplay}${zs.targetTemp !== null ? `, target ${zs.targetTemp}${zs.unit}` : ''}${zs.humidity !== null ? `, ${Math.round(zs.humidity)}% humidity` : ''}, ${zs.hvacAction}`;
+    : `${escapeHtml(zs.name)}: ${tempDisplay}${zs.targetTemp !== null ? `, target ${formatNumericDisplay(zs.targetTemp)}${zs.unit}` : ''}${zs.humidity !== null ? `, ${Math.round(zs.humidity)}% humidity` : ''}, ${zs.hvacAction}`;
 
   let html = `<div class="zone-row${unavailableClass}" tabindex="0" role="button"
     aria-label="${escapeHtml(ariaLabel)}" data-entity="${escapeHtml(zs.entityId)}">`;
@@ -157,8 +157,8 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
     : zs.hvacAction === 'cooling' ? `Cooling ${Math.round(power)}%`
     : 'Idle';
 
-  const tempDisplay = zs.currentTemp !== null ? `${zs.currentTemp}${escapeHtml(zs.unit)}` : '--';
-  const targetDisplay = zs.targetTemp !== null ? `→ ${zs.targetTemp}${escapeHtml(zs.unit)}` : '';
+  const tempDisplay = zs.currentTemp !== null ? `${formatNumericDisplay(zs.currentTemp)}${escapeHtml(zs.unit)}` : '--';
+  const targetDisplay = zs.targetTemp !== null ? `→ ${formatNumericDisplay(zs.targetTemp)}${escapeHtml(zs.unit)}` : '';
 
   const ariaLabel = `${escapeHtml(zs.name)}: ${tempDisplay}, ${actionText}`;
   const rowClass = `zone-row zone-row-pulse${isHeating ? ' heating' : ''}`;
@@ -352,10 +352,10 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
       const tempDisplay = zoneState.isUnavailable
         ? 'Unavailable'
         : zoneState.currentTemp !== null
-          ? `${zoneState.currentTemp}${zoneState.unit}`
+          ? `${formatNumericDisplay(zoneState.currentTemp)}${zoneState.unit}`
           : '--';
       const targetDisplay = (!zoneState.isUnavailable && zoneState.targetTemp !== null)
-        ? `<span class="zone-target">→ ${zoneState.targetTemp}${escapeHtml(zoneState.unit)}</span>`
+        ? `<span class="zone-target">→ ${formatNumericDisplay(zoneState.targetTemp)}${escapeHtml(zoneState.unit)}</span>`
         : '';
       tempEl.innerHTML = `${escapeHtml(tempDisplay)}${targetDisplay}`;
     }

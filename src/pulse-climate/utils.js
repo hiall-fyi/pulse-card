@@ -4,7 +4,7 @@
  */
 
 import { HVAC_VISUALS, RISK_COLORS, DEFAULTS, DEFAULT_SECTIONS, LOG_PREFIX, SECTION_DEFAULTS } from './constants.js';
-import { clamp } from '../shared/utils.js';
+import { clamp, formatNumericDisplay } from '../shared/utils.js';
 
 /**
  * Log a warning with card prefix.
@@ -111,7 +111,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     const s = states[discoveredEntities[entityKey]];
     if (s && !['unavailable', 'unknown', 'none'].includes(s.state.toLowerCase())) {
       const riskColor = resolveRiskColor(s.state);
-      chips.push({ type, icon, label: s.state, color: riskColor.fallback, severity: s.state, entityId: discoveredEntities[entityKey] });
+      chips.push({ type, icon, label: s.state, color: `var(${riskColor.cssVar}, ${riskColor.fallback})`, severity: s.state, entityId: discoveredEntities[entityKey] });
     }
   };
 
@@ -121,7 +121,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
       const isOpen = s.state === 'on';
       chips.push({
         type: 'open_window', icon: isOpen ? 'mdi:window-open' : 'mdi:window-closed',
-        label: isOpen ? 'Open' : 'Closed', color: isOpen ? '#F44336' : undefined,
+        label: isOpen ? 'Open' : 'Closed', color: isOpen ? 'var(--label-badge-red, #F44336)' : undefined,
         entityId: discoveredEntities.open_window,
       });
     }
@@ -132,7 +132,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     if (s && s.state === 'on') {
       chips.push({
         type: 'window_predicted', icon: 'mdi:window-open-variant',
-        label: 'Window predicted', color: '#FF9800',
+        label: 'Window predicted', color: 'var(--label-badge-yellow, #FF9800)',
         entityId: discoveredEntities.window_predicted,
       });
     }
@@ -151,7 +151,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   if (include('preheat_now') && discoveredEntities.preheat_now) {
     const s = states[discoveredEntities.preheat_now];
     if (s && s.state === 'on') {
-      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', color: '#FF9800', entityId: discoveredEntities.preheat_now });
+      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', color: 'var(--label-badge-yellow, #FF9800)', entityId: discoveredEntities.preheat_now });
     }
   }
 
@@ -179,7 +179,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
         for (let i = 0; i < batteries.length; i++) {
           const b = batteries[i];
           const battIcon = b.lower === 'low' || b.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-          const battColor = b.lower === 'critical' ? '#F44336' : b.lower === 'low' ? '#FF9800' : undefined;
+          const battColor = b.lower === 'critical' ? 'var(--label-badge-red, #F44336)' : b.lower === 'low' ? 'var(--label-badge-yellow, #FF9800)' : undefined;
           chips.push({ type: `battery${i > 0 ? `_${i + 1}` : ''}`, icon: battIcon, label: b.state, color: battColor, entityId: b.eid });
         }
       } else {
@@ -191,7 +191,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
           if ((SEVERITY[b.lower] || 0) > (SEVERITY[worst.lower] || 0)) worst = b;
         }
         const battIcon = worst.lower === 'low' || worst.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-        const battColor = worst.lower === 'critical' ? '#F44336' : worst.lower === 'low' ? '#FF9800' : undefined;
+        const battColor = worst.lower === 'critical' ? 'var(--label-badge-red, #F44336)' : worst.lower === 'low' ? 'var(--label-badge-yellow, #FF9800)' : undefined;
         chips.push({ type: 'battery', icon: battIcon, label: worst.state, color: battColor, entityId: worst.eid });
       }
     }
@@ -204,10 +204,13 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     const valveActive = attrs.valve_control_active;
     const valveTarget = attrs.valve_target;
     const backedOff = attrs.valve_control_backed_off;
+    const valveEnabled = attrs.valve_control_enabled;
     if (backedOff === true) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Backed off', color: '#9E9E9E' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Backed off', color: 'var(--disabled-color, #9E9E9E)' });
     } else if (valveActive === true && valveTarget !== undefined) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${valveTarget}${zoneState.unit}`, color: '#FF9800' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${formatNumericDisplay(valveTarget)}${zoneState.unit}`, color: 'var(--label-badge-yellow, #FF9800)' });
+    } else if (valveEnabled === true) {
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Idle', color: 'var(--disabled-color, #9E9E9E)' });
     }
   }
 

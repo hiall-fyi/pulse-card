@@ -25,7 +25,7 @@ import { renderEnergyFlowSection, updateEnergyFlowSection } from './sections/ene
 import { renderRadialSection } from './sections/radial.js';
 import { renderHomeStatusSection } from './sections/home-status.js';
 import { renderZoneRankingSection } from './sections/zone-ranking.js';
-import { escapeHtml, sanitizeCssValue, isReducedMotion } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } from '../shared/utils.js';
 import { buildFilledSparkline, temperatureToColor } from './chart-primitives.js';
 import { createStripTooltip, createFixedTooltip, pointerToSlotIndex, bindDragSelect, bindCrosshair } from './sections/slot-engine.js';
 import { executeAction as sharedExecuteAction, fireEvent, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
@@ -709,7 +709,7 @@ class PulseClimateCard extends HTMLElement {
       const valueEl = centerEl.querySelector('.center-value');
       const labelEl = centerEl.querySelector('.center-label');
       const subEl = centerEl.querySelector('.center-sub');
-      if (valueEl) valueEl.textContent = temp !== undefined ? `${temp}${zd.unit}` : '--';
+      if (valueEl) valueEl.textContent = temp !== undefined ? `${formatNumericDisplay(temp)}${zd.unit}` : '--';
       if (labelEl) labelEl.textContent = name;
       const humText = humidity !== undefined ? ` · ${humidity}%` : '';
       if (subEl) subEl.textContent = `${actionLabel}${humText}`;
@@ -1025,7 +1025,7 @@ class PulseClimateCard extends HTMLElement {
         let sparklineHtml = '';
         if (historyData.length >= 2) {
           const sparkColor = hvacAction === 'heating'
-            ? '#FF9800'
+            ? 'var(--label-badge-yellow, #FF9800)'
             : (temp !== undefined && isFinite(Number(temp)) ? temperatureToColor(Number(temp)) : 'var(--primary-text-color)');
           const safeColor = sanitizeCssValue(sparkColor);
           const result = this._sparklinePathCache.get(sensorId) || buildFilledSparkline(historyData, 340, 36, 48);
@@ -1217,7 +1217,7 @@ class PulseClimateCard extends HTMLElement {
         }
         const bestHour = labels[bestIdx] || '--';
         const worstHour = labels[worstIdx] || '--';
-        const barColor = avg >= 80 ? '#34c759' : avg >= 50 ? '#ff9f0a' : '#ff453a';
+        const barColor = avg >= 80 ? 'var(--label-badge-green, #34c759)' : avg >= 50 ? 'var(--label-badge-yellow, #ff9f0a)' : 'var(--label-badge-red, #ff453a)';
         const zoneName = row.querySelector('.zone-label')?.textContent || '';
 
         detailEl.innerHTML = `<div class="detail-header"><span class="detail-name">${escapeHtml(zoneName)}</span><span class="detail-close">✕ Close</span></div>

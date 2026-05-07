@@ -25,6 +25,7 @@ export const SECTION_TYPES = /** @type {const} */ ([
   'astro',
   'alerts',
   'atmosphere',
+  'meteogram',
 ]);
 
 // ── Tier Colors ─────────────────────────────────────────────────────
@@ -186,6 +187,9 @@ export const SWEEP_ACTIVE_S = 4;
 /** Radar sweep duration — all clear (seconds). */
 export const SWEEP_CALM_S = 8;
 
+/** Forecast data refresh interval (milliseconds). */
+export const FORECAST_REFRESH_MS = 30 * 60 * 1000;
+
 /** Alert "until further notice" sentinel threshold (days). */
 export const ALERT_FAR_FUTURE_DAYS = 7;
 
@@ -266,14 +270,18 @@ export const ATMOS_CE_SENSOR_KEYS = [
   // Atmospheric stability
   'cape', 'lifted_index', 'freezing_level_height', 'soil_temperature', 'soil_moisture',
   // Atmospheric stability (derived by Atmos CE)
-  'wind_shear_0_6km', 'lapse_rate_700_500', 'lcl_height', 'stability_assessment',
+  // Wind shear + lapse rate: support both old and new Atmos CE entity ID formats
+  'wind_shear_0_6_km', 'lapse_rate_700_500_hpa', 'lcl_height', 'stability_assessment',
+  // Derived weather insights (Atmos CE v4.1+)
+  'dew_point_comfort', 'visibility_category', 'feels_like_context', 'pressure_trend',
   // Air quality
   'european_aqi', 'us_aqi', 'pm2_5', 'pm10',
   'nitrogen_dioxide', 'ozone', 'sulphur_dioxide', 'carbon_monoxide', 'carbon_dioxide',
   // Astronomical
   'golden_hour_morning_start', 'golden_hour_morning_end',
   'golden_hour_evening_start', 'golden_hour_evening_end',
-  'blue_hour_morning', 'blue_hour_evening',
+  'blue_hour_morning_start', 'blue_hour_morning_end',
+  'blue_hour_evening_start', 'blue_hour_evening_end',
   'moon_phase', 'moonrise', 'moonset', 'daylight_duration',
 ];
 

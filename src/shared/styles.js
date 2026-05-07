@@ -169,6 +169,7 @@ export const SHARED_STYLES = `
 .pulse-stats-row {
   display: flex;
   justify-content: space-between;
+  gap: 4px;
   padding-top: var(--pulse-space-section);
   border-top: 1px solid var(--pulse-border-subtle);
 }
@@ -176,6 +177,7 @@ export const SHARED_STYLES = `
 .pulse-stats-row .stat {
   flex: 1;
   text-align: center;
+  padding: 6px 0;
 }
 
 /* Ultra-muted label */
@@ -204,6 +206,6 @@ export const SHARED_STYLES = `
   left: 1px;
   right: 1px;
   border-radius: 2px 2px 0 0;
-  background: #5ac8fa;
+  background: var(--info-color, #5ac8fa);
 }
 `;
