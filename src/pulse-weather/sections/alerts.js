@@ -3,7 +3,7 @@
  * @description Radar display, severity wash, and alert list with countdown.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../weather-primitives.js';
+import { escapeHtml, sanitizeCssValue, hexToRgba } from '../weather-primitives.js';
 import { intensityRatio, tensionWash, breatheDuration, sweepDuration } from '../../shared/visual-tension.js';
 import { ALERT_ICON_MAP, ALERT_COLOR_MAP, ALERT_FAR_FUTURE_DAYS } from '../constants.js';
 
@@ -28,7 +28,12 @@ function parseAlerts(entity, isActive) {
   // Atmos CE stores alert data in attributes
   const alerts = [];
   const type = /** @type {string} */ (attrs.alert_type || attrs.type || 'wind');
-  const severity = Number(attrs.level) || 1;
+  // Level is contractually numeric (Atmos CE: 1–4). `Number(attrs.level)`
+  // alone swallows non-numeric strings as NaN and `|| 1` would silently
+  // downgrade a truthy-but-unparseable value to "low" — use explicit
+  // finite check so the fallback path is auditable.
+  const rawLevel = Number(attrs.level);
+  const severity = Number.isFinite(rawLevel) && rawLevel > 0 ? rawLevel : 1;
   const color = /** @type {string} */ (attrs.color || ALERT_COLOR_MAP[/** @type {keyof typeof ALERT_COLOR_MAP} */ (severity)] || ALERT_COLOR_MAP[1]);
   const icon = /** @type {string} */ (ALERT_ICON_MAP[type] || 'mdi:alert');
   const progress = Number(attrs.progress) || 0;
@@ -123,13 +128,15 @@ export function renderAlerts({ hass, config: _config, discovery }) {
   const cx = radarSize / 2;
   const cy = radarSize / 2;
 
-  // CRT color scheme per severity
+  // CRT color scheme per severity. Uses hexToRgba so we don't rely on
+  // worstColor being in rgb() form; ALERT_COLOR_MAP stores hex, which
+  // previously made the .replace() calls silent no-ops.
   const crtColors = hasAlerts
     ? { bgInner: worstSeverity >= 4 ? '#1a0000' : worstSeverity >= 3 ? '#1a0e00' : '#1a1500',
         bgOuter: worstSeverity >= 4 ? '#0a0000' : worstSeverity >= 3 ? '#0a0500' : '#0a0800',
-        ring: sanitizeCssValue(worstColor.replace(')', ',0.15)').replace('rgb(', 'rgba(')),
-        line: sanitizeCssValue(worstColor.replace(')', ',0.08)').replace('rgb(', 'rgba(')),
-        sweep: sanitizeCssValue(worstColor.replace(')', ',0.4)').replace('rgb(', 'rgba(')) }
+        ring: sanitizeCssValue(hexToRgba(worstColor, 0.15)),
+        line: sanitizeCssValue(hexToRgba(worstColor, 0.08)),
+        sweep: sanitizeCssValue(hexToRgba(worstColor, 0.4)) }
     : { bgInner: '#001a00', bgOuter: '#000800',
         ring: 'rgba(80,255,0,0.15)', line: 'rgba(80,255,0,0.08)', sweep: 'rgba(80,255,0,0.35)' };
 
@@ -171,6 +178,13 @@ export function renderAlerts({ hass, config: _config, discovery }) {
     const rowClass = a.active ? 'active' : 'upcoming';
     const alertColor = a.active ? `--pw-alert-color:${sanitizeCssValue(a.color)}` : '';
 
+    // Only render link if protocol is http(s) — guards against javascript:
+    // or data: URIs smuggled through the alert attribute.
+    const safeLink = a.link && /^https?:\/\//i.test(a.link) ? a.link : null;
+    const linkHtml = safeLink
+      ? `<a class="pw-alert-link" href="${escapeHtml(safeLink)}" target="_blank" rel="noopener noreferrer">More info</a>`
+      : '';
+
     return `
       <div class="pw-alert-row ${rowClass}" style="${alertColor}">
         <div class="pw-alert-dot" style="background:${sanitizeCssValue(a.color)}"></div>
@@ -179,6 +193,7 @@ export function renderAlerts({ hass, config: _config, discovery }) {
           <div class="pw-alert-type">${escapeHtml(a.type)}</div>
           ${a.desc ? `<div class="pw-alert-desc">${escapeHtml(a.desc)}</div>` : ''}
           ${a.locations.length > 0 ? `<div class="pw-alert-locations">${escapeHtml(a.locations.join(', '))}</div>` : ''}
+          ${linkHtml}
         </div>
         <span class="pw-alert-time">${escapeHtml(timeLabel)}</span>
       </div>`;

@@ -67,6 +67,8 @@ class PulseWeatherCard extends HTMLElement {
     this._countdownTimer = null;
     /** @type {number|null} */
     this._minuteTimer = null;
+    /** @type {string|null} Last configured entity id we warned about — prevents log spam on every hass tick. */
+    this._warnedMissingEntity = null;
   }
 
   /**
@@ -75,8 +77,22 @@ class PulseWeatherCard extends HTMLElement {
    */
   setConfig(config) {
     if (!config) throw new Error('Invalid configuration');
+    // Halt any timers from the prior config before the DOM is rebuilt,
+    // otherwise scheduled phase transitions / countdowns fire against
+    // stale state and can trigger a render under an old config.
+    this._cleanupTimers();
     this._config = normalizeWeatherConfig(/** @type {Record<string, unknown>} */ (config));
+    this._warnedMissingEntity = null;
     if (this._hass) this._fullRender();
+  }
+
+  /**
+   * Clear every timer owned by this card. Idempotent; safe to call repeatedly.
+   */
+  _cleanupTimers() {
+    if (this._phaseTimer) { clearTimeout(this._phaseTimer); this._phaseTimer = null; }
+    if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
+    if (this._minuteTimer) { clearInterval(this._minuteTimer); this._minuteTimer = null; }
   }
 
   /**
@@ -88,11 +104,20 @@ class PulseWeatherCard extends HTMLElement {
     this._hass = hass;
     if (!this._config) return;
 
-    const weatherId = this._config.weather_entity
+    const configuredId = this._config.weather_entity;
+    const weatherId = configuredId
       || Object.keys(hass.states).find((eid) => eid.startsWith('weather.'))
       || '';
     const weatherEntity = hass.states[weatherId];
-    if (!weatherEntity) return;
+    if (!weatherEntity) {
+      // Surface configured-but-missing entity once per unique id so users can
+      // diagnose typos instead of staring at a blank card.
+      if (configuredId && this._warnedMissingEntity !== configuredId) {
+        console.warn('Pulse Weather: weather_entity "%s" not found in hass.states', configuredId);
+        this._warnedMissingEntity = configuredId;
+      }
+      return;
+    }
 
     // Differential update: only re-render when weather state changes
     const stateKey = `${weatherEntity.state}|${JSON.stringify(weatherEntity.attributes)}`;
@@ -122,9 +147,12 @@ class PulseWeatherCard extends HTMLElement {
     this._forecastFetching = true;
     this._subscribedEntityId = entityId;
 
-    if (!hass.callWS) return;
-
+    // Always reset the fetching flag, even on early return / throw.
+    // Previously the flag could stick permanently if hass.callWS was
+    // undefined, leaving the card unable to ever fetch forecast again.
     try {
+      if (!hass.callWS) return;
+
       // Try Atmos CE extended forecast first (22 fields including dew_point, cape)
       let extendedHourly = null;
       if (this._discovery?.atmosSource) {
@@ -151,8 +179,9 @@ class PulseWeatherCard extends HTMLElement {
               extendedHourly = /** @type {Array<Record<string, unknown>>} */ (extResponse.forecast);
             }
           }
-        } catch {
+        } catch (e) {
           // Extended forecast unavailable — fall through to standard
+          console.debug('Pulse Weather: extended forecast fetch failed, using standard', e);
         }
       }
 
@@ -195,11 +224,12 @@ class PulseWeatherCard extends HTMLElement {
         daily: /** @type {Array<Record<string, unknown>>} */ (dailyEntry?.forecast || []),
       };
       this._forecastLastFetch = Date.now();
-      this._forecastFetching = false;
       this._fullRender();
-    } catch {
-      // Forecast fetch failed — set timestamp to prevent retry spam
+    } catch (e) {
+      // Forecast fetch failed — timestamp advanced below in finally prevents retry spam.
+      console.warn('Pulse Weather: forecast fetch failed, throttling retries', e);
       this._forecastLastFetch = Date.now();
+    } finally {
       this._forecastFetching = false;
     }
   }
@@ -217,9 +247,7 @@ class PulseWeatherCard extends HTMLElement {
    */
   disconnectedCallback() {
     this._unsubscribeForecasts();
-    if (this._phaseTimer) { clearTimeout(this._phaseTimer); this._phaseTimer = null; }
-    if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
-    if (this._minuteTimer) { clearInterval(this._minuteTimer); this._minuteTimer = null; }
+    this._cleanupTimers();
   }
 
   /**
@@ -247,27 +275,39 @@ class PulseWeatherCard extends HTMLElement {
             forecastData: this._forecastData,
           });
           if (html) parts.push(html);
-        } catch {  
-          // Section render failed — skip gracefully
+        } catch (e) {
+          // Section render failed — skip gracefully but log so regressions are catchable
+          console.warn(`Pulse Weather: section "${section?.type}" renderer threw`, e);
         }
       }
     }
 
     parts.push('</div>');
+    // SECURITY-AUDIT: parts[] is assembled from section renderers (renderOverview, renderForecast, renderAstro,
+    // SECURITY-AUDIT: etc.) that each pre-escape every user attribute via escapeHtml() / sanitizeCssValue().
+    // SECURITY-AUDIT: Section-thrown errors are caught and logged — only sanitised markup ever reaches this
+    // SECURITY-AUDIT: sink.
+    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
     this.shadowRoot.innerHTML = parts.join('');
     this._postRender(discovery);
 
     // Schedule re-render at next sky phase boundary (golden/blue hour transitions)
     this._schedulePhaseTransition();
 
-    // Periodic 60s re-render for arc progress and time-dependent elements
-    if (this._minuteTimer) { clearInterval(this._minuteTimer); this._minuteTimer = null; }
-    this._minuteTimer = setInterval(() => {
-      this._lastWeatherState = null;
-      if (this._hass) this._fullRender();
-    }, 60000);
+    // Periodic 60s re-render for arc progress and time-dependent elements.
+    // Create once per card lifecycle; _fullRender itself shouldn't reset the
+    // timer or a dashboard with many sections will never let the tick fire.
+    if (!this._minuteTimer) {
+      this._minuteTimer = setInterval(() => {
+        this._lastWeatherState = null;
+        if (this._hass) this._fullRender();
+      }, 60000);
+    }
 
-    // Countdown timer — update only the countdown text, not full render
+    // Countdown timer — tied to .pw-astro-countdown presence in the DOM.
+    // The element identity can change across renders, so a short-lived
+    // countdown per-render remains correct; it stops itself when the
+    // element is gone and self-clears on expiry.
     if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
     if (this.shadowRoot.querySelector('.pw-astro-countdown')) {
       this._countdownTimer = setInterval(() => {
@@ -346,7 +386,10 @@ class PulseWeatherCard extends HTMLElement {
         if (cloudData && cloudData !== '""' && cloudData !== '') {
           cloudCover = JSON.parse(cloudData);
         }
-      } catch { /* ignore parse errors */ }
+      } catch {
+        // data-cloud JSON parse failure — attribute set by our own render,
+        // so only reachable if truncated mid-update; safe to ignore silently.
+      }
 
       const frag = buildConditionFx(condition, isNight, cloudCover);
       container.replaceChildren(frag);

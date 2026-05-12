@@ -13,7 +13,7 @@
  * - buildThermalParticles — score + color → DOM fragment
  */
 
-import { capeColor, escapeHtml, sanitizeCssValue, statHtml } from '../weather-primitives.js';
+import { capeColor, escapeHtml, sanitizeCssValue, statHtml, hexToRgba } from '../weather-primitives.js';
 import { intensityRatio, tensionWash, breatheDuration } from '../../shared/visual-tension.js';
 import { LIFTED_INDEX_TIERS } from '../constants.js';
 
@@ -450,6 +450,8 @@ export function buildThermalParticles(score, tierColor, rng = Math.random) {
   const cfg = particleConfig(score);
   if (cfg.count === 0) return frag;
 
+  const safeColor = sanitizeCssValue(tierColor);
+
   for (let i = 0; i < cfg.count; i++) {
     const el = document.createElement('div');
     el.className = 'pw-thermal-particle';
@@ -466,7 +468,7 @@ export function buildThermalParticles(score, tierColor, rng = Math.random) {
       `height:${size.toFixed(1)}px`,
       `left:${left.toFixed(1)}%`,
       `bottom:${bottom.toFixed(1)}%`,
-      `background:${tierColor}`,
+      `background:${safeColor}`,
       `--rise-dur:${dur.toFixed(2)}s`,
       `--rise-dist:${riseDist.toFixed(0)}px`,
       `--peak-op:${opacity.toFixed(2)}`,
@@ -576,7 +578,9 @@ export function renderAtmosphere({ hass, config: _config, discovery }) {
   const lapseGradientHtml = lapseSensor ? (() => {
     const { color: lapseColor } = resolveLapseColor(lapseVal, resolved.attrs);
     const lapseOpacity = lapseVal < 6.0 ? 0.15 : lapseVal < 7.5 ? 0.25 : 0.35;
-    const lapseRgba = `${lapseColor}${Math.round(lapseOpacity * 255).toString(16).padStart(2, '0')}`;
+    // Use hexToRgba rather than hex+alpha-hex concatenation so a future
+    // rgb()/named colour input still produces valid CSS instead of garbage.
+    const lapseRgba = hexToRgba(lapseColor, lapseOpacity);
     const lapseBottom = freezeMarkerPosition(3000, scaleMax);
     const lapseTop = freezeMarkerPosition(5500, scaleMax);
     const lapseUnit = /** @type {string} */ (lapseSensor?.attributes?.unit_of_measurement || '\u00b0C/km');

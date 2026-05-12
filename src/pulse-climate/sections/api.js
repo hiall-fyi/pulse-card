@@ -194,7 +194,7 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
         } else {
           nextDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
         }
-      } catch { /* keep raw */ }
+      } catch (e) { /* keep raw */ console.debug('Pulse Climate: api date parse fallback', e); }
     }
     html += `<span class="chip chip-next-sync" data-entity="${escapeHtml(hubEntities.next_sync)}" data-target="${targetMs}">Next: ${escapeHtml(nextDisplay)}</span>`;
   }
@@ -205,7 +205,7 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
       try {
         const d = new Date(resetRaw);
         resetDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-      } catch { /* keep raw */ }
+      } catch (e) { /* keep raw */ console.debug('Pulse Climate: api date parse fallback', e); }
     }
     html += `<span class="chip" data-entity="${escapeHtml(hubEntities.api_reset)}">Reset: ${escapeHtml(resetDisplay)}</span>`;
   }
@@ -233,6 +233,10 @@ export function updateApiSection(sectionEl, hubEntities, states) {
   const limit = parseFloat(states[hubEntities.api_limit]?.state) || 100;
   const centerEl = /** @type {HTMLElement|null} */ (sectionEl.querySelector('.gauge-center'));
   if (centerEl) {
+    // SECURITY-AUDIT: Gauge center markup interpolates only rounded numeric usage / limit values through
+    // SECURITY-AUDIT: escapeHtml(), never raw state strings — numbers are coerced through Math.round() before
+    // SECURITY-AUDIT: reaching this sink.
+    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
     centerEl.innerHTML = `${escapeHtml(Math.round(usage))}<br><span style="font-size:10px;opacity:0.6">/ ${escapeHtml(Math.round(limit))}</span>`;
   }
 }

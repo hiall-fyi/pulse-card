@@ -66,6 +66,10 @@ class PulseWeatherCardEditor extends HTMLElement {
       </div>
     `).join('');
 
+    // SECURITY-AUDIT: Editor swatch markup — all interpolated values are hex colour strings normalised through
+    // SECURITY-AUDIT: the toHex6() helper (strict /#[0-9a-f]{6}/ output) or constant label strings from the
+    // SECURITY-AUDIT: schema.
+    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; padding: 16px; }

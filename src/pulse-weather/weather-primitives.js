@@ -20,6 +20,98 @@ import {
 import { escapeHtml, sanitizeCssValue } from '../shared/utils.js';
 export { escapeHtml, sanitizeCssValue };
 
+// ── Numeric Hygiene ─────────────────────────────────────────────────
+
+/**
+ * Filter an array to entries whose numeric accessor returns a finite number.
+ * Guards path-building math (Math.min/max over temps, SVG coord calc) from
+ * NaN / Infinity / undefined values propagating into the DOM.
+ * @template T
+ * @param {T[]} items
+ * @param {(item: T) => number} accessor - Maps item to its numeric field.
+ * @returns {T[]}
+ */
+export function filterFinite(items, accessor) {
+  return items.filter((item) => Number.isFinite(accessor(item)));
+}
+
+/**
+ * Coerce a value to a finite number; fall back to default if NaN/Infinity.
+ * Use instead of `Number(x) || default` which silently accepts Infinity.
+ * @param {*} value
+ * @param {number} [fallback]
+ * @returns {number}
+ */
+export function finiteNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Convert a colour string to rgba() at the given alpha.
+ * Supports #rgb, #rrggbb, and rgb(r,g,b) inputs. Unknown/unsupported
+ * formats (named colours, HSL, currentColor) fall through unchanged —
+ * callers cannot expect those to carry an alpha override.
+ * @param {string} color
+ * @param {number} alpha - 0..1
+ * @returns {string}
+ */
+export function hexToRgba(color, alpha) {
+  if (typeof color !== 'string') return String(color);
+  const a = Math.max(0, Math.min(1, Number(alpha)));
+  let m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
+  if (m) {
+    return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`;
+  }
+  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(color);
+  if (m) {
+    return `rgba(${parseInt(m[1] + m[1], 16)},${parseInt(m[2] + m[2], 16)},${parseInt(m[3] + m[3], 16)},${a})`;
+  }
+  m = /^rgb\(\s*(\d+)\s*[,\s]\s*(\d+)\s*[,\s]\s*(\d+)\s*\)$/i.exec(color);
+  if (m) {
+    return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
+  }
+  return color;
+}
+
+let _svgIdCounter = 0;
+
+/**
+ * Generate a unique SVG id for use in <defs> gradients / filters / clipPaths.
+ * The card lives in a shadow root so cross-card collision is already
+ * prevented, but duplicate sections (e.g. two meteograms, two astro blocks)
+ * in the same card render with the same static id would make url(#id)
+ * resolve to the first match — the later sections silently pick up the
+ * wrong gradient.
+ * @param {string} [prefix='pw-id']
+ * @returns {string}
+ */
+export function uniqueSvgId(prefix = 'pw-id') {
+  _svgIdCounter = (_svgIdCounter + 1) >>> 0;
+  return `${prefix}-${_svgIdCounter.toString(36)}`;
+}
+
+/**
+ * Filter forecast array to entries with a parseable future datetime.
+ * Shared by overview / forecast / meteogram so all three sections agree on
+ * which forecast entry is "next". Entries older than `now - bufferMs` are
+ * dropped (default: 1 h buffer so the current hour still counts).
+ * @template {{datetime?: string}} T
+ * @param {T[]} items
+ * @param {Date} [now]
+ * @param {number} [bufferMs] - Anything with datetime >= now - bufferMs is kept.
+ * @returns {T[]}
+ */
+export function futureHourly(items, now, bufferMs = 3600000) {
+  const cutoff = (now ? now.getTime() : Date.now()) - bufferMs;
+  return items.filter((it) => {
+    const raw = /** @type {*} */ (it).datetime;
+    if (!raw) return false;
+    const t = new Date(raw).getTime();
+    return Number.isFinite(t) && t >= cutoff;
+  });
+}
+
 // ── Color Mapping ───────────────────────────────────────────────────
 
 /**

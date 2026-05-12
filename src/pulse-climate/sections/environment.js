@@ -51,10 +51,10 @@ export function renderEnvironmentSection(zones, states, discovery) {
       html += `<span class="chip" data-entity="${escapeHtml(entities.comfort_level)}"><ha-icon icon="mdi:emoticon-outline"></ha-icon>${escapeHtml(states[entities.comfort_level].state)}</span>`;
     }
     if (hasSurface) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.surface_temp)}"><ha-icon icon="mdi:texture-box"></ha-icon>${escapeHtml(states[entities.surface_temp].state)}${states[entities.surface_temp]?.attributes?.unit_of_measurement || '°C'}</span>`;
+      html += `<span class="chip" data-entity="${escapeHtml(entities.surface_temp)}"><ha-icon icon="mdi:texture-box"></ha-icon>${escapeHtml(states[entities.surface_temp].state)}${escapeHtml(states[entities.surface_temp]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
     if (hasDew) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.dew_point)}"><ha-icon icon="mdi:water-thermometer"></ha-icon>${escapeHtml(states[entities.dew_point].state)}${states[entities.dew_point]?.attributes?.unit_of_measurement || '°C'}</span>`;
+      html += `<span class="chip" data-entity="${escapeHtml(entities.dew_point)}"><ha-icon icon="mdi:water-thermometer"></ha-icon>${escapeHtml(states[entities.dew_point].state)}${escapeHtml(states[entities.dew_point]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
 
     html += `</div></div>`;

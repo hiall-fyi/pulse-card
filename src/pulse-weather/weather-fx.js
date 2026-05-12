@@ -254,9 +254,14 @@ export function addBolts(frag, boltCount = 2, flashDelays) {
     svg.style.animation = `pw-boltStrike 6s ease-in-out ${delays[i] || 0}s infinite`;
     svg.style.animationFillMode = 'backwards';
 
+    // Compute the bolt path once and reuse for glow + main layer so
+    // they actually align. Previously each layer called jaggedBoltPath
+    // with fresh Math.random() → two different zig-zags.
+    const boltPoints = jaggedBoltPath(30, 180);
+
     // Glow layer
     const glow = document.createElementNS(ns, 'polyline');
-    glow.setAttribute('points', jaggedBoltPath(30, 180));
+    glow.setAttribute('points', boltPoints);
     glow.setAttribute('fill', 'none');
     glow.setAttribute('stroke', 'rgba(200,220,255,0.4)');
     glow.setAttribute('stroke-width', '6');
@@ -266,7 +271,7 @@ export function addBolts(frag, boltCount = 2, flashDelays) {
 
     // Main bolt
     const bolt = document.createElementNS(ns, 'polyline');
-    bolt.setAttribute('points', jaggedBoltPath(30, 180));
+    bolt.setAttribute('points', boltPoints);
     bolt.setAttribute('fill', 'none');
     bolt.setAttribute('stroke', '#fff');
     bolt.setAttribute('stroke-width', '2');
@@ -466,8 +471,9 @@ export function buildConditionFx(condition, isNight, cloudCover) {
         if (cloudCover && cloudCount > 0) addClouds(frag, cloudCount);
         break;
     }
-  } catch {  
+  } catch (e) {
     // Never throw — return empty or partial fragment on error
+    console.warn('Pulse Weather: buildConditionFx threw, returning partial fragment', e);
   }
 
   return frag;

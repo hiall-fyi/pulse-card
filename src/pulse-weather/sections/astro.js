@@ -3,7 +3,7 @@
  * @description Sun/moon arc, sky-wash themes, moon phase rendering.
  */
 
-import { escapeHtml, sanitizeCssValue, statHtml, getSkyTheme, SKY_THEMES } from '../weather-primitives.js';
+import { escapeHtml, sanitizeCssValue, statHtml, getSkyTheme, SKY_THEMES, uniqueSvgId } from '../weather-primitives.js';
 import { tensionWash } from '../../shared/visual-tension.js';
 import { SYNODIC_MONTH, MOON_PHASES } from '../constants.js';
 
@@ -137,7 +137,7 @@ function fmtTime(/** @type {Date|null} */ date) {
  * @returns {string} SVG element markup.
  */
 function sv(tag, attrs, content) {
-  const a = Object.entries(attrs).map(([k, v]) => ' ' + k + '="' + v + '"').join('');
+  const a = Object.entries(attrs).map(([k, v]) => ' ' + k + '="' + escapeHtml(String(v)) + '"').join('');
   return content !== undefined ? '<' + tag + a + '>' + content + '</' + tag + '>' : '<' + tag + a + '/>';
 }
 
@@ -178,6 +178,9 @@ const TWILIGHT_ARC_GRADIENT_STOPS = [
 
 /**
  * Determine twilight arc opacity based on sky phase.
+ * Currently every branch returns 1.0 — per-phase modulation is done
+ * via gradient stops in renderTwilightArc. Switch kept as an explicit
+ * extension point for future phase-specific opacity tuning.
  * @param {number} themeIdx - Current sky theme index (0–5).
  * @returns {number} Opacity value (0–1).
  */
@@ -198,7 +201,7 @@ export function getTwilightArcOpacity(themeIdx) {
  * @returns {string} SVG markup string.
  */
 export function renderTwilightArc(side, opacity) {
-  const gradId = 'pw-twi-grad-' + side;
+  const gradId = uniqueSvgId('pw-twi-grad-' + side);
   const path = side === 'am'
     ? 'M12,4 Q8,60 8,116 Q9,170 34,227'
     : 'M34,4 Q38,60 38,116 Q37,170 12,227';
@@ -287,7 +290,7 @@ export function renderAstro({ hass, config: _config, discovery }) {
   const parts = [];
 
   // SVG gradient definition for filled arc
-  const gradId = 'pw-arc-fill';
+  const gradId = uniqueSvgId('pw-arc-fill');
   const arcFill = ARC_FILLS[themeIdx];
   parts.push('<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">'
     + '<stop offset="0%" stop-color="' + arcFill.top + '"/>'

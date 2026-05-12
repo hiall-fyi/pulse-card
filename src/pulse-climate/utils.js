@@ -15,6 +15,26 @@ export function warn(msg, ...args) {
   console.warn(`${LOG_PREFIX} ${msg}`, ...args);
 }
 
+/** Dedupe set for one-shot override warnings; keyed by zone|key|entityId. */
+const _warnedOverrides = new Set();
+
+/**
+ * Warn (once per unique triple) when a manual entity override in zone config
+ * points at an entity the hass object doesn't know about. Silent if the
+ * override resolves successfully, or if the override isn't set.
+ * @param {string} zoneName - For the log message context.
+ * @param {string} key - Which override key (e.g. "battery_entity").
+ * @param {string|undefined} entityId - The override value.
+ * @param {Record<string, *>} states - hass.states.
+ */
+export function warnUnresolvedOverride(zoneName, key, entityId, states) {
+  if (!entityId || states[entityId]) return;
+  const dedupeKey = `${zoneName}|${key}|${entityId}`;
+  if (_warnedOverrides.has(dedupeKey)) return;
+  _warnedOverrides.add(dedupeKey);
+  warn(`zone "%s": ${key} override points at missing entity "%s" — chip will not render`, zoneName, entityId);
+}
+
 /**
  * Resolve HVAC action visual (icon, color, label).
  * @param {string} action - hvac_action value.
@@ -287,11 +307,23 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
   // Resolve chips
   const chipFilter = zoneConfig.chips || cardConfig.chips || null;
 
-  // Merge manual entity overrides into discoveredEntities (YAML overrides take priority)
+  // Merge manual entity overrides into discoveredEntities (YAML overrides take priority).
+  // Warn once per unique triple if the override points at a missing entity so
+  // users can diagnose typos rather than quietly losing the chip.
   const mergedEntities = { ...discoveredEntities };
-  if (zoneConfig.open_window_entity) mergedEntities.open_window = zoneConfig.open_window_entity;
-  if (zoneConfig.battery_entity) mergedEntities.battery = zoneConfig.battery_entity;
-  if (zoneConfig.mold_risk_entity) mergedEntities.mold_risk = zoneConfig.mold_risk_entity;
+  const zoneName = zoneConfig.name || entityId;
+  if (zoneConfig.open_window_entity) {
+    mergedEntities.open_window = zoneConfig.open_window_entity;
+    warnUnresolvedOverride(zoneName, 'open_window_entity', zoneConfig.open_window_entity, states);
+  }
+  if (zoneConfig.battery_entity) {
+    mergedEntities.battery = zoneConfig.battery_entity;
+    warnUnresolvedOverride(zoneName, 'battery_entity', zoneConfig.battery_entity, states);
+  }
+  if (zoneConfig.mold_risk_entity) {
+    mergedEntities.mold_risk = zoneConfig.mold_risk_entity;
+    warnUnresolvedOverride(zoneName, 'mold_risk_entity', zoneConfig.mold_risk_entity, states);
+  }
 
   const zoneState = {
     entityId, name, icon, isUnavailable,
@@ -430,7 +462,15 @@ export function normalizeClimateConfig(config) {
           if (section[key] === undefined || section[key] === null) {
             section[key] = typeof defaultVal === 'boolean' ? defaultVal : defaultVal;
           } else if (typeof defaultVal === 'number') {
-            section[key] = Number(section[key]) || defaultVal;
+            // Coerce numeric fields; surface unparseable values so users can
+            // spot typos instead of silently reverting to defaults.
+            const coerced = Number(section[key]);
+            if (!Number.isFinite(coerced)) {
+              warn('section "%s": %s=%o is not numeric — using default %o', section.type, key, section[key], defaultVal);
+              section[key] = defaultVal;
+            } else {
+              section[key] = coerced || defaultVal;
+            }
           }
         }
       }

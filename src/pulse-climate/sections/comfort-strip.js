@@ -6,7 +6,7 @@
  * Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
+import { escapeHtml } from '../../shared/utils.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slot-engine.js';
@@ -120,7 +120,7 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
 
   let html = `<div class="section section-comfort-strip">`;
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
-  html += `<div class="section-label">${sanitizeCssValue(hours)}h ${escapeHtml(modeLabel)}</div>`;
+  html += `<div class="section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(modeLabel)}</div>`;
   html += `<span class="card-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
   html += `</div>`;
 

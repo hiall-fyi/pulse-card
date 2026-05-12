@@ -36,7 +36,7 @@ export function renderThermalSection(zones, states, discovery) {
     html += `<div class="zone-chips">`;
 
     if (hasRate) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.heating_rate)}"><ha-icon icon="mdi:trending-up"></ha-icon>${escapeHtml(states[entities.heating_rate].state)}${states[entities.heating_rate]?.attributes?.unit_of_measurement || '°C/hr'}</span>`;
+      html += `<span class="chip" data-entity="${escapeHtml(entities.heating_rate)}"><ha-icon icon="mdi:trending-up"></ha-icon>${escapeHtml(states[entities.heating_rate].state)}${escapeHtml(states[entities.heating_rate]?.attributes?.unit_of_measurement || '°C/hr')}</span>`;
     }
     if (hasInertia) {
       html += `<span class="chip" data-entity="${escapeHtml(entities.thermal_inertia)}"><ha-icon icon="mdi:speedometer"></ha-icon>${escapeHtml(states[entities.thermal_inertia].state)}</span>`;
@@ -48,10 +48,10 @@ export function renderThermalSection(zones, states, discovery) {
       html += `<span class="chip" data-entity="${escapeHtml(entities.confidence)}"><ha-icon icon="mdi:check-circle-outline"></ha-icon>${escapeHtml(states[entities.confidence].state)}%</span>`;
     }
     if (hasAccel) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.heat_accel)}"><ha-icon icon="mdi:rocket-launch"></ha-icon>${escapeHtml(states[entities.heat_accel].state)}${states[entities.heat_accel]?.attributes?.unit_of_measurement || ''}</span>`;
+      html += `<span class="chip" data-entity="${escapeHtml(entities.heat_accel)}"><ha-icon icon="mdi:rocket-launch"></ha-icon>${escapeHtml(states[entities.heat_accel].state)}${escapeHtml(states[entities.heat_accel]?.attributes?.unit_of_measurement || '')}</span>`;
     }
     if (hasApproach) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.approach_factor)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.approach_factor].state)}${states[entities.approach_factor]?.attributes?.unit_of_measurement || ''}</span>`;
+      html += `<span class="chip" data-entity="${escapeHtml(entities.approach_factor)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.approach_factor].state)}${escapeHtml(states[entities.approach_factor]?.attributes?.unit_of_measurement || '')}</span>`;
     }
 
     html += `</div></div>`;

@@ -175,6 +175,21 @@ export function resolveVirtualIcon(portConfig) {
 }
 
 // =====================================================================
+// Config Normalization
+// =====================================================================
+
+/**
+ * Coerce a config value to a positive finite number; fall back to default.
+ * @param {*} value - Raw config value (may be string, number, undefined, object).
+ * @param {number} fallback - Default to use when value is invalid.
+ * @returns {number}
+ */
+export function normalizePositiveNumber(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+// =====================================================================
 // Security & Logging Helpers
 // =====================================================================
 

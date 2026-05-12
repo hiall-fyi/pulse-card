@@ -7,7 +7,7 @@
  * Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
+import { escapeHtml } from '../../shared/utils.js';
 import { temperatureToColor, humidityToColor } from '../chart-primitives.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
@@ -41,7 +41,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
 
   let html = `<div class="section section-thermal-strip">`;
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
-  html += `<div class="section-label">${sanitizeCssValue(hours)}h ${escapeHtml(typeLabel)} ${escapeHtml(modeLabel)}</div>`;
+  html += `<div class="section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(typeLabel)} ${escapeHtml(modeLabel)}</div>`;
   html += `<span class="card-subtitle section-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
   html += `</div>`;
 
@@ -72,7 +72,8 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
       const entityExists = !!states[sensorId];
       const hasCacheEntry = sensorId in (historyCache?.data || {});
       const emptyMsg = (entityExists && !hasCacheEntry) ? 'Waiting for data' : 'No data';
-      html += `<div class="strip-container"><div class="chart-empty" style="height:14px;font-size:10px">${escapeHtml(emptyMsg)}</div></div>`;
+      html += `<div class="strip-container"><div class="chart-empty" style="height:14px;font-size:10px">`
+        + `${escapeHtml(emptyMsg)}</div></div>`;
     } else {
       const slotData = computeSlots(data, slots, windowMs);
       const unitLabel = isHumidity ? 'humidity' : 'temperature';

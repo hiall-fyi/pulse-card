@@ -35,18 +35,18 @@ export function renderScheduleSection(zones, states, discovery) {
 
     if (hasNext) {
       const nextTemp = entities.next_sched_temp && states[entities.next_sched_temp]
-        ? ` → ${escapeHtml(states[entities.next_sched_temp].state)}${states[entities.next_sched_temp]?.attributes?.unit_of_measurement || '°C'}`
+        ? ` → ${escapeHtml(states[entities.next_sched_temp].state)}${escapeHtml(states[entities.next_sched_temp]?.attributes?.unit_of_measurement || '°C')}`
         : '';
       html += `<span class="chip" data-entity="${escapeHtml(entities.next_schedule)}"><ha-icon icon="mdi:calendar-clock"></ha-icon>${escapeHtml(states[entities.next_schedule].state)}${nextTemp}</span>`;
     }
     if (hasDeviation) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.schedule_deviation)}"><ha-icon icon="mdi:swap-vertical"></ha-icon>${escapeHtml(states[entities.schedule_deviation].state)}${states[entities.schedule_deviation]?.attributes?.unit_of_measurement || '°C'}</span>`;
+      html += `<span class="chip" data-entity="${escapeHtml(entities.schedule_deviation)}"><ha-icon icon="mdi:swap-vertical"></ha-icon>${escapeHtml(states[entities.schedule_deviation].state)}${escapeHtml(states[entities.schedule_deviation]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
     if (hasAdvisor) {
       html += `<span class="chip" data-entity="${escapeHtml(entities.preheat_advisor)}"><ha-icon icon="mdi:radiator"></ha-icon>${escapeHtml(states[entities.preheat_advisor].state)}</span>`;
     }
     if (hasComfort) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.comfort_target)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.comfort_target].state)}${states[entities.comfort_target]?.attributes?.unit_of_measurement || '°C'}</span>`;
+      html += `<span class="chip" data-entity="${escapeHtml(entities.comfort_target)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.comfort_target].state)}${escapeHtml(states[entities.comfort_target]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
 
     html += `</div></div>`;

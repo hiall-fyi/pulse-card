@@ -738,6 +738,16 @@ export const STYLES = `${SHARED_STYLES}
   line-height: 1.4;
 }
 
+.pw-alert-link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--pulse-accent-primary);
+  text-decoration: none;
+  border-bottom: 1px dashed currentColor;
+}
+.pw-alert-link:hover { color: var(--pulse-accent-hover); }
+
 .pw-alert-locations {
   font-size: 10px;
   color: var(--pulse-text-secondary);

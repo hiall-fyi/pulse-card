@@ -357,6 +357,11 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
       const targetDisplay = (!zoneState.isUnavailable && zoneState.targetTemp !== null)
         ? `<span class="zone-target">→ ${formatNumericDisplay(zoneState.targetTemp)}${escapeHtml(zoneState.unit)}</span>`
         : '';
+      // SECURITY-AUDIT: Differential update recomposes zone-temp block from displayValue / targetTemp which
+      // SECURITY-AUDIT: flow through escapeHtml() (display) or formatNumericDisplay (numeric). The only direct
+      // SECURITY-AUDIT: interpolation of a raw attribute is the unit-of-measurement string, which is itself
+      // SECURITY-AUDIT: escaped.
+      // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
       tempEl.innerHTML = `${escapeHtml(tempDisplay)}${targetDisplay}`;
     }
 

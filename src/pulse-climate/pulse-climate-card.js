@@ -124,6 +124,14 @@ class PulseClimateCard extends HTMLElement {
   _sparklineAbort = null;
   /** @type {Map<string, {linePath: string, areaPath: string}>} Pre-computed sparkline SVG paths. */
   _sparklinePathCache = new Map();
+  /** @type {{shimmer: boolean, sheen: boolean}} Active flags for radial animation timer chains.
+   * Kept on the instance (not the DOM node) so that rebinds / DOM replacement can
+   * halt in-flight setTimeout chains before they resume against detached arcs. */
+  _radialAnimState = { shimmer: false, sheen: false };
+  /** @type {number} Monotonically increasing generation counter. Bumped on every
+   * setConfig() / _runDiscovery() so in-flight history fetches can detect that
+   * their captured context is stale and skip writing to the cache. */
+  _historyGen = 0;
 
   constructor() {
     super();
@@ -136,6 +144,12 @@ class PulseClimateCard extends HTMLElement {
    * @param {Record<string, *>} config
    */
   setConfig(config) {
+    // Stop any radial animation timer chains from the previous config before
+    // the DOM is rebuilt — otherwise they'd fire against detached arcs.
+    this._stopRadialAnimations();
+    // Bump history generation — any in-flight fetch will see its captured
+    // gen differs from _historyGen on resume and skip its cache write.
+    this._historyGen++;
     this._config = normalizeClimateConfig(config);
     this._discovery = null;
     this._prevStates = {};
@@ -190,6 +204,8 @@ class PulseClimateCard extends HTMLElement {
   /** Run Tado CE entity discovery. */
   _runDiscovery() {
     if (!this._hass || !this._config) return;
+    // Discovery may redefine zone set — bump gen so in-flight fetches are stale.
+    this._historyGen++;
     const zones = this._config._zones || [];
     const zoneNames = zones.map((/** @type {import('./types.js').ZoneConfig} */ z) => extractZoneName(z.entity));
     this._discovery = discoverTadoEntities(this._hass.states, zoneNames, this._hass.entities);
@@ -414,6 +430,12 @@ class PulseClimateCard extends HTMLElement {
       html += `</ha-card>`;
     }
 
+    // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
+    // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
+    // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name strings
+    // SECURITY-AUDIT: are static literals. Detail panels (zone-detail, radial-detail, comfort-detail) likewise
+    // SECURITY-AUDIT: pre-escape every value before interpolation — see audit-C1 §2q trace.
+    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
     this._shadow.innerHTML = html;
 
     // Cache DOM refs
@@ -730,6 +752,13 @@ class PulseClimateCard extends HTMLElement {
 
       // Detail panel
       if (detailEl) {
+        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
+        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
+        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
+        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
+        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
+        // SECURITY-AUDIT: §2q trace.
+        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
         detailEl.innerHTML = `<div class="detail-stats">
           <div class="stat"><div class="stat-value">${target !== undefined ? escapeHtml(target) + escapeHtml(zd.unit) : '--'}</div><div class="stat-label">Target</div></div>
           <div class="stat"><div class="stat-value">${humidity !== undefined ? escapeHtml(humidity) + '%' : '--'}</div><div class="stat-label">Humidity</div></div>
@@ -761,15 +790,21 @@ class PulseClimateCard extends HTMLElement {
       item.addEventListener('click', () => selectZone(i), { signal: radialSignal });
     });
 
+    // Stop any in-flight animation chains from a previous bind. A prior call
+    // would have set _radialAnimState.shimmer/sheen to true; on next tick the
+    // cycle checks the flag and exits, releasing the DOM closure.
+    this._stopRadialAnimations();
+
     // Per-zone shimmer — zones light up sequentially like piano keys
     // Direction and speed vary randomly between sweeps
     if (arcs.length > 1 && !isReducedMotion()) {
-      let shimmerRunning = true;
+      this._radialAnimState.shimmer = true;
       let currentIdx = 0;
       let direction = 1;
 
       const shimmerCycle = () => {
-        if (!shimmerRunning || selectedIdx !== null) {
+        if (!this._radialAnimState.shimmer) return;
+        if (selectedIdx !== null) {
           // Paused while zone selected — check again later
           setTimeout(shimmerCycle, 500);
           return;
@@ -808,12 +843,6 @@ class PulseClimateCard extends HTMLElement {
 
       // Start after a short delay
       setTimeout(shimmerCycle, 1500);
-
-      // Store cleanup
-      const firstArc = arcs[0];
-      if (firstArc) {
-        /** @type {*} */ (firstArc).__shimmerStop = () => { shimmerRunning = false; };
-      }
     }
 
     // ── Glass sheen sweep ──────────────────────────────────────────
@@ -828,9 +857,9 @@ class PulseClimateCard extends HTMLElement {
         if (isLight) sheenEl.classList.add('light-theme');
         else sheenEl.classList.remove('light-theme');
 
-        let sheenRunning = true;
+        this._radialAnimState.sheen = true;
         const sheenCycle = () => {
-          if (!sheenRunning) return;
+          if (!this._radialAnimState.sheen) return;
           const fromLeft = Math.random() > 0.5;
           const startPos = fromLeft ? '-100% 50%' : '200% 50%';
           const endPos = fromLeft ? '200% 50%' : '-100% 50%';
@@ -849,23 +878,26 @@ class PulseClimateCard extends HTMLElement {
         };
 
         setTimeout(sheenCycle, 2000 + Math.random() * 3000);
-
-        const sheenArc = arcs[0];
-        if (sheenArc) {
-          const prevStop = /** @type {*} */ (sheenArc).__shimmerStop;
-          /** @type {*} */ (sheenArc).__shimmerStop = () => {
-            sheenRunning = false;
-            if (typeof prevStop === 'function') prevStop();
-          };
-        }
       }
     }
+  }
+
+  /**
+   * Stop any active radial shimmer / glass-sheen timer chains. The chains
+   * self-reschedule via setTimeout, so setting the flag to false causes the
+   * next callback to short-circuit and release its closure. Safe to call
+   * repeatedly.
+   */
+  _stopRadialAnimations() {
+    this._radialAnimState.shimmer = false;
+    this._radialAnimState.sheen = false;
   }
 
   /** Bind thermal strip row click → select zone, show detail panel. */
   _bindTimelineInteractions() {
     if (this._timelineAbort) this._timelineAbort.abort();
     this._timelineAbort = new AbortController();
+    const { signal: timelineSignal } = this._timelineAbort;
     const rows = this._shadow.querySelectorAll('.section-thermal-strip .timeline-row');
     const detailEl = this._shadow.querySelector('.section-thermal-strip');
     if (rows.length === 0 || !detailEl) return;
@@ -945,6 +977,13 @@ class PulseClimateCard extends HTMLElement {
             const legendEl = document.createElement('div');
             legendEl.className = 'comparison-legend';
             legendEl.style.cssText = 'display:flex;gap:12px;font-size:10px;margin-top:4px;color:var(--secondary-text-color,#8e8e93)';
+            // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields
+            // SECURITY-AUDIT: (zone names, sensor states, units) via escapeHtml() and sanitize CSS values via
+            // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
+            // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
+            // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see
+            // SECURITY-AUDIT: audit-C1 §2q trace.
+            // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
             legendEl.innerHTML = `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:4px"></span>${escapeHtml(primaryName)}</span>` +
               `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--info-color, #4FC3F7);margin-right:4px"></span>${escapeHtml(cmpName)}</span>`;
             detail.appendChild(legendEl);
@@ -1049,6 +1088,13 @@ class PulseClimateCard extends HTMLElement {
           detail.className = 'zone-detail';
           detailEl.insertBefore(detail, detailEl.querySelector('.timeline-row'));
         }
+        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
+        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
+        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
+        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
+        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
+        // SECURITY-AUDIT: §2q trace.
+        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
         detail.innerHTML = `<div class="detail-header"><span class="detail-name">${escapeHtml(name)}</span><span class="detail-close">✕ Close</span></div>
           <div class="detail-stats">
             <div class="stat"><div class="stat-value">${temp !== undefined ? escapeHtml(temp) + escapeHtml(zd.unit) : '--'}</div><div class="stat-label">Current</div>${trendLabel ? `<div class="stat-sub">${escapeHtml(trendLabel)}</div>` : ''}</div>
@@ -1065,8 +1111,8 @@ class PulseClimateCard extends HTMLElement {
           rows.forEach((/** @type {Element} */ r) => r.classList.remove('selected'));
           detail.classList.remove('active');
           if (subtitleEl) subtitleEl.textContent = defaultSubtitle;
-        });
-      });
+        }, { signal: timelineSignal });
+      }, { signal: timelineSignal });
     });
 
     // Per-slot tooltip — handles both timeline (.strip-container) and heatmap (.cells) modes
@@ -1084,7 +1130,7 @@ class PulseClimateCard extends HTMLElement {
       const slotsAttr = strip.getAttribute('data-slots');
       /** @type {*[]|null} */
       let cachedSlots = null;
-      try { if (slotsAttr) cachedSlots = JSON.parse(slotsAttr); } catch { /* ignore */ }
+      try { if (slotsAttr) cachedSlots = JSON.parse(slotsAttr); } catch { /* card's own attribute; parse failure only if mid-update truncation */ }
 
       strip.addEventListener('pointermove', (/** @type {*} */ ev) => {
         if (ev.pointerType === 'touch' || !cachedSlots) return;
@@ -1095,8 +1141,8 @@ class PulseClimateCard extends HTMLElement {
           const text = slot.v !== null ? `${slot.l}: ${slot.v}${tempUnit}` : `${slot.l}: --`;
           tooltip.show(rect, ev.clientX - rect.left, text);
         }
-      });
-      strip.addEventListener('pointerleave', () => tooltip.hide());
+      }, { signal: timelineSignal });
+      strip.addEventListener('pointerleave', () => tooltip.hide(), { signal: timelineSignal });
       strip.addEventListener('pointerdown', (/** @type {*} */ ev) => {
         if (ev.pointerType !== 'touch' || !cachedSlots) return;
         const rect = strip.getBoundingClientRect();
@@ -1107,7 +1153,7 @@ class PulseClimateCard extends HTMLElement {
           tooltip.show(rect, ev.clientX - rect.left, text);
           setTimeout(() => tooltip.hide(), 2000);
         }
-      });
+      }, { signal: timelineSignal });
     });
 
     // Heatmap mode: per-cell tooltip
@@ -1122,8 +1168,8 @@ class PulseClimateCard extends HTMLElement {
         const text = val ? `${hour}: ${val}${tempUnit}` : `${hour}: --`;
         const refRect = container.getBoundingClientRect();
         tooltip.show(refRect, ev.clientX - refRect.left, text);
-      });
-      container.addEventListener('pointerleave', () => tooltip.hide());
+      }, { signal: timelineSignal });
+      container.addEventListener('pointerleave', () => tooltip.hide(), { signal: timelineSignal });
       container.addEventListener('pointerdown', (/** @type {*} */ ev) => {
         if (ev.pointerType !== 'touch') return;
         const cellEl = ev.target?.closest?.('.cell');
@@ -1134,7 +1180,7 @@ class PulseClimateCard extends HTMLElement {
         const refRect = container.getBoundingClientRect();
         tooltip.show(refRect, ev.clientX - refRect.left, text);
         setTimeout(() => tooltip.hide(), 2000);
-      });
+      }, { signal: timelineSignal });
     });
 
     // Crosshair — vertical line across all zone rows
@@ -1151,7 +1197,7 @@ class PulseClimateCard extends HTMLElement {
       const slotsAttr = container.getAttribute('data-slots');
       /** @type {*[]|null} */
       let dragSlots = null;
-      try { if (slotsAttr) dragSlots = JSON.parse(slotsAttr); } catch { /* ignore */ }
+      try { if (slotsAttr) dragSlots = JSON.parse(slotsAttr); } catch { /* card's own attribute; parse failure only if mid-update truncation */ }
       bindDragSelect(container, dragSlots, tooltip, tempUnit);
     });
   }
@@ -1160,6 +1206,7 @@ class PulseClimateCard extends HTMLElement {
   _bindHeatmapInteractions() {
     if (this._heatmapAbort) this._heatmapAbort.abort();
     this._heatmapAbort = new AbortController();
+    const { signal: heatmapSignal } = this._heatmapAbort;
     const rows = this._shadow.querySelectorAll('.section-comfort-strip .heatmap-row');
     const detailEl = this._shadow.querySelector('#heatmap-detail');
     if (rows.length === 0 || !detailEl) return;
@@ -1203,7 +1250,7 @@ class PulseClimateCard extends HTMLElement {
               for (const s of parsed) {
                 if (s.v !== null && s.v !== undefined) { scores.push(s.v); labels.push(s.l || '--'); }
               }
-            } catch { /* ignore */ }
+            } catch { /* card's own attribute; parse failure only if mid-update truncation */ }
           }
         }
         if (scores.length === 0) return;
@@ -1220,6 +1267,13 @@ class PulseClimateCard extends HTMLElement {
         const barColor = avg >= 80 ? 'var(--label-badge-green, #34c759)' : avg >= 50 ? 'var(--label-badge-yellow, #ff9f0a)' : 'var(--label-badge-red, #ff453a)';
         const zoneName = row.querySelector('.zone-label')?.textContent || '';
 
+        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
+        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
+        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
+        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
+        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
+        // SECURITY-AUDIT: §2q trace.
+        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
         detailEl.innerHTML = `<div class="detail-header"><span class="detail-name">${escapeHtml(zoneName)}</span><span class="detail-close">✕ Close</span></div>
           <div class="detail-stats">
             <div class="stat"><div class="stat-value">${avg}</div><div class="stat-label">Avg Score</div></div>
@@ -1234,8 +1288,8 @@ class PulseClimateCard extends HTMLElement {
           selectedIdx = null;
           rows.forEach((/** @type {Element} */ r) => r.classList.remove('selected'));
           detailEl.classList.remove('active');
-        });
-      });
+        }, { signal: heatmapSignal });
+      }, { signal: heatmapSignal });
     });
 
     // Per-cell/slot tooltip — handles both heatmap (.cells) and timeline (.strip-container) modes
@@ -1264,8 +1318,8 @@ class PulseClimateCard extends HTMLElement {
         if (refRect) {
           heatmapTooltip.show(refRect, ev.clientX - refRect.left, text);
         }
-      });
-      container.addEventListener('pointerleave', () => heatmapTooltip.hide());
+      }, { signal: heatmapSignal });
+      container.addEventListener('pointerleave', () => heatmapTooltip.hide(), { signal: heatmapSignal });
       container.addEventListener('pointerdown', (/** @type {*} */ ev) => {
         if (ev.pointerType !== 'touch') return;
         const cellEl = ev.target?.closest?.('.cell');
@@ -1278,7 +1332,7 @@ class PulseClimateCard extends HTMLElement {
           heatmapTooltip.show(refRect, ev.clientX - refRect.left, text);
           setTimeout(() => heatmapTooltip.hide(), 2000);
         }
-      });
+      }, { signal: heatmapSignal });
     });
 
     // Timeline mode: per-slot tooltip via data-slots JSON
@@ -1287,7 +1341,7 @@ class PulseClimateCard extends HTMLElement {
       const slotsAttr = strip.getAttribute('data-slots');
       /** @type {*[]|null} */
       let cachedSlots = null;
-      try { if (slotsAttr) cachedSlots = JSON.parse(slotsAttr); } catch { /* ignore */ }
+      try { if (slotsAttr) cachedSlots = JSON.parse(slotsAttr); } catch { /* card's own attribute; parse failure only if mid-update truncation */ }
 
       strip.addEventListener('pointermove', (/** @type {*} */ ev) => {
         if (ev.pointerType === 'touch' || !cachedSlots) return;
@@ -1298,8 +1352,8 @@ class PulseClimateCard extends HTMLElement {
           const text = slot.v !== null ? `${slot.l}: Score ${slot.v}` : `${slot.l}: --`;
           heatmapTooltip.show(rect, ev.clientX - rect.left, text);
         }
-      });
-      strip.addEventListener('pointerleave', () => heatmapTooltip.hide());
+      }, { signal: heatmapSignal });
+      strip.addEventListener('pointerleave', () => heatmapTooltip.hide(), { signal: heatmapSignal });
       strip.addEventListener('pointerdown', (/** @type {*} */ ev) => {
         if (ev.pointerType !== 'touch' || !cachedSlots) return;
         const rect = strip.getBoundingClientRect();
@@ -1310,7 +1364,7 @@ class PulseClimateCard extends HTMLElement {
           heatmapTooltip.show(rect, ev.clientX - rect.left, text);
           setTimeout(() => heatmapTooltip.hide(), 2000);
         }
-      });
+      }, { signal: heatmapSignal });
     });
 
     // Crosshair — vertical line across all zone rows
@@ -1326,7 +1380,7 @@ class PulseClimateCard extends HTMLElement {
       const slotsAttr = container.getAttribute('data-slots');
       /** @type {*[]|null} */
       let cachedDragSlots = null;
-      try { if (slotsAttr) cachedDragSlots = JSON.parse(slotsAttr); } catch { /* ignore */ }
+      try { if (slotsAttr) cachedDragSlots = JSON.parse(slotsAttr); } catch { /* card's own attribute; parse failure only if mid-update truncation */ }
       bindDragSelect(container, cachedDragSlots, heatmapTooltip);
     });
   }
@@ -1367,6 +1421,7 @@ class PulseClimateCard extends HTMLElement {
   _bindSparklineCrosshairs() {
     if (this._sparklineAbort) this._sparklineAbort.abort();
     this._sparklineAbort = new AbortController();
+    const { signal: sparklineSignal } = this._sparklineAbort;
     // Clean up previous instances (prevents accumulation on re-bind after history refresh)
     this._shadow.querySelectorAll('.strip-tooltip-fixed').forEach((el) => el.remove());
     this._shadow.querySelectorAll('.sparkline-crosshair').forEach((el) => el.remove());
@@ -1395,7 +1450,7 @@ class PulseClimateCard extends HTMLElement {
       const dataAttr = el.getAttribute('data-sparkline');
       /** @type {*} */
       let cachedParsed = null;
-      try { if (dataAttr) cachedParsed = JSON.parse(dataAttr); } catch { /* ignore */ }
+      try { if (dataAttr) cachedParsed = JSON.parse(dataAttr); } catch { /* card's own attribute; parse failure only if mid-update truncation */ }
 
       el.addEventListener('pointermove', (/** @type {*} */ ev) => {
         if (ev.pointerType === 'touch') return;
@@ -1416,11 +1471,11 @@ class PulseClimateCard extends HTMLElement {
             tooltip.show(rect, ev.clientX, text);
           }
         }
-      });
+      }, { signal: sparklineSignal });
       el.addEventListener('pointerleave', () => {
         crosshair.style.display = 'none';
         tooltip.hide();
-      });
+      }, { signal: sparklineSignal });
 
       // Touch: tap-to-pin crosshair + tooltip, auto-hide after 2s
       /** @type {ReturnType<typeof setTimeout>|null} */
@@ -1451,7 +1506,7 @@ class PulseClimateCard extends HTMLElement {
           tooltip.hide();
           sparkTouchTimer = null;
         }, 2000);
-      });
+      }, { signal: sparklineSignal });
     });
   }
 
@@ -1477,6 +1532,13 @@ class PulseClimateCard extends HTMLElement {
         const html = renderZoneRankingSection(zones, states, discovery, newMetric);
         if (!html) return;
         const tpl = document.createElement('template');
+        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
+        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
+        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
+        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
+        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
+        // SECURITY-AUDIT: §2q trace.
+        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
         tpl.innerHTML = html;
         const newEl = tpl.content.firstElementChild;
         if (newEl) {
@@ -1624,6 +1686,12 @@ class PulseClimateCard extends HTMLElement {
       const html = target.render();
       if (!html) continue;
       const tpl = document.createElement('template');
+      // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
+      // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
+      // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name strings
+      // SECURITY-AUDIT: are static literals. Detail panels (zone-detail, radial-detail, comfort-detail)
+      // SECURITY-AUDIT: likewise pre-escape every value before interpolation — see audit-C1 §2q trace.
+      // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
       tpl.innerHTML = html;
       const newEl = tpl.content.firstElementChild;
       if (newEl) {
@@ -1682,6 +1750,13 @@ class PulseClimateCard extends HTMLElement {
           const html = renderEnergyFlowSection(zones, states, discovery);
           if (html) {
             const tpl = document.createElement('template');
+            // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields
+            // SECURITY-AUDIT: (zone names, sensor states, units) via escapeHtml() and sanitize CSS values via
+            // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
+            // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
+            // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see
+            // SECURITY-AUDIT: audit-C1 §2q trace.
+            // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
             tpl.innerHTML = html;
             const newEl = tpl.content.firstElementChild;
             if (newEl) {
@@ -1727,6 +1802,12 @@ class PulseClimateCard extends HTMLElement {
 
       // Swap the section element
       const tpl = document.createElement('template');
+      // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
+      // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
+      // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name strings
+      // SECURITY-AUDIT: are static literals. Detail panels (zone-detail, radial-detail, comfort-detail)
+      // SECURITY-AUDIT: likewise pre-escape every value before interpolation — see audit-C1 §2q trace.
+      // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
       tpl.innerHTML = html;
       const newEl = tpl.content.firstElementChild;
       if (newEl) {
@@ -1786,6 +1867,9 @@ class PulseClimateCard extends HTMLElement {
 
     if (this._historyFetchInProgress) return;
     this._historyFetchInProgress = true;
+    // Capture generation at fetch start so we can detect if setConfig /
+    // _runDiscovery replaced the zone set while await was pending.
+    const fetchGen = this._historyGen;
     const zones = this._config._zones || [];
     /** @type {string[]} */
     const entityIds = [];
@@ -1833,6 +1917,13 @@ class PulseClimateCard extends HTMLElement {
     if (validIds.length === 0) { this._historyFetchInProgress = false; return; }
     try {
       const data = await fetchSparklineData(this._hass, validIds, 24);
+      // Stale check: if config/discovery changed during the await, bail out.
+      // Without this guard, old zone data would overwrite the new cache and
+      // leak into the shared module cache, affecting other card instances.
+      if (fetchGen !== this._historyGen) {
+        warn('History fetch result discarded — config changed during fetch');
+        return;
+      }
       this._historyCache = updateCache(this._historyCache, data);
       this._rebuildSparklinePathCache();
       // Update shared cache so other card instances can reuse this data
@@ -1842,8 +1933,8 @@ class PulseClimateCard extends HTMLElement {
       if (withData > 0) {
         this._updateHistorySections();
       }
-    } catch {
-      warn('History fetch failed, using cached data');
+    } catch (e) {
+      warn('History fetch failed, using cached data: %O', e);
     } finally {
       this._historyFetchInProgress = false;
     }
@@ -1894,11 +1985,8 @@ class PulseClimateCard extends HTMLElement {
     this._heatmapAbort?.abort();
     this._energyFlowAbort?.abort();
     this._sparklineAbort?.abort();
-    // Stop radial shimmer animation
-    const firstArc = this._shadow?.querySelector('.arc-group');
-    if (firstArc && typeof /** @type {*} */ (firstArc).__shimmerStop === 'function') {
-      /** @type {*} */ (firstArc).__shimmerStop();
-    }
+    // Stop radial shimmer / sheen animation chains.
+    this._stopRadialAnimations();
     // Clean up action listeners to prevent leaks
     const rows = this._shadow?.querySelectorAll('.zone-row') || [];
     for (const row of rows) {

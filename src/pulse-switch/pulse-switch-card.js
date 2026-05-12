@@ -13,6 +13,7 @@ import {
   deriveTxEntityId,
   escapeHtml,
   estimatePps,
+  normalizePositiveNumber,
   resolveLabel,
   resolvePortType,
   resolveVirtualIcon,
@@ -88,7 +89,12 @@ class PulseSwitchCard extends HTMLElement {
     this._config = {
       ...DEFAULTS,
       ...config,
-      ports: config.ports,
+      columns: normalizePositiveNumber(config.columns, DEFAULTS.columns),
+      avg_packet_size: normalizePositiveNumber(config.avg_packet_size, DEFAULTS.avg_packet_size),
+      ports: config.ports.map((p) => ({
+        ...p,
+        link_speed: normalizePositiveNumber(p.link_speed, DEFAULT_LINK_SPEED),
+      })),
     };
 
     this._prevStates = {};
@@ -161,6 +167,11 @@ class PulseSwitchCard extends HTMLElement {
     }
 
     const tpl = document.createElement('template');
+    // SECURITY-AUDIT: fullHtml is built by _renderPortTile which escapes every attacker-controllable value
+    // SECURITY-AUDIT: (label from entity friendly_name / RouterOS comment attribute, data-entity attrs) via
+    // SECURITY-AUDIT: escapeHtml(). Port type / LED classes are enumerated literals; all pin / tab / icon
+    // SECURITY-AUDIT: markup is static.
+    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
     tpl.innerHTML = fullHtml;
     this._shadow.appendChild(tpl.content.cloneNode(true));
 
@@ -267,21 +278,26 @@ class PulseSwitchCard extends HTMLElement {
 
     const ps = this._resolvePortState(port);
 
-    // Update tile state class
-    els.tile.className = `port-tile ${ps.linkState}`;
+    // Update tile state class — use classList so unrelated classes
+    // (e.g. .has-ripple from attachRipple) survive state changes.
+    const tileStates = ['connected', 'disconnected', 'disabled', 'unavailable'];
+    for (const s of tileStates) els.tile.classList.toggle(s, s === ps.linkState);
 
     // Update port body class
     const body = els.tile.querySelector('.port-body');
     if (body) {
-      body.className = `port-body ${ps.portType} ${ps.linkState}`;
+      const portTypes = ['rj45', 'sfp', 'virtual'];
+      for (const t of portTypes) body.classList.toggle(t, t === ps.portType);
+      for (const s of tileStates) body.classList.toggle(s, s === ps.linkState);
     }
 
     // Update link LED
-    els.linkLed.className = `port-led link ${ps.linkState}`;
+    for (const s of tileStates) els.linkLed.classList.toggle(s, s === ps.linkState);
 
     // Update activity LED class (active/idle base state)
-    const actClass = ps.totalSpeed > 0 ? 'active' : 'idle';
-    els.actLed.className = `port-led activity ${actClass}`;
+    const isActive = ps.totalSpeed > 0;
+    els.actLed.classList.toggle('active', isActive);
+    els.actLed.classList.toggle('idle', !isActive);
 
     // Update ActivityLed animation
     const led = this._activityLeds[port.entity];

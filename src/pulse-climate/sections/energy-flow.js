@@ -90,7 +90,7 @@ export function renderEnergyFlowSection(zones, states, discovery) {
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
   html += `<div class="section-label">Energy Flow</div>`;
   if (hasAttribute) {
-    html += `<span style="font-size:11px;color:${sanitizeCssValue(HVAC_VISUALS.heating.fallback)};font-weight:500">${escapeHtml(totalPower)}% avg</span>`;
+    html += `<span class="energy-flow-header-value" style="font-size:11px;color:${sanitizeCssValue(HVAC_VISUALS.heating.fallback)};font-weight:500">${escapeHtml(totalPower)}% avg</span>`;
   }
   html += `</div>`;
 
@@ -178,7 +178,7 @@ export function renderEnergyFlowSection(zones, states, discovery) {
     const fanSourceY = sourceY + (i - (zoneData.length - 1) / 2) * fanSpacing;
     const ribbonPath = buildRibbonPath(fanSourceY, destY, ribbonW / 2, ribbonW / 2, svgW, sourceX + boilerW / 2, destX - 12);
 
-    html += `<path d="${ribbonPath}" fill="url(#flow-g${i})"${ribbonClass}${active ? ' filter="url(#flow-glow)"' : ''} data-zone="${escapeHtml(zone.name)}">`;
+    html += `<path d="${ribbonPath}" fill="url(#flow-g${i})"${ribbonClass}${active ? ' filter="url(#flow-glow)"' : ''} data-zone="${escapeHtml(zone.name)}" data-zone-idx="${i}">`;
     html += `<title>${escapeHtml(zone.name)}: ${Math.round(zone.power)}% heating power</title></path>`;
 
     // Particles — animated dots along the ribbon center path
@@ -189,7 +189,7 @@ export function renderEnergyFlowSection(zones, states, discovery) {
       const glowR = (r * 0.8).toFixed(1);
       const motionPath = buildRibbonCenterPath(fanSourceY, destY, sourceX + boilerW / 2, destX - 12);
 
-      html += `<g class="flow-particles" data-zone="${escapeHtml(zone.name)}" style="will-change:transform">`;
+      html += `<g class="flow-particles" data-zone="${escapeHtml(zone.name)}" data-zone-idx="${i}" style="will-change:transform">`;
       for (let p = 0; p < count; p++) {
         const beginOffset = (p * (dur / count)).toFixed(2);
         html += `<circle r="${r.toFixed(1)}" fill="${sanitizeCssValue(heatingColor)}" opacity="0.8"`;
@@ -269,7 +269,7 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
 
   // Update header avg power
   const totalPower = Math.round(zoneData.reduce((s, z) => s + z.power, 0) / zoneData.length);
-  const headerSpan = sectionEl.querySelector('.section-label + span, div > span');
+  const headerSpan = sectionEl.querySelector('.energy-flow-header-value');
   if (headerSpan) headerSpan.textContent = `${totalPower}% avg`;
 
   // Update boiler node tint
@@ -310,8 +310,9 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
     const titleEl = ribbon.querySelector('title');
     if (titleEl) titleEl.textContent = `${zone.name}: ${Math.round(zone.power)}% heating power`;
 
-    // Update particle group visibility
-    const particleGroup = svg.querySelector(`g.flow-particles[data-zone="${zone.name}"]`);
+    // Update particle group visibility — select by integer index to avoid
+    // CSS selector injection when zone names contain quotes / brackets.
+    const particleGroup = svg.querySelector(`g.flow-particles[data-zone-idx="${i}"]`);
     if (particleGroup) {
       /** @type {HTMLElement} */ (particleGroup).style.display = zone.power > 0 ? '' : 'none';
     }

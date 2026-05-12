@@ -201,6 +201,11 @@ class PulseCard extends HTMLElement {
     if (old) old.remove();
 
     const tpl = document.createElement('template');
+    // SECURITY-AUDIT: fullHtml is built by _renderBarRow which routes every user-controlled string through
+    // SECURITY-AUDIT: escapeHtml() / sanitizeCssValue() (shared/utils.js). Template interpolations consume only
+    // SECURITY-AUDIT: pre-sanitized values + trusted static markup; no attacker-reachable path bypasses
+    // SECURITY-AUDIT: escaping.
+    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
     tpl.innerHTML = fullHtml;
     this._shadow.appendChild(tpl.content.cloneNode(true));
 
@@ -566,6 +571,23 @@ class PulseCard extends HTMLElement {
   }
 
   /**
+   * Build sparkline SVG markup. Shared by the initial render
+   * (_buildSparklineHtml) and the post-fetch DOM injection path
+   * (_updateSparklines) so both paths produce byte-identical output
+   * for the same inputs.
+   * @param {{path: string, strokeWidth: number, color: string|null}} scfg
+   * @param {number} barWidthScale - 0..1, multiplied by 100 for width%.
+   * @param {boolean} [includeXmlns] - true when injecting via DOMParser.
+   * @returns {string}
+   */
+  _buildSparklineMarkup(scfg, barWidthScale, includeXmlns = false) {
+    const widthPct = `${barWidthScale * 100}%`;
+    const colorStyle = scfg.color ? `color:${sanitizeCssValue(scfg.color)};` : '';
+    const ns = includeXmlns ? ' xmlns="http://www.w3.org/2000/svg"' : '';
+    return `<svg${ns} class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" height="100%" style="width:${widthPct};${colorStyle}"><path d="${scfg.path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
+  }
+
+  /**
    * Build sparkline SVG HTML for a bar row.
    * @param {EntityConfig} ec
    * @param {NormalizedConfig} cfg
@@ -579,10 +601,11 @@ class PulseCard extends HTMLElement {
     const path = buildSparklinePath(data, 200, 50, scfg.slots, scfg.aggregateFunc, scfg.smoothing);
     if (!path) return '';
     const barWidthScale = computeBarWidthScale(ec, cfg);
-    const sparkWidth = barWidthScale * 100;
-    const colorStyle = scfg.color ? `color:${sanitizeCssValue(scfg.color)};` : '';
-    const widthStyle = `width:${sparkWidth}%;${colorStyle}`;
-    return `<svg class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" height="100%" style="${widthStyle}"><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
+    return this._buildSparklineMarkup(
+      { path, strokeWidth: scfg.strokeWidth, color: scfg.color },
+      barWidthScale,
+      false,
+    );
   }
 
   /**
@@ -671,8 +694,11 @@ class PulseCard extends HTMLElement {
         // Must use DOMParser to create proper SVG namespace elements (innerHTML creates HTMLUnknownElement).
         const container = row.querySelector('.bar-container');
         if (!container) continue;
-        const colorStyle = scfg.color ? `color:${sanitizeCssValue(scfg.color)};` : '';
-        const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" class="bar-sparkline" viewBox="0 0 200 50" preserveAspectRatio="none" height="100%" style="width:${sparkWidth};${colorStyle}"><path d="${path}" fill="none" stroke="currentColor" stroke-width="${scfg.strokeWidth}" /></svg>`;
+        const svgMarkup = this._buildSparklineMarkup(
+          { path, strokeWidth: scfg.strokeWidth, color: scfg.color },
+          barWidthScale,
+          true,
+        );
         const parsed = new DOMParser().parseFromString(svgMarkup, 'image/svg+xml');
         const svgEl = document.importNode(parsed.documentElement, true);
         const track = container.querySelector('.bar-track');

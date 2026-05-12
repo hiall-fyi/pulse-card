@@ -12,6 +12,17 @@ import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 
 /**
+ * Module-level counter for unique gradient ids. Prevents `graph-grad-${i}`
+ * collision when a single card renders stacked sub-graphs (temp + humidity)
+ * or multiple graph sections within the same shadow DOM.
+ */
+let _graphGradCounter = 0;
+function uniqueGraphGradId() {
+  _graphGradCounter = (_graphGradCounter + 1) >>> 0;
+  return `graph-grad-${_graphGradCounter.toString(36)}`;
+}
+
+/**
  * Resolve the color for a zone at a given index.
  * @param {number} index - Zone index.
  * @param {string[]} [palette] - Custom palette (falls back to CHART_PALETTE).
@@ -58,11 +69,15 @@ function renderFilledGraph(series, height, ariaLabel) {
     return svg;
   }
 
+  // Pre-allocate unique gradient ids for each series to prevent cross-graph
+  // collision when multiple graph SVGs live in the same shadow DOM (e.g.
+  // stacked mode renders temperature + humidity back-to-back).
+  const gradIds = filled.map(() => uniqueGraphGradId());
+
   let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="chart-svg" preserveAspectRatio="none">`;
   svg += '<defs>';
   for (let i = 0; i < filled.length; i++) {
-    const gradId = `graph-grad-${i}`;
-    svg += `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">`;
+    svg += `<linearGradient id="${gradIds[i]}" x1="0" y1="0" x2="0" y2="1">`;
     svg += `<stop offset="0%" stop-color="${sanitizeCssValue(filled[i].color)}" stop-opacity="0.25"/>`;
     svg += `<stop offset="100%" stop-color="${sanitizeCssValue(filled[i].color)}" stop-opacity="0"/>`;
     svg += `</linearGradient>`;
@@ -71,7 +86,7 @@ function renderFilledGraph(series, height, ariaLabel) {
 
   for (let i = 0; i < filled.length; i++) {
     const f = filled[i];
-    svg += `<path d="${f.areaPath}" fill="url(#graph-grad-${i})" />`;
+    svg += `<path d="${f.areaPath}" fill="url(#${gradIds[i]})" />`;
     svg += `<path d="${f.linePath}" fill="none" stroke="${sanitizeCssValue(f.color)}" stroke-width="var(--pulse-chart-line-width, 1.5)" data-entity="${escapeHtml(f.entityId)}" />`;
   }
   svg += '</svg>';

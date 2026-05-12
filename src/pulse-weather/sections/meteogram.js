@@ -6,7 +6,7 @@
  * Single SVG, single viewBox, uniform scaling — no preserveAspectRatio="none".
  */
 
-import { tempToColor, conditionIcon, escapeHtml, sanitizeCssValue } from '../weather-primitives.js';
+import { tempToColor, conditionIcon, escapeHtml, sanitizeCssValue, filterFinite, futureHourly, finiteNumber, uniqueSvgId } from '../weather-primitives.js';
 
 /**
  * @typedef {object} MeteogramPoint
@@ -84,6 +84,11 @@ export function slotX(i, n) {
  * @returns {number} Y coordinate in viewBox units.
  */
 export function tempY(temp, min, max) {
+  // If any input is non-finite (bad forecast data slipped past the filter),
+  // anchor the Y coordinate mid-curve rather than emitting NaN into path d=.
+  if (!Number.isFinite(temp) || !Number.isFinite(min) || !Number.isFinite(max)) {
+    return (CURVE_Y_START + CURVE_Y_END) / 2;
+  }
   const range = max - min || 1;
   return CURVE_Y_START + ((max - temp) / range) * (CURVE_Y_END - CURVE_Y_START);
 }
@@ -100,17 +105,18 @@ function formatHourLabel(dt) {
     const d = new Date(dt);
     if (isNaN(d.getTime())) return '';
     return String(d.getHours()).padStart(2, '0');
-  } catch {
+  } catch (e) {
+    console.debug('Pulse Weather: formatHourLabel fallback for', dt, e);
     return '';
   }
 }
 
-/**
- * Build meteogram data from hourly forecast.
- * @param {Array<Record<string, unknown>>} hourlyData - Raw hourly forecast entries.
- * @param {number} hours - Number of hours to display (default 24).
- * @returns {{points: Array<object>, n: number, min: number, max: number, minIdx: number, maxIdx: number, maxPrecipMm: number, hasCloud: boolean, hasLayeredCloud: boolean, hasWind: boolean}|null}
- */
+/** Safety cap: pathological extended-forecast arrays can carry thousands of
+ * entries; spreading all of them into Math.min/max hits V8's argument limit.
+ * 500 is well above the hourly.hours upper bound of 48, with generous
+ * headroom for higher-granularity sources. */
+const MAX_RAW_FORECAST_ENTRIES = 500;
+
 /**
  * Build meteogram data from hourly forecast.
  * @param {Array<Record<string, *>>} hourlyData - Raw hourly forecast data.
@@ -118,11 +124,11 @@ function formatHourLabel(dt) {
  * @returns {MeteogramData|null} Processed data or null if insufficient data.
  */
 export function buildMeteogramData(hourlyData, hours = 24) {
-  const nowMs = Date.now();
-  const future = hourlyData.filter((h) => {
-    const dt = new Date(String(h.datetime || ''));
-    return !isNaN(dt.getTime()) && dt.getTime() >= nowMs - 3600000;
-  });
+  if (!Array.isArray(hourlyData)) return null;
+  // Cap the input array first so the filter/sort/spread below can never fan
+  // tens of thousands of args into Math.min(...arr).
+  const capped = hourlyData.slice(0, MAX_RAW_FORECAST_ENTRIES);
+  const future = futureHourly(capped, new Date());
 
   const raw = future.slice(0, hours);
   if (raw.length < 2) return null;
@@ -132,12 +138,12 @@ export function buildMeteogramData(hourlyData, hours = 24) {
   const hasLayeredCloud = 'cloud_cover_low' in sample && 'cloud_cover_mid' in sample && 'cloud_cover_high' in sample;
   const hasWind = 'wind_speed' in sample && ('wind_bearing' in sample || 'wind_direction' in sample);
 
-  const points = raw.map((h) => {
-    const temp = Number(h.temperature) || 0;
-    const precip = Number(h.precipitation_probability) || 0;
-    const snowfall = Number(h.snowfall) || 0;
-    const rain = Number(h.rain) || 0;
-    const showers = Number(h.showers) || 0;
+  const rawPoints = raw.map((h) => {
+    const temp = Number(h.temperature);
+    const precip = finiteNumber(h.precipitation_probability, 0);
+    const snowfall = finiteNumber(h.snowfall, 0);
+    const rain = finiteNumber(h.rain, 0);
+    const showers = finiteNumber(h.showers, 0);
     const condition = String(h.condition || '');
     const precipType = snowfall > 0 || condition === 'snowy' || condition === 'snowy-rainy' ? 'snow' : 'rain';
     const precipMm = precipType === 'snow' ? snowfall : rain + showers;
@@ -148,16 +154,21 @@ export function buildMeteogramData(hourlyData, hours = 24) {
       precipMm,
       precipType,
       condition,
-      cloudCover: hasCloud ? Number(h.cloud_cover) || 0 : null,
-      cloudLow: hasLayeredCloud ? Number(h.cloud_cover_low) || 0 : null,
-      cloudMid: hasLayeredCloud ? Number(h.cloud_cover_mid) || 0 : null,
-      cloudHigh: hasLayeredCloud ? Number(h.cloud_cover_high) || 0 : null,
-      windSpeed: hasWind ? Number(h.wind_speed) || 0 : null,
-      windBearing: hasWind ? Number(h.wind_bearing ?? h.wind_direction) || 0 : null,
+      cloudCover: hasCloud ? finiteNumber(h.cloud_cover, 0) : null,
+      cloudLow: hasLayeredCloud ? finiteNumber(h.cloud_cover_low, 0) : null,
+      cloudMid: hasLayeredCloud ? finiteNumber(h.cloud_cover_mid, 0) : null,
+      cloudHigh: hasLayeredCloud ? finiteNumber(h.cloud_cover_high, 0) : null,
+      windSpeed: hasWind ? finiteNumber(h.wind_speed, 0) : null,
+      windBearing: hasWind ? finiteNumber(h.wind_bearing ?? h.wind_direction, 0) : null,
       timeLabel: formatHourLabel(String(h.datetime || '')),
       datetime: String(h.datetime || ''),
     };
   });
+
+  // Drop entries where temperature isn't finite — one NaN poisons Math.min/max
+  // and flows NaN into every SVG coordinate downstream.
+  const points = filterFinite(rawPoints, (p) => p.temp);
+  if (points.length < 2) return null;
 
   const temps = points.map((p) => p.temp);
   const minTemp = Math.min(...temps);
@@ -296,7 +307,7 @@ function renderTempCurve(data, _showDots) {
 
   const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(1)},${CURVE_Y_END} L${coords[0].x.toFixed(1)},${CURVE_Y_END} Z`;
 
-  const gradId = 'pw-meteogram-grad';
+  const gradId = uniqueSvgId('pw-meteogram-grad');
   const maxColor = tempToColor(max);
   const minColor = tempToColor(min);
 
@@ -439,12 +450,14 @@ export function renderMeteogram({ config, forecastData }) {
     ? ` style="height: ${sanitizeCssValue(String(config.meteogram_height))}"`
     : '';
 
+  const titleId = uniqueSvgId('pw-meteogram-title');
+
   return `
     <div class="pw-section pw-meteogram">
       <div class="pw-section-header">
-        <span class="pw-section-title" id="pw-meteogram-title">Meteogram</span>
+        <span class="pw-section-title" id="${titleId}">Meteogram</span>
       </div>
-      <div class="pw-meteogram-chart" aria-labelledby="pw-meteogram-title"${heightStyle}>
+      <div class="pw-meteogram-chart" aria-labelledby="${titleId}"${heightStyle}>
         <svg viewBox="0 0 ${VB_WIDTH} ${VB_HEIGHT}" style="width:100%; height:auto" role="img" aria-label="${escapeHtml(ariaLabel)}">
           <title>${escapeHtml(titleText)}</title>
           ${layers.join('\n')}

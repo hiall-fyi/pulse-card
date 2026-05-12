@@ -4,7 +4,7 @@
  * contextual weather summary, day progress arc, and tier-coloured stats.
  */
 
-import { tempToColor, uvColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, statHtml, cloudCoverColor, dewPointComfortColor, getSkyTheme, SKY_THEMES } from '../weather-primitives.js';
+import { tempToColor, uvColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, statHtml, cloudCoverColor, dewPointComfortColor, getSkyTheme, SKY_THEMES, uniqueSvgId, futureHourly as filterFutureHourly } from '../weather-primitives.js';
 import { intensityRatio, tensionGlow, tensionVignette } from '../../shared/visual-tension.js';
 import { ATMOS_CE_TIER_MAP } from './atmosphere.js';
 import { LIFTED_INDEX_TIERS } from '../constants.js';
@@ -126,7 +126,12 @@ export function buildWeatherSummary({ precipNow, precipLabel, slots, windSpeed, 
  * @returns {{svgPath: string, areaPath: string, peakValue: number, peakIndex: number, maxCape: number}} Sparkline data.
  */
 export function buildCapeSparklineSvg(slots, width, height) {
-  const values = slots.map((h) => Number(h.cape) || 0);
+  // Coerce NaN/Infinity to 0 before Math.max — Math.max(...[NaN]) is NaN
+  // which poisons every downstream coordinate.
+  const values = slots.map((h) => {
+    const n = Number(h.cape);
+    return Number.isFinite(n) ? n : 0;
+  });
   const maxCape = Math.max(...values, 300);
   const peakValue = Math.max(...values);
   const peakIndex = values.indexOf(peakValue);
@@ -233,9 +238,64 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
   const visUnit = unit('visibility', 'km');
   const pressUnit = unit('pressure', 'hPa');
   const dewUnit = unit('dew_point', '°C');
-  const forecast = /** @type {Array<Record<string, unknown>>|undefined} */ (attrs.forecast);
-  const tempLow = Number(forecast?.[0]?.templow ?? temp - 5);
-  const tempHigh = Number(forecast?.[0]?.temperature ?? temp + 5);
+  // Resolve today's L / H. Preference order:
+  //   1. Daily forecast slot [0] — HA's standard shape exposes
+  //      `templow` (day min) + `temperature` (day max) for daily type.
+  //   2. Scan hourly forecast for today's entries and take min/max.
+  //   3. Legacy attrs.forecast (only populated on a few older
+  //      integrations; hourly attrs flat-out have no templow and
+  //      `temperature` ≈ current, which causes L === H bug).
+  //   4. Collapse to current temp when nothing usable — better than
+  //      fabricating a ±5° range that misleads users.
+  const dailyForecast = /** @type {Array<Record<string, unknown>>|undefined} */ (forecastData?.daily);
+  const hourlyForecast = /** @type {Array<Record<string, unknown>>|undefined} */ (forecastData?.hourly);
+  const legacyForecast = /** @type {Array<Record<string, unknown>>|undefined} */ (attrs.forecast);
+
+  /** @type {number} */
+  let tempLow = temp;
+  /** @type {number} */
+  let tempHigh = temp;
+
+  if (dailyForecast && dailyForecast.length > 0) {
+    // Daily forecast shape: templow = min, temperature = max for that day.
+    const d0 = dailyForecast[0];
+    const dLow = Number(d0.templow);
+    const dHigh = Number(d0.temperature);
+    if (Number.isFinite(dLow) && Number.isFinite(dHigh)) {
+      tempLow = Math.min(dLow, dHigh);
+      tempHigh = Math.max(dLow, dHigh);
+    }
+  } else if (hourlyForecast && hourlyForecast.length > 0) {
+    // Derive today's window from hourly forecasts. Scan the next
+    // 24 slots (or until we cross midnight) and pick min / max of
+    // the `temperature` field.
+    const now = Date.now();
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+    const endMs = endOfDay.getTime();
+    let mn = Infinity;
+    let mx = -Infinity;
+    for (const slot of hourlyForecast.slice(0, 24)) {
+      const slotTs = Date.parse(String(slot.datetime ?? ''));
+      if (Number.isFinite(slotTs) && (slotTs < now || slotTs > endMs)) continue;
+      const v = Number(slot.temperature);
+      if (!Number.isFinite(v)) continue;
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+    if (Number.isFinite(mn) && Number.isFinite(mx) && mn !== mx) {
+      tempLow = Math.min(mn, temp);
+      tempHigh = Math.max(mx, temp);
+    }
+  } else if (legacyForecast && legacyForecast.length > 0) {
+    const f0 = legacyForecast[0];
+    const fLow = Number(f0.templow);
+    const fHigh = Number(f0.temperature);
+    if (Number.isFinite(fLow) && Number.isFinite(fHigh)) {
+      tempLow = Math.min(fLow, fHigh);
+      tempHigh = Math.max(fLow, fHigh);
+    }
+  }
 
   // UV from Atmos CE or weather entity
   const uvSensor = discovery.atmosCe.uv_index;
@@ -391,7 +451,9 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
   const gustStr = showGust
     ? (gustBold ? ` / <b>${escapeHtml(Math.round(windGusts))}</b>` : ` / ${escapeHtml(Math.round(windGusts))}`)
     : '';
-  const compassSvg = `<svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;transform:rotate(${Number(windBearing)}deg)"><polygon points="5,0 3,8 5,6 7,8" fill="${sanitizeCssValue(windColor)}" opacity="0.8"/></svg>`;
+  // Number(undefined) === NaN makes CSS drop the whole transform; use the
+  // || 0 fallback so the compass still renders as N rather than unrotated.
+  const compassSvg = `<svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;transform:rotate(${Number(windBearing) || 0}deg)"><polygon points="5,0 3,8 5,6 7,8" fill="${sanitizeCssValue(windColor)}" opacity="0.8"/></svg>`;
   const windValue = `${escapeHtml(Math.round(windSpeed))}${gustStr} ${compassSvg}${escapeHtml(dirLabel)}`;
 
   // ── Dynamic temp arc (Task 4) ─────────────────────────────────────
@@ -542,7 +604,13 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
   const hourly = forecastData?.hourly || [];
   if (hourly.length > 0) {
     const now = new Date();
-    const futureHourly = hourly.filter((h) => new Date(/** @type {string} */ (h.datetime)) >= now);
+    // Shared helper: include current hour (1h buffer), drop unparseable
+    // datetimes. Matches forecast.js and meteogram.js so the "next" hour
+    // shown across sections is consistent.
+    const futureHourly = filterFutureHourly(
+      /** @type {Array<Record<string, *>>} */ (hourly),
+      now,
+    );
     const slots = futureHourly.slice(0, 12);
     const hasAnyPrecip = slots.some((h) => Number(h.precipitation_probability) > 0);
 
@@ -607,20 +675,21 @@ export function renderOverview({ hass, config: _config, discovery, weatherEntity
         ? `${String(peakDt.getHours()).padStart(2, '0')}:${String(peakDt.getMinutes()).padStart(2, '0')}`
         : '';
 
+      const capeGradId = uniqueSvgId('pw-cape-grad');
       capeBarHtml = `
       <div style="position: relative; z-index: 2; margin: 4px 20px 0;">
         <div class="pw-precip-label" style="font-size:10px">Storm risk</div>
         <div style="position:relative">
           <svg class="pw-cape-sparkline" width="100%" height="${sparkH}" viewBox="0 0 ${sparkW} ${sparkH}" preserveAspectRatio="none">
             <defs>
-              <linearGradient id="capeGrad" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="${capeGradId}" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="#ff453a" stop-opacity="0.6"/>
                 <stop offset="33%" stop-color="#ff9f0a" stop-opacity="0.4"/>
                 <stop offset="66%" stop-color="#ffd60a" stop-opacity="0.3"/>
                 <stop offset="100%" stop-color="#30d158" stop-opacity="0.2"/>
               </linearGradient>
             </defs>
-            <path d="${spark.areaPath}" fill="url(#capeGrad)"/>
+            <path d="${spark.areaPath}" fill="url(#${capeGradId})"/>
             <path d="${spark.svgPath}" fill="none" stroke="#ff9f0a" stroke-width="1.5"/>
           </svg>
           ${spark.peakValue > 0 ? `<div class="pw-cape-peak" style="left:${Number(peakX)}px">${escapeHtml(peakLabel)} ${escapeHtml(peakTime)}</div>` : ''}

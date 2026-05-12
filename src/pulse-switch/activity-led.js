@@ -90,14 +90,25 @@ export class ActivityLed {
    * @param {number} offMs
    */
   _ensureBlink(onMs, offMs) {
+    // Defence in depth: if upstream math produced NaN/Infinity (e.g. from bad
+    // config that slipped past normalization), drop back to solid-off rather
+    // than scheduling a busy-loop via setTimeout(fn, NaN).
+    if (!Number.isFinite(onMs) || !Number.isFinite(offMs) || onMs <= 0 || offMs < 0) {
+      this._stopBlink();
+      this._setOff();
+      return;
+    }
     const roundedOn = Math.round(onMs);
     const roundedOff = Math.round(offMs);
     if (this._timer && this._currentOnMs === roundedOn && this._currentOffMs === roundedOff) {
       return; // timing unchanged, keep current blink cycle
     }
+    // Stop first (clears _currentOnMs/_currentOffMs to 0), then cache the
+    // new timing — otherwise _stopBlink() would wipe the just-assigned
+    // cache and every subsequent call with matching timing would restart.
+    this._stopBlink();
     this._currentOnMs = roundedOn;
     this._currentOffMs = roundedOff;
-    this._stopBlink();
     const tick = () => {
       // ±20% jitter on each cycle to simulate natural packet timing variance
       const jitterOn = roundedOn * (0.8 + Math.random() * 0.4);

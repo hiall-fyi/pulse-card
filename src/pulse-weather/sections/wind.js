@@ -5,7 +5,7 @@
  */
 
 import {
-  windTier, beaufort, compassLabel, svgEl, escapeHtml, sanitizeCssValue,
+  windTier, beaufort, compassLabel, svgEl, escapeHtml, sanitizeCssValue, hexToRgba,
 } from '../weather-primitives.js';
 import { SPEED_CAP, MAX_STREAKS, SHAKE_THRESHOLD, TIER_COLORS } from '../constants.js';
 
@@ -109,7 +109,7 @@ function buildArrow(displaySpeed, rad, speedRatio, tierColor) {
   const anim = swayAngle > SWAY_THRESHOLD
     ? `animation:pw-arrowSway ${swayDur.toFixed(2)}s ease-in-out infinite;--sway-fwd:${(swayAngle * SWAY_FWD_RATIO).toFixed(2)}deg;--sway-back:${(-swayAngle * (1 - SWAY_FWD_RATIO)).toFixed(2)}deg`
     : '';
-  const style = `transform-origin:${ROSE_CX}px ${ROSE_CY}px;filter:drop-shadow(0 0 6px ${tierColor}60);${anim}`;
+  const style = `transform-origin:${ROSE_CX}px ${ROSE_CY}px;filter:drop-shadow(0 0 6px ${hexToRgba(tierColor, 0.38)});${anim}`;
 
   const body = svgEl('path', {
     d: `M${ROSE_CX},${ROSE_CY} L${bodyL.x.toFixed(1)},${bodyL.y.toFixed(1)} L${tip.x.toFixed(1)},${tip.y.toFixed(1)} L${bodyR.x.toFixed(1)},${bodyR.y.toFixed(1)} Z`,
@@ -184,7 +184,7 @@ export function renderWind({ hass, config, discovery, weatherEntity }) {
     const sy = (startD * wv.y + spread * py).toFixed(1);
     const ex = (endD * wv.x + spread * px).toFixed(1);
     const ey = (endD * wv.y + spread * py).toFixed(1);
-    streaks.push(`<div class="pw-streak" style="left:50%;top:50%;width:${w}px;height:1px;transform:rotate(${bearing - 90}deg);animation-duration:${dur}s;animation-delay:${delay}s;opacity:${op};background:linear-gradient(to right, transparent, ${tierColor}44, transparent);--sx:${sx}px;--sy:${sy}px;--ex:${ex}px;--ey:${ey}px"></div>`);
+    streaks.push(`<div class="pw-streak" style="left:50%;top:50%;width:${w}px;height:1px;transform:rotate(${bearing - 90}deg);animation-duration:${dur}s;animation-delay:${delay}s;opacity:${op};background:linear-gradient(to right, transparent, ${hexToRgba(tierColor, 0.27)}, transparent);--sx:${sx}px;--sy:${sy}px;--ex:${ex}px;--ey:${ey}px"></div>`);
   }
 
   // ── Rose SVG (matching prototype) ─────────────────────────────────

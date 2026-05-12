@@ -3,7 +3,7 @@
  * @description Hourly strip, daily rows, temperature sparkline, and mode tabs.
  */
 
-import { tempToColor, conditionIcon, escapeHtml, sanitizeCssValue } from '../weather-primitives.js';
+import { tempToColor, conditionIcon, escapeHtml, sanitizeCssValue, filterFinite, finiteNumber, uniqueSvgId, futureHourly as filterFutureHourly } from '../weather-primitives.js';
 import { intensityRatio, tensionGlow } from '../../shared/visual-tension.js';
 
 /**
@@ -17,7 +17,9 @@ function formatHour(dt, isNow) {
   try {
     const d = new Date(dt);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-  } catch {  
+  } catch (e) {
+    // Invalid Date → toLocaleTimeString throws RangeError in some engines.
+    console.debug('Pulse Weather: formatHour fallback for', dt, e);
     return '';
   }
 }
@@ -32,7 +34,8 @@ function formatDay(dt, index) {
   if (index === 0) return 'Today';
   try {
     return new Date(dt).toLocaleDateString([], { weekday: 'short' });
-  } catch {  
+  } catch (e) {
+    console.debug('Pulse Weather: formatDay fallback for', dt, e);
     return '';
   }
 }
@@ -45,8 +48,12 @@ function formatDay(dt, index) {
  * @returns {{linePath: string, areaPath: string, min: number, max: number}}
  */
 function buildSparkline(data, width, height) {
-  if (!data || data.length < 2) return { linePath: '', areaPath: '', min: 0, max: 0 };
-  const temps = data.map((d) => Number(d.temperature) || 0);
+  if (!data) return { linePath: '', areaPath: '', min: 0, max: 0 };
+  // Drop entries where temperature isn't a finite number. A single Infinity
+  // collapses Math.max/min and renders a path full of NaN coordinates.
+  const finite = filterFinite(data, (d) => Number(d.temperature));
+  if (finite.length < 2) return { linePath: '', areaPath: '', min: 0, max: 0 };
+  const temps = finite.map((d) => Number(d.temperature));
   const min = Math.min(...temps);
   const max = Math.max(...temps);
   const range = max - min || 1;
@@ -92,16 +99,13 @@ export function renderForecast({ hass, config, discovery, forecastData }) {
   // Hourly strip
   let hourlyHtml = '';
   if (showHourly && hourly.length > 0) {
-    // Filter to current hour and future only
-    const nowMs = Date.now();
-    const futureHourly = hourly.filter((h) => {
-      const dt = new Date(String(h.datetime || ''));
-      return !isNaN(dt.getTime()) && dt.getTime() >= nowMs - 3600000; // include current hour
-    });
+    // Filter to current hour and future only. Shared helper so overview /
+    // forecast / meteogram agree on which entry is "next".
+    const futureHourly = filterFutureHourly(/** @type {Array<Record<string, *>>} */ (hourly));
 
     const cols = futureHourly.slice(0, 24).map((h, i) => {
-      const temp = Number(h.temperature) || 0;
-      const precip = Number(h.precipitation_probability) || 0;
+      const temp = finiteNumber(h.temperature, 0);
+      const precip = finiteNumber(h.precipitation_probability, 0);
       const precipI = intensityRatio(precip, 0, 100);
       const precipBg = precipI > 0.1 ? ` style="background: rgba(90,200,250,${(precipI * 0.12).toFixed(3)})"` : '';
       return `
@@ -117,17 +121,18 @@ export function renderForecast({ hass, config, discovery, forecastData }) {
     const sparkW = 300;
     const sparkH = 40;
     const spark = buildSparkline(/** @type {Array<{temperature: number}>} */ (futureHourly.slice(0, 24)), sparkW, sparkH);
+    const sparkGradId = uniqueSvgId('pw-spark-grad');
     const sparkSvg = spark.linePath ? `
       <div class="pw-sparkline-wrap">
         <svg width="100%" height="${sparkH}" viewBox="0 0 ${sparkW} ${sparkH}" preserveAspectRatio="none" role="img" aria-label="Temperature trend">
           <title>Temperature sparkline</title>
           <defs>
-            <linearGradient id="pw-spark-grad" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="${sparkGradId}" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="${sanitizeCssValue(tempToColor(spark.max))}" stop-opacity="0.3"/>
               <stop offset="100%" stop-color="${sanitizeCssValue(tempToColor(spark.min))}" stop-opacity="0.05"/>
             </linearGradient>
           </defs>
-          <path d="${escapeHtml(spark.areaPath)}" fill="url(#pw-spark-grad)"/>
+          <path d="${escapeHtml(spark.areaPath)}" fill="url(#${sparkGradId})"/>
           <path d="${escapeHtml(spark.linePath)}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
         </svg>
       </div>` : '';
@@ -140,15 +145,15 @@ export function renderForecast({ hass, config, discovery, forecastData }) {
   // Daily rows
   let dailyHtml = '';
   if (showDaily && daily.length > 0) {
-    const allTemps = daily.map((d) => [Number(d.temperature) || 0, Number(d.templow) || 0]).flat();
+    const allTemps = daily.flatMap((d) => [finiteNumber(d.temperature, 0), finiteNumber(d.templow, 0)]);
     const globalMin = Math.min(...allTemps);
     const globalMax = Math.max(...allTemps);
     const globalRange = globalMax - globalMin || 1;
 
     const rows = daily.slice(0, 7).map((d, i) => {
-      const high = Number(d.temperature) || 0;
-      const low = Number(d.templow) || 0;
-      const precip = Number(d.precipitation_probability) || 0;
+      const high = finiteNumber(d.temperature, 0);
+      const low = finiteNumber(d.templow, 0);
+      const precip = finiteNumber(d.precipitation_probability, 0);
       const barLeft = ((low - globalMin) / globalRange) * 100;
       const barWidth = ((high - low) / globalRange) * 100;
       const precipI = intensityRatio(precip, 0, 100);

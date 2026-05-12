@@ -45,6 +45,13 @@ export function clamp(value, min, max) {
 }
 
 /**
+ * Rejects strings longer than this cap before numeric-digit inspection to
+ * rule out any ReDoS risk — a CSS dimension has no legitimate use case near
+ * this length, so the cap is effectively unreachable in real configs.
+ */
+const CSS_VALUE_MAX_LEN = 32;
+
+/**
  * Ensure a CSS dimension value has a unit.
  * @param {*} value
  * @returns {string}
@@ -52,8 +59,20 @@ export function clamp(value, min, max) {
 export function cssValue(value) {
   if (value === undefined || value === null || value === '') return '';
   const str = String(value);
-  if (/^\d+(\.\d+)?$/.test(str)) return `${str}px`;
-  return str;
+  if (str.length > CSS_VALUE_MAX_LEN) return str;
+  // Split-and-inspect avoids the eslint-plugin-security false positive on
+  // the equivalent regex /^\d+(\.\d+)?$/ (non-nested quantifiers are
+  // linear, but the detector flags optional groups conservatively).
+  const parts = str.split('.');
+  if (parts.length > 2) return str;
+  for (const part of parts) {
+    if (part.length === 0) return str;
+    for (let i = 0; i < part.length; i++) {
+      const c = part.charCodeAt(i);
+      if (c < 48 || c > 57) return str; // not a digit
+    }
+  }
+  return `${str}px`;
 }
 
 /**

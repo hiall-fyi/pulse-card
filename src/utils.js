@@ -575,8 +575,10 @@ export async function fetchSparklineData(hass, entityIds, hoursToShow = 24) {
           }
         }
         results[eid] = points;
-      } catch {
-        // Isolate per-entity parsing errors so one bad entity doesn't block others
+      } catch (e) {
+        // Isolate per-entity parsing errors so one bad entity doesn't block others.
+        // Log so HA history-format drift is diagnosable instead of silently empty.
+        warn('Sparkline parse failed for %s: %O', eid, e);
         results[eid] = [];
       }
     }

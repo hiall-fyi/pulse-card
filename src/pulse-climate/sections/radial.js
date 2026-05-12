@@ -120,9 +120,17 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   html += `<div class="section-label">${escapeHtml(sectionLabel)}</div>`;
   html += `<div class="radial-container">`;
 
+  // Per-render unique suffix prevents <defs> id collisions across multiple
+  // card instances on the same dashboard. Without this, two cards on one
+  // page share `id="radial-glow"` and url(#radial-glow) in the second card
+  // resolves to the first card's filter (wrong stdDeviation if sizes differ).
+  const instanceId = `r${Math.random().toString(36).slice(2, 9)}`;
+  const glowId = `radial-glow-${instanceId}`;
+  const shimmerId = (/** @type {number} */ i) => `heat-shimmer-${instanceId}-${i}`;
+
   html += `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${escapeHtml(sectionLabel)}" style="display:block;margin:0 auto">`;
   html += `<defs>`;
-  html += `<filter id="radial-glow"><feGaussianBlur stdDeviation="${computeGlowStdDev(size, 280).toFixed(1)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  html += `<filter id="${glowId}"><feGaussianBlur stdDeviation="${computeGlowStdDev(size, 280).toFixed(1)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
 
   // Heat shimmer filters — per-zone <filter> with <feTurbulence> + <feDisplacementMap>
   if (!reducedMotion) {
@@ -136,7 +144,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       const bfX = (0.02 * freqScale).toFixed(4);
       const bfY = (0.04 * freqScale).toFixed(4);
 
-      html += `<filter id="heat-shimmer-${i}" x="-5%" y="-5%" width="110%" height="110%">`;
+      html += `<filter id="${shimmerId(i)}" x="-5%" y="-5%" width="110%" height="110%">`;
       html += `<feTurbulence type="turbulence" baseFrequency="${bfX} ${bfY}" numOctaves="2" result="turb">`;
       html += `<animate attributeName="baseFrequency" values="${bfX} ${bfY};${(parseFloat(bfX) * 1.5).toFixed(4)} ${bfY};${bfX} ${bfY}" dur="4s" repeatCount="indefinite"/>`;
       html += `</feTurbulence>`;
@@ -182,9 +190,9 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       // Shimmer takes precedence over glow for high-power zones
       const shimmerScale = computeShimmerScale(z.power, size);
       if (shimmerScale > 0 && !reducedMotion) {
-        html += ` filter="url(#heat-shimmer-${i})"`;
+        html += ` filter="url(#${shimmerId(i)})"`;
       } else if (isActive) {
-        html += ` filter="url(#radial-glow)"`;
+        html += ` filter="url(#${glowId})"`;
       }
       html += `><title>${titleText}</title>`;
       if (isActive && !reducedMotion) {

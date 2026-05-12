@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.4.0] - 2026-05-12
+
+**Security, reliability, and diagnostics — chip text hardening, animation timer cleanup, and the Climate Card now tells you when something's wrong instead of silently breaking.**
+
+### Security
+
+- **Chip text hardening on the Climate Card** — environment, thermal, and schedule chips now escape the unit suffix (°C, %, etc.) before rendering. Units are read from Home Assistant entity attributes, which can be overridden via `customize.yaml`, so the extra escape step keeps the chips safe if an unusual value ever turns up there
+- **URL scheme whitelist on tap actions** — tap, hold, and double-tap actions that navigate or open a URL now only allow `http://`, `https://`, and `/local` paths. This prevents a crafted YAML config from triggering unexpected protocols
+
+### Bug Fixes
+
+- **Climate Card no longer leaks animation timers** — the shimmer sweep and glass sheen on the radial view now stop cleanly when you edit the card config, refresh the dashboard, or navigate away. On long-running dashboards this prevents a gradual slowdown as orphaned animation timers used to pile up in the background
+- **Climate Card detail tooltips no longer stack on reconnect** — tap/hover interactions on thermal strips, comfort heatmaps, and zone sparklines now correctly clean up their listeners when the dashboard reloads, so tooltips no longer fire twice after an HA restart
+- **Climate Card history never shows stale data** — if you edit the card config or change zones while a history fetch is in flight, the in-flight result is discarded instead of overwriting the new cache. Other Pulse Climate Cards on the same dashboard are no longer affected either
+- **Climate Card radial view no longer bleeds filter effects between cards** — if you had two Pulse Climate Cards on the same dashboard at different sizes, the second card's glow and heat-shimmer effects could silently pick up the first card's settings. Each card now owns its own filter definitions
+- **Climate Card stacked graphs no longer collide in shadow DOM** — when the graph section was set to `stacked: true`, the temperature and humidity sub-graphs could share gradient IDs, causing subtle colour bleed. Each sub-graph now gets a unique ID
+- **Climate Card history alerts no longer silently downgrade severity** — if the Atmos CE integration ever emitted an alert with an unparseable severity value, the card silently rendered it as level 1. Now only truthy numeric levels are accepted
+- **Energy flow section handles unusual zone names** — zones with quotes or brackets in the name no longer break the section's internal selector logic
+
+### Improvements
+
+- **Diagnostic logging for Bar Card sparklines** — if Home Assistant's history format ever changes in a way the card can't parse, you'll now see a console warning pointing at the specific entity instead of a silently-empty sparkline
+- **Climate Card warns when a section option is not a number** — if you accidentally write something like `radial: { size: auto }` instead of a number, the card now logs a clear warning instead of silently substituting the default
+- **Manual entity overrides now warn on typos** — if you set `battery_entity: sensor.does_not_exist` on a zone, you'll see a console warning naming the zone and the missing entity, so the silent "chip disappeared" case is diagnosable
+- **Hardened internal helpers against future misuse** — thermal particle backgrounds and SVG attribute builders now sanitize their inputs internally
+
+
 ## [1.3.2] - 2026-05-07
 
 **Colour token sweep — chip colours, ranking highlights, and comfort bars now follow your HA theme automatically.**
