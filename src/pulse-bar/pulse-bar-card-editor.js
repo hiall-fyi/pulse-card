@@ -8,7 +8,7 @@
 
 import { LitElement, html, css, nothing } from 'lit';
 import { DEFAULTS } from './constants.js';
-import { loadEditorHelpers, renderReorderButtons, computeLabel } from './shared/editor-helpers.js';
+import { loadEditorHelpers, renderReorderButtons, computeLabel, SHARED_EDITOR_STYLES } from '../shared/editor-helpers.js';
 
 /** Default swatch color — resolves HA theme primary text color, falls back to HA blue. */
 function getDefaultSwatch() {
@@ -197,10 +197,10 @@ const SCHEMA_ADVANCED = [
  */
 
 /**
- * PulseCardEditor — visual config editor for Pulse Card.
+ * PulseBarCardEditor — visual config editor for Pulse Card.
  * LitElement-based, following HA Core + Mushroom patterns.
  */
-class PulseCardEditor extends LitElement {
+class PulseBarCardEditor extends LitElement {
   /** @type {boolean} Whether HA card helpers have been loaded (prevents re-loading). */
   _helpersLoaded = false;
 
@@ -632,13 +632,13 @@ class PulseCardEditor extends LitElement {
     };
 
     return html`
-      <div class="editor">
+      <div class="pb-editor">
         <h3>Entities</h3>
-        <div class="entities">
+        <div class="pb-editor-entities">
           ${entities.map(
             (/** @type {EditorEntityEntry} */ ec, /** @type {number} */ i) => html`
-              <div class="entity-row">
-                <div class="entity-row-main">
+              <div class="pb-editor-entity-row">
+                <div class="pb-editor-entity-row-main">
                   <ha-entity-picker
                     .hass=${hass}
                     .value=${ec.entity}
@@ -652,13 +652,13 @@ class PulseCardEditor extends LitElement {
                     (idx) => this._removeEntity(idx),
                   )}
                 </div>
-                <div class="entity-row-fields">
+                <div class="pb-editor-entity-row-fields">
                   <ha-textfield
                     .label=${'Name'}
                     .value=${ec.name || ''}
                     @input=${(/** @type {Event} */ ev) => this._entityFieldChanged(i, 'name', ev)}
                   ></ha-textfield>
-                  <div class="color-field">
+                  <div class="pb-editor-color-field">
                     <ha-textfield
                       .label=${'Color'}
                       .value=${ec.color || ''}
@@ -671,7 +671,7 @@ class PulseCardEditor extends LitElement {
                     />
                   </div>
                 </div>
-                <div class="entity-row-fields">
+                <div class="pb-editor-entity-row-fields">
                   <ha-textfield
                     .label=${'Secondary Text'}
                     .value=${ec.secondary_info?.text || ''}
@@ -683,8 +683,8 @@ class PulseCardEditor extends LitElement {
                     @input=${(/** @type {Event} */ ev) => this._entitySecondaryChanged(i, 'attribute', ev)}
                   ></ha-textfield>
                 </div>
-                <div class="entity-row-fields">
-                  <label class="interactive-toggle">
+                <div class="pb-editor-entity-row-fields">
+                  <label class="pb-editor-interactive-toggle">
                     <span>Interactive</span>
                     <ha-switch
                       .checked=${!!ec.interactive}
@@ -706,7 +706,7 @@ class PulseCardEditor extends LitElement {
           )}
         </div>
         <ha-entity-picker
-          class="add-entity"
+          class="pb-editor-add-entity"
           .hass=${hass}
           @value-changed=${this._addEntity}
         ></ha-entity-picker>
@@ -719,7 +719,7 @@ class PulseCardEditor extends LitElement {
           @value-changed=${this._settingsChanged}
         ></ha-form>
         ${formData.sparkline_show ? html`
-          <div class="color-field sparkline-color">
+          <div class="pb-editor-color-field pb-editor-sparkline-color">
             <ha-textfield
               .label=${'Sparkline Color'}
               .value=${formData.sparkline_color || ''}
@@ -761,7 +761,7 @@ class PulseCardEditor extends LitElement {
 
   static get styles() {
     return css`
-      .editor {
+      .pb-editor {
         display: flex;
         flex-direction: column;
       }
@@ -774,12 +774,12 @@ class PulseCardEditor extends LitElement {
       h3:first-child {
         margin-top: 0;
       }
-      .entities {
+      .pb-editor-entities {
         display: flex;
         flex-direction: column;
         gap: 8px;
       }
-      .entity-row {
+      .pb-editor-entity-row {
         display: flex;
         flex-direction: column;
         gap: 4px;
@@ -787,45 +787,34 @@ class PulseCardEditor extends LitElement {
         border: 1px solid var(--divider-color, #e0e0e0);
         border-radius: 8px;
       }
-      .entity-row-main {
+      .pb-editor-entity-row-main {
         display: flex;
         align-items: center;
       }
-      .entity-row-main ha-entity-picker {
+      .pb-editor-entity-row-main ha-entity-picker {
         flex: 1;
         min-width: 0;
       }
-      .entity-row-fields {
+      .pb-editor-entity-row-fields {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 8px;
       }
-      .remove-icon {
-        color: var(--secondary-text-color);
-        --mdc-icon-button-size: 36px;
-      }
-      .move-icon {
-        color: var(--secondary-text-color);
-        --mdc-icon-button-size: 36px;
-      }
-      .move-icon[disabled] {
-        opacity: 0.3;
-        pointer-events: none;
-      }
-      .add-entity {
+      ${SHARED_EDITOR_STYLES}
+      .pb-editor-add-entity {
         display: block;
         margin-top: 8px;
       }
-      .color-field {
+      .pb-editor-color-field {
         display: flex;
         align-items: center;
         gap: 8px;
       }
-      .color-field ha-textfield {
+      .pb-editor-color-field ha-textfield {
         flex: 1;
         min-width: 0;
       }
-      .color-field input[type="color"] {
+      .pb-editor-color-field input[type="color"] {
         -webkit-appearance: none;
         appearance: none;
         width: 40px;
@@ -838,17 +827,17 @@ class PulseCardEditor extends LitElement {
         flex-shrink: 0;
         overflow: hidden;
       }
-      .color-field input[type="color"]::-webkit-color-swatch-wrapper {
+      .pb-editor-color-field input[type="color"]::-webkit-color-swatch-wrapper {
         padding: 2px;
       }
-      .color-field input[type="color"]::-webkit-color-swatch {
+      .pb-editor-color-field input[type="color"]::-webkit-color-swatch {
         border: none;
         border-radius: 3px;
       }
-      .sparkline-color {
+      .pb-editor-sparkline-color {
         margin: 4px 0 16px;
       }
-      .interactive-toggle {
+      .pb-editor-interactive-toggle {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -861,8 +850,14 @@ class PulseCardEditor extends LitElement {
   }
 }
 
+// Register the new name first; alias the old name as a thin subclass
+// (one class can only be registered once with customElements.define)
+// so existing `type: custom:pulse-card` configs continue to work.
+if (!customElements.get('pulse-bar-card-editor')) {
+  customElements.define('pulse-bar-card-editor', PulseBarCardEditor);
+}
 if (!customElements.get('pulse-card-editor')) {
-  customElements.define('pulse-card-editor', PulseCardEditor);
+  customElements.define('pulse-card-editor', class extends PulseBarCardEditor {});
 }
 
-export { PulseCardEditor };
+export { PulseBarCardEditor };

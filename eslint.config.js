@@ -4,6 +4,9 @@ import noUnsanitized from 'eslint-plugin-no-unsanitized';
 import security from 'eslint-plugin-security';
 
 export default [
+  {
+    ignores: ['dist/**', 'coverage/**'],
+  },
   js.configs.recommended,
   // no-unsanitized: catch DOM XSS sinks — innerHTML, outerHTML,
   // insertAdjacentHTML, legacy doc-write APIs, setTimeout(string), etc.
@@ -71,6 +74,19 @@ export default [
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-undef': 'off', // vitest globals
+    },
+  },
+  {
+    files: ['scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
 ];

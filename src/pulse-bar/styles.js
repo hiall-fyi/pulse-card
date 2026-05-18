@@ -4,41 +4,47 @@
  * string for Shadow DOM encapsulation.
  */
 
-import { SHARED_STYLES } from './shared/styles.js';
+import { SHARED_STYLES } from '../shared/styles.js';
 
 export const STYLES = `${SHARED_STYLES}
   :host {
     display: block;
+
+    /* Card-local design tokens — override via card-mod or HA theme.
+       Family-shared concerns live on --pulse-* via SHARED_STYLES. */
+    --pb-columns: 1;
+    --pb-track-opacity: 0.12;
+    --pb-animation-speed: 0.8s;
   }
 
   ha-card {
     overflow: hidden;
     padding: 16px;
-    background: var(--pulse-card-background, var(--ha-card-background, var(--card-background-color)));
+    background: var(--pulse-bg-card, var(--ha-card-background, var(--card-background-color)));
     container-type: inline-size;
   }
 
-  .pulse-card {
+  .pb-card {
     display: flex;
     flex-direction: column;
-    gap: var(--pulse-gap, 12px);
+    gap: var(--pulse-space-element, 12px);
   }
 
   /* Multi-column grid — responsive: auto-collapse on narrow screens */
-  .pulse-card[class*="columns-"] {
+  .pb-card[class*="columns-"] {
     display: grid;
-    grid-template-columns: repeat(var(--pulse-columns, 1), 1fr);
-    gap: var(--pulse-gap, 16px);
+    grid-template-columns: repeat(var(--pb-columns), 1fr);
+    gap: var(--pulse-space-element, 16px);
   }
 
   @container (max-width: 300px) {
-    .pulse-card[class*="columns-"] {
+    .pb-card[class*="columns-"] {
       grid-template-columns: 1fr;
     }
   }
 
   /* Bar row — each entity */
-  .bar-row {
+  .pb-row {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -49,42 +55,42 @@ export const STYLES = `${SHARED_STYLES}
   }
 
   /* Labels row (outside mode — default) */
-  .bar-labels {
+  .pb-labels {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 2px;
   }
 
-  .bar-label-left, .bar-label-right {
+  .pb-label-left, .pb-label-right {
     display: flex;
     align-items: center;
     gap: 6px;
   }
 
-  .bar-label-left {
+  .pb-label-left {
     flex: 1;
     min-width: 0;
     overflow: hidden;
   }
 
-  .bar-name {
-    font-size: var(--pulse-font-size, 14px);
-    color: var(--pulse-name-color, var(--primary-text-color));
+  .pb-name {
+    font-size: var(--pulse-font-body);
+    color: var(--pulse-text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .bar-value {
-    font-size: var(--pulse-font-size, 14px);
+  .pb-value {
+    font-size: var(--pulse-font-body);
     font-weight: 500;
-    color: var(--pulse-value-color, var(--primary-text-color));
+    color: var(--pulse-text-primary);
     white-space: nowrap;
   }
 
   /* Bar container */
-  .bar-container {
+  .pb-container {
     position: relative;
     width: 100%;
     overflow: hidden;
@@ -92,28 +98,28 @@ export const STYLES = `${SHARED_STYLES}
   }
 
   /* Track (background) */
-  .bar-track {
+  .pb-track {
     position: absolute;
     inset: 0;
     background: var(--primary-color, #03A9F4);
-    opacity: var(--pulse-track-opacity, 0.12);
+    opacity: var(--pb-track-opacity);
     border-radius: inherit;
   }
 
   /* Fill */
-  .bar-fill {
+  .pb-fill {
     position: absolute;
     top: 0;
     left: 0;
     bottom: 0;
     background: var(--primary-color, #03A9F4);
     border-radius: inherit;
-    transition: width var(--pulse-animation-speed, 0.8s) ease,
+    transition: width var(--pb-animation-speed) ease,
                 background-color 0.3s ease;
   }
 
   /* Content overlay (classic/inside mode) */
-  .bar-content {
+  .pb-content {
     position: relative;
     display: flex;
     justify-content: space-between;
@@ -122,11 +128,11 @@ export const STYLES = `${SHARED_STYLES}
     height: 100%;
     z-index: 3;
     /* Auto-scale font to bar height: 30% of container, clamped 10px–16px */
-    font-size: var(--pulse-font-size, clamp(10px, 40cqh, 16px));
+    font-size: var(--pulse-font-body, clamp(10px, 40cqh, 16px));
   }
 
   /* Target marker — visually distinct from fill */
-  .bar-target {
+  .pb-target {
     position: absolute;
     top: -1px;
     bottom: -1px;
@@ -140,7 +146,7 @@ export const STYLES = `${SHARED_STYLES}
   }
 
   /* Target label */
-  .bar-target-label {
+  .pb-target-label {
     position: absolute;
     top: -18px;
     left: 50%;
@@ -154,41 +160,41 @@ export const STYLES = `${SHARED_STYLES}
   }
 
   /* Indicator */
-  .bar-indicator {
+  .pb-indicator {
     font-size: 12px;
     font-weight: 500;
-    color: var(--pulse-indicator-color);
+    color: var(--pb-indicator-color);
   }
-  .bar-indicator.up { color: var(--pulse-indicator-color, var(--pulse-status-green)); }
-  .bar-indicator.down { color: var(--pulse-indicator-color, var(--pulse-status-red)); }
-  .bar-indicator.neutral { color: var(--pulse-indicator-color, var(--pulse-text-secondary)); }
+  .pb-indicator.up { color: var(--pb-indicator-color, var(--pulse-status-green)); }
+  .pb-indicator.down { color: var(--pb-indicator-color, var(--pulse-status-red)); }
+  .pb-indicator.neutral { color: var(--pb-indicator-color, var(--pulse-text-secondary)); }
 
   /* Inverted indicator — up is bad, down is good (CPU, memory, disk usage) */
-  .bar-indicator.inverted.up { color: var(--pulse-indicator-color, var(--pulse-status-red)); }
-  .bar-indicator.inverted.down { color: var(--pulse-indicator-color, var(--pulse-status-green)); }
+  .pb-indicator.inverted.up { color: var(--pb-indicator-color, var(--pulse-status-red)); }
+  .pb-indicator.inverted.down { color: var(--pb-indicator-color, var(--pulse-status-green)); }
 
   /* Icon */
-  .bar-icon {
+  .pb-icon {
     --mdc-icon-size: 1.3em;
-    font-size: var(--pulse-font-size, 14px);
-    color: var(--pulse-icon-color, var(--secondary-text-color));
+    font-size: var(--pulse-font-body);
+    color: var(--pulse-text-secondary);
     flex-shrink: 0;
     display: flex;
     align-items: center;
     line-height: 0;
   }
-  .bar-content .bar-icon {
-    color: var(--pulse-icon-color, var(--pulse-name-color, var(--primary-text-color)));
+  .pb-content .pb-icon {
+    color: var(--pulse-text-primary);
   }
 
   /* Unavailable state */
-  .bar-row.unavailable .bar-fill {
+  .pb-row.unavailable .pb-fill {
     background: var(--pulse-disabled) !important;
     width: 100% !important;
     opacity: 0.2;
   }
-  .bar-row.unavailable .bar-name,
-  .bar-row.unavailable .bar-value {
+  .pb-row.unavailable .pb-name,
+  .pb-row.unavailable .pb-value {
     opacity: 0.5;
   }
 
@@ -197,7 +203,7 @@ export const STYLES = `${SHARED_STYLES}
     0%, 100% { opacity: 1; }
     50% { opacity: 0.75; }
   }
-  .bar-fill.charge {
+  .pb-fill.charge {
     animation: pulse-charge 2s ease-in-out infinite;
   }
 
@@ -206,33 +212,28 @@ export const STYLES = `${SHARED_STYLES}
     padding: 8px 0;
   }
 
-  /* Title header */
-  .pulse-title {
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--primary-text-color);
-    padding-bottom: 4px;
-  }
+  /* Title — adds layout padding on top of shared typography. */
+  .pulse-title { padding-bottom: 4px; }
 
   /* Hover feedback */
-  .bar-row:not(.has-ripple):active {
+  .pb-row:not(.has-ripple):active {
     opacity: 0.8;
   }
   @media (hover: hover) {
-    .bar-row:hover .bar-fill {
+    .pb-row:hover .pb-fill {
       filter: brightness(1.1);
     }
   }
 
   /* Keyboard focus indicator */
-  .bar-row:focus-visible {
+  .pb-row:focus-visible {
     outline: 2px solid var(--pulse-accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
 
   /* Secondary info group — wraps name + secondary line */
-  .bar-name-group {
+  .pb-name-group {
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -240,23 +241,23 @@ export const STYLES = `${SHARED_STYLES}
   }
 
   /* Secondary info text */
-  .bar-secondary {
+  .pb-secondary {
     font-size: 0.75em;
     opacity: 0.85;
-    color: var(--pulse-secondary-color, var(--pulse-text-secondary));
+    color: var(--pulse-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   /* Inside bar — inherit text color from parent, reduce opacity */
-  .bar-content .bar-secondary {
-    color: var(--pulse-secondary-color, inherit);
+  .pb-content .pb-secondary {
+    color: inherit;
     opacity: 0.6;
   }
 
   /* Sparkline overlay */
-  .bar-sparkline {
+  .pb-sparkline {
     position: absolute;
     left: 0;
     bottom: 0;
@@ -265,28 +266,28 @@ export const STYLES = `${SHARED_STYLES}
     z-index: 1;
     pointer-events: none;
     opacity: 0.45;
-    color: var(--pulse-sparkline-color, var(--primary-text-color));
+    color: var(--pb-sparkline-color, var(--primary-text-color));
   }
-  .bar-sparkline path {
+  .pb-sparkline path {
     vector-effect: non-scaling-stroke;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
 
   /* Interactive slider bars */
-  .bar-row[data-interactive] .bar-container {
+  .pb-row[data-interactive] .pb-container {
     touch-action: none;
     cursor: pointer;
   }
-  .bar-row[data-interactive].sliding .bar-container {
+  .pb-row[data-interactive].sliding .pb-container {
     cursor: grabbing;
   }
-  .bar-row[data-interactive].sliding .bar-fill {
+  .pb-row[data-interactive].sliding .pb-fill {
     transition: none;
   }
 
   /* Step buttons for interactive bars */
-  .bar-step-btn {
+  .pb-step-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -305,20 +306,20 @@ export const STYLES = `${SHARED_STYLES}
     overflow: hidden;
     transition: opacity 0.15s;
   }
-  .bar-step-btn:hover {
+  .pb-step-btn:hover {
     opacity: 1;
   }
-  .bar-step-btn:not(.has-ripple):active {
+  .pb-step-btn:not(.has-ripple):active {
     opacity: 0.4;
   }
 
-  /* Interactive bar row layout — bar-container between step buttons */
-  .bar-row[data-interactive] .bar-interactive-row {
+  /* Interactive bar row layout — pb-container between step buttons */
+  .pb-row[data-interactive] .pb-interactive-row {
     display: flex;
     align-items: stretch;
     gap: 2px;
   }
-  .bar-row[data-interactive] .bar-interactive-row .bar-container {
+  .pb-row[data-interactive] .pb-interactive-row .pb-container {
     flex: 1;
     min-width: 0;
   }
@@ -327,28 +328,28 @@ export const STYLES = `${SHARED_STYLES}
   ha-card:has(.compact) {
     padding: 10px;
   }
-  .pulse-card.compact {
-    gap: var(--pulse-gap, 6px);
+  .pb-card.compact {
+    gap: var(--pulse-space-element, 6px);
   }
-  .compact .bar-row {
+  .compact .pb-row {
     gap: 3px;
   }
-  .compact .bar-labels {
+  .compact .pb-labels {
     padding: 0;
   }
-  .compact .bar-name {
-    font-size: var(--pulse-font-size, 12px);
+  .compact .pb-name {
+    font-size: var(--pulse-font-body, 12px);
   }
-  .compact .bar-value {
-    font-size: var(--pulse-font-size, 12px);
+  .compact .pb-value {
+    font-size: var(--pulse-font-body, 12px);
   }
-  .compact .bar-indicator {
+  .compact .pb-indicator {
     font-size: 10px;
   }
 
   /* Reduced motion — respect prefers-reduced-motion */
   @media (prefers-reduced-motion: reduce) {
-    .bar-fill.charge { animation: none; }
-    .bar-fill, .bar-row { transition: none; }
+    .pb-fill.charge { animation: none; }
+    .pb-fill, .pb-row { transition: none; }
   }
 `;

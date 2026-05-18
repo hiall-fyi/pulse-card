@@ -59,7 +59,7 @@ function renderUsageGauge(usage, limit) {
   const isWarning = pct > 80;
   const needsGlow = isUrgent || isWarning;
 
-  let html = `<div class="usage-gauge">`;
+  let html = `<div class="pc-usage-gauge">`;
   html += `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="API usage: ${Math.round(usage)} of ${Math.round(limit)}" style="width:${size}px;height:${size}px">`;
   if (needsGlow) {
     html += `<defs><filter id="gauge-glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
@@ -77,7 +77,7 @@ function renderUsageGauge(usage, limit) {
     html += `</path>`;
   }
   html += `</svg>`;
-  html += `<div class="gauge-center">${escapeHtml(Math.round(usage))}<br><span style="font-size:10px;opacity:0.6">/ ${escapeHtml(Math.round(limit))}</span></div>`;
+  html += `<div class="pc-gauge-center">${escapeHtml(Math.round(usage))}<br><span style="font-size:10px;opacity:0.6">/ ${escapeHtml(Math.round(limit))}</span></div>`;
   html += `</div>`;
   return html;
 }
@@ -109,7 +109,7 @@ function renderBreakdownDonut(attrs) {
 
   // Wrap donut + legend in flex row
   let html = `<div style="display:flex;align-items:center;gap:12px">`;
-  html += `<div class="donut-container" style="width:${size}px;height:${size}px;flex-shrink:0;margin:0">`;
+  html += `<div class="pc-donut-container" style="width:${size}px;height:${size}px;flex-shrink:0;margin:0">`;
   html += `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="API call breakdown">`;
   const oR = size / 2 - 2;
   const iR = oR * 0.6;
@@ -118,7 +118,7 @@ function renderBreakdownDonut(attrs) {
     html += `<path d="${arc.d}" fill="${sanitizeCssValue(arc.color)}"><title>${escapeHtml(arc.label)}: ${Math.round(arc.angle / 360 * total)}</title></path>`;
   }
   html += `</svg>`;
-  html += `<div class="donut-center" style="font-size:12px">${escapeHtml(Math.round(total))}</div>`;
+  html += `<div class="pc-donut-center" style="font-size:12px">${escapeHtml(Math.round(total))}</div>`;
   html += `</div>`;
   // Legend inline next to donut
   html += buildLegendChips(segments.map((s) => ({ label: s.label, color: s.color, value: String(Math.round(s.value)) })));
@@ -144,12 +144,12 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
   const status = states[hubEntities.api_status]?.state || 'unknown';
   const statusColor = resolveStatusColor(status);
 
-  let html = `<div class="section section-api">`;
-  html += `<div class="section-label">API Usage</div>`;
-  html += `<div class="api-dashboard">`;
+  let html = `<div class="pc-section pc-section-api">`;
+  html += `<div class="pulse-section-label">API Usage</div>`;
+  html += `<div class="pc-api-dashboard">`;
 
   // Row 1: Gauge + History sparkline (use api_usage for reset-aware history)
-  html += `<div class="api-row">`;
+  html += `<div class="pc-api-row">`;
   html += renderUsageGauge(usage, limit);
   const historyEntity = hubEntities.api_usage;
   if (historyEntity && historyCache) {
@@ -159,24 +159,24 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
 
   // Row 2: Breakdown donut
   if (hubEntities.api_breakdown && states[hubEntities.api_breakdown]) {
-    html += `<div class="api-row">`;
+    html += `<div class="pc-api-row">`;
     html += renderBreakdownDonut(states[hubEntities.api_breakdown].attributes || {});
     html += `</div>`;
   }
 
   // Row 3: Status chips — Rate | Poll | Next Sync (countdown) | Reset | Token | Status
-  html += `<div class="zone-chips">`;
+  html += `<div class="pc-zone-chips">`;
   if (hubEntities.call_history && states[hubEntities.call_history]) {
     const callsPerHour = states[hubEntities.call_history].attributes?.calls_per_hour;
     if (callsPerHour !== undefined && callsPerHour !== null && Number(callsPerHour) > 0) {
-      html += `<span class="chip" data-entity="${escapeHtml(hubEntities.call_history)}">`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.call_history)}">`;
       html += `<ha-icon icon="mdi:speedometer"></ha-icon>${escapeHtml(Math.round(Number(callsPerHour)))}/hr</span>`;
     }
   }
   if (hubEntities.polling_interval && states[hubEntities.polling_interval]) {
     const pollState = states[hubEntities.polling_interval];
     const pollUnit = pollState.attributes?.unit_of_measurement || '';
-    html += `<span class="chip" data-entity="${escapeHtml(hubEntities.polling_interval)}">Poll: ${escapeHtml(pollState.state)}${pollUnit ? escapeHtml(pollUnit) : ''}</span>`;
+    html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.polling_interval)}">Poll: ${escapeHtml(pollState.state)}${pollUnit ? escapeHtml(pollUnit) : ''}</span>`;
   }
   if (hubEntities.next_sync && states[hubEntities.next_sync]) {
     const nextRaw = states[hubEntities.next_sync].state;
@@ -196,7 +196,7 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
         }
       } catch (e) { /* keep raw */ console.debug('Pulse Climate: api date parse fallback', e); }
     }
-    html += `<span class="chip chip-next-sync" data-entity="${escapeHtml(hubEntities.next_sync)}" data-target="${targetMs}">Next: ${escapeHtml(nextDisplay)}</span>`;
+    html += `<span class="pc-chip chip-next-sync" data-entity="${escapeHtml(hubEntities.next_sync)}" data-target="${targetMs}">Next: ${escapeHtml(nextDisplay)}</span>`;
   }
   if (hubEntities.api_reset && states[hubEntities.api_reset]) {
     const resetRaw = states[hubEntities.api_reset].state;
@@ -207,12 +207,12 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
         resetDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
       } catch (e) { /* keep raw */ console.debug('Pulse Climate: api date parse fallback', e); }
     }
-    html += `<span class="chip" data-entity="${escapeHtml(hubEntities.api_reset)}">Reset: ${escapeHtml(resetDisplay)}</span>`;
+    html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.api_reset)}">Reset: ${escapeHtml(resetDisplay)}</span>`;
   }
   if (hubEntities.token_status && states[hubEntities.token_status]) {
-    html += `<span class="chip" data-entity="${escapeHtml(hubEntities.token_status)}">Token: ${escapeHtml(states[hubEntities.token_status].state)}</span>`;
+    html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.token_status)}">Token: ${escapeHtml(states[hubEntities.token_status].state)}</span>`;
   }
-  html += `<span class="chip" data-entity="${hubEntities.api_status ? escapeHtml(hubEntities.api_status) : ''}" style="color:${sanitizeCssValue(statusColor)}">${escapeHtml(status)}</span>`;
+  html += `<span class="pc-chip" data-entity="${hubEntities.api_status ? escapeHtml(hubEntities.api_status) : ''}" style="color:${sanitizeCssValue(statusColor)}">${escapeHtml(status)}</span>`;
   html += `</div>`;
 
   html += `</div>`;
@@ -222,7 +222,7 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
 
 /**
  * Update API section DOM differentially.
- * @param {HTMLElement} sectionEl - The .section-api element.
+ * @param {HTMLElement} sectionEl - The .pc-section-api element.
  * @param {Record<string, string>} hubEntities
  * @param {Record<string, *>} states
  */
@@ -231,12 +231,9 @@ export function updateApiSection(sectionEl, hubEntities, states) {
   // Gauge center text update
   const usage = parseFloat(states[hubEntities.api_usage]?.state) || 0;
   const limit = parseFloat(states[hubEntities.api_limit]?.state) || 100;
-  const centerEl = /** @type {HTMLElement|null} */ (sectionEl.querySelector('.gauge-center'));
+  const centerEl = /** @type {HTMLElement|null} */ (sectionEl.querySelector('.pc-gauge-center'));
   if (centerEl) {
-    // SECURITY-AUDIT: Gauge center markup interpolates only rounded numeric usage / limit values through
-    // SECURITY-AUDIT: escapeHtml(), never raw state strings — numbers are coerced through Math.round() before
-    // SECURITY-AUDIT: reaching this sink.
-    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+    // eslint-disable-next-line no-unsanitized/property -- rounded numerics, escaped via escapeHtml
     centerEl.innerHTML = `${escapeHtml(Math.round(usage))}<br><span style="font-size:10px;opacity:0.6">/ ${escapeHtml(Math.round(limit))}</span>`;
   }
 }

@@ -15,7 +15,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-1.4.0-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.5.0-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 
@@ -29,7 +29,7 @@
 
 **Two cards, one install — compact bar charts and a full climate dashboard.**
 
-[Pulse Card Guide](PULSE_CARD_GUIDE.md) • [Climate Card Guide](CLIMATE_CARD_GUIDE.md) • [Contributing](CONTRIBUTING.md) • [Discussions](https://github.com/hiall-fyi/pulse-card/discussions)
+[Bar Card Guide](BAR_CARD_GUIDE.md) • [Climate Card Guide](CLIMATE_CARD_GUIDE.md) • [Contributing](CONTRIBUTING.md) • [Discussions](https://github.com/hiall-fyi/pulse-card/discussions)
 
 </div>
 
@@ -45,7 +45,7 @@ A compact horizontal bar chart card — a modern replacement for the discontinue
 
 **Highlights:** severity colors · sparkline trends · slider mode · multi-column grid · conditional visibility · bar-card compatible
 
-📖 **[Full Configuration Guide →](PULSE_CARD_GUIDE.md)**
+📖 **[Full Configuration Guide →](BAR_CARD_GUIDE.md)**
 
 ### Pulse Climate Card
 
@@ -89,12 +89,12 @@ Both cards are included in a single install — no separate downloads needed.
 ### Pulse Card
 
 ```yaml
-type: custom:pulse-card
+type: custom:pulse-bar-card
 entity: sensor.battery_level
 ```
 
 ```yaml
-type: custom:pulse-card
+type: custom:pulse-bar-card
 title: Room Sensors
 entities:
   - sensor.temperature
@@ -128,7 +128,7 @@ sections:
 
 | Card | Guide | What's covered |
 |---|---|---|
-| **Pulse Card** | [PULSE_CARD_GUIDE.md](PULSE_CARD_GUIDE.md) | Configuration reference, style presets, bar-card migration, CSS custom properties, known limitations |
+| **Pulse Bar Card** | [BAR_CARD_GUIDE.md](BAR_CARD_GUIDE.md) | Configuration reference, style presets, bar-card migration, CSS custom properties, known limitations |
 | **Pulse Climate Card** | [CLIMATE_CARD_GUIDE.md](CLIMATE_CARD_GUIDE.md) | Zone setup, section types, sparkline modes, Tado CE auto-discovery, visual identity, actions & interactivity |
 
 ---
@@ -137,7 +137,7 @@ sections:
 
 ```bash
 npm install
-npm run build      # Build dist/pulse-card.js
+npm run build      # Build dist/pulse-card.js (Bar Card) + pulse-card-editor.js + pulse-climate-editor.js
 npm run dev        # Watch mode
 npm test           # Run tests
 npm run lint       # Lint source

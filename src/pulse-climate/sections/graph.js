@@ -58,12 +58,12 @@ function renderFilledGraph(series, height, ariaLabel) {
   if (filled.length === 0) {
     const paths = buildMultiLinePaths(series, width, height);
     const hasData = paths.some((p) => p.d !== '');
-    if (!hasData) return `<div class="chart-empty">No data available</div>`;
+    if (!hasData) return `<div class="pc-chart-empty">No data available</div>`;
 
-    let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="chart-svg" preserveAspectRatio="none">`;
+    let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="pc-chart-svg" preserveAspectRatio="none">`;
     for (const p of paths) {
       if (p.d === '') continue;
-      svg += `<path d="${p.d}" fill="none" stroke="${sanitizeCssValue(p.color)}" stroke-width="var(--pulse-chart-line-width, 1.5)" data-entity="${escapeHtml(p.entityId)}" />`;
+      svg += `<path d="${p.d}" fill="none" stroke="${sanitizeCssValue(p.color)}" stroke-width="var(--pc-chart-line-width, 1.5)" data-entity="${escapeHtml(p.entityId)}" />`;
     }
     svg += '</svg>';
     return svg;
@@ -74,7 +74,7 @@ function renderFilledGraph(series, height, ariaLabel) {
   // stacked mode renders temperature + humidity back-to-back).
   const gradIds = filled.map(() => uniqueGraphGradId());
 
-  let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="chart-svg" preserveAspectRatio="none">`;
+  let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="pc-chart-svg" preserveAspectRatio="none">`;
   svg += '<defs>';
   for (let i = 0; i < filled.length; i++) {
     svg += `<linearGradient id="${gradIds[i]}" x1="0" y1="0" x2="0" y2="1">`;
@@ -87,7 +87,7 @@ function renderFilledGraph(series, height, ariaLabel) {
   for (let i = 0; i < filled.length; i++) {
     const f = filled[i];
     svg += `<path d="${f.areaPath}" fill="url(#${gradIds[i]})" />`;
-    svg += `<path d="${f.linePath}" fill="none" stroke="${sanitizeCssValue(f.color)}" stroke-width="var(--pulse-chart-line-width, 1.5)" data-entity="${escapeHtml(f.entityId)}" />`;
+    svg += `<path d="${f.linePath}" fill="none" stroke="${sanitizeCssValue(f.color)}" stroke-width="var(--pc-chart-line-width, 1.5)" data-entity="${escapeHtml(f.entityId)}" />`;
   }
   svg += '</svg>';
   return svg;
@@ -111,7 +111,7 @@ export function renderGraphSection(sectionConfig, zones, historyCache, states, d
   const climateIds = sectionConfig.entities || zones.map((/** @type {*} */ z) => z.entity);
   if (climateIds.length === 0) return '';
 
-  let html = '<div class="section section-graph">';
+  let html = '<div class="pc-section pc-section-graph">';
 
   if (stacked) {
     html += renderAttributeGraph(climateIds, 'current_temperature', 'Temperature', height, palette, historyCache, states, discovery, zones);
@@ -169,8 +169,8 @@ function renderAttributeGraph(climateIds, attribute, label, height, palette, his
   const zoneNames = legendItems.map((l) => l.label).join(', ');
   const ariaLabel = `${label} history for ${zoneNames}`;
 
-  let html = `<div class="section-label">${escapeHtml(label)}</div>`;
-  html += `<div class="chart-container" style="height:${sanitizeCssValue(height)}px">`;
+  let html = `<div class="pulse-section-label">${escapeHtml(label)}</div>`;
+  html += `<div class="pc-chart-container" style="height:${sanitizeCssValue(height)}px">`;
   html += renderFilledGraph(series, height, ariaLabel);
   html += '</div>';
   html += buildLegendChips(legendItems);

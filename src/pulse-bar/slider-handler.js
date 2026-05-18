@@ -22,7 +22,7 @@ const SLIDING_FLAG_DELAY = 50;
 
 /**
  * Clean up slider listeners on a bar row.
- * @param {HTMLElement} rowEl - The .bar-row element.
+ * @param {HTMLElement} rowEl - The .pb-row element.
  */
 export function cleanupSliderListeners(rowEl) {
   const cleanup = /** @type {*} */ (rowEl).__pulseSliderCleanup;
@@ -30,9 +30,9 @@ export function cleanupSliderListeners(rowEl) {
 }
 
 /**
- * Bind slider pointer listeners to a bar row's .bar-container element.
+ * Bind slider pointer listeners to a bar row's .pb-container element.
  * Uses cardEl._hass for live hass access (never captures hass in closure).
- * @param {HTMLElement} rowEl - The .bar-row element.
+ * @param {HTMLElement} rowEl - The .pb-row element.
  * @param {{_hass: import('./types.js').Hass|null}} cardEl - Card element with _hass property.
  * @param {import('./types.js').PulseCardConfig} cfg - Card config.
  * @param {import('./types.js').EntityConfig} ec - Entity config.
@@ -40,7 +40,7 @@ export function cleanupSliderListeners(rowEl) {
 export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
   cleanupSliderListeners(rowEl);
 
-  const containerEl = /** @type {HTMLElement|null} */ (rowEl.querySelector('.bar-container'));
+  const containerEl = /** @type {HTMLElement|null} */ (rowEl.querySelector('.pb-container'));
   if (!containerEl) return;
   const container = /** @type {HTMLElement} */ (containerEl);
 
@@ -94,7 +94,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     const range = max - min;
     const pct = range > 0 ? ((value - min) / range) * 100 : 0;
 
-    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.bar-fill'));
+    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.pb-fill'));
     if (fillEl) fillEl.style.width = `${pct}%`;
 
     const unit = resolveUnit(ec, state);
@@ -102,7 +102,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     const formatted = decimal > 0 ? value.toFixed(decimal) : String(Math.round(value));
     const display = unit ? `${formatted}${unit}` : formatted;
 
-    const valueEls = rowEl.querySelectorAll('.bar-value');
+    const valueEls = rowEl.querySelectorAll('.pb-value');
     for (const el of valueEls) el.textContent = display;
   }
 
@@ -111,12 +111,12 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
    */
   function revertUI() {
     if (!dragState) return;
-    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.bar-fill'));
+    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.pb-fill'));
     if (fillEl) {
       fillEl.style.transition = '';
       fillEl.style.width = dragState.fillWidth;
     }
-    const valueEls = rowEl.querySelectorAll('.bar-value');
+    const valueEls = rowEl.querySelectorAll('.pb-value');
     for (const el of valueEls) el.textContent = dragState.displayValue;
   }
 
@@ -145,14 +145,14 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
       });
   }
 
-  // --- Pointer events on .bar-container ---
+  // --- Pointer events on .pb-container ---
 
   container.addEventListener('pointerdown', (ev) => {
     if (!cardEl._hass) return;
     ev.preventDefault();
 
-    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.bar-fill'));
-    const valueEl = rowEl.querySelector('.bar-value');
+    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.pb-fill'));
+    const valueEl = rowEl.querySelector('.pb-value');
 
     dragState = {
       fillWidth: fillEl?.style.width || '0%',
@@ -189,7 +189,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     if (!dragState || ev.pointerId !== dragState.pointerId) return;
     ev.preventDefault();
 
-    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.bar-fill'));
+    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.pb-fill'));
 
     // Re-enable CSS transition
     if (fillEl) fillEl.style.transition = '';
@@ -217,7 +217,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
   container.addEventListener('pointercancel', (ev) => {
     if (!dragState || ev.pointerId !== dragState.pointerId) return;
 
-    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.bar-fill'));
+    const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.pb-fill'));
     if (fillEl) fillEl.style.transition = '';
 
     rowEl.classList.remove('sliding');
@@ -252,7 +252,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     commitValue(newValue);
   }
 
-  const stepBtns = rowEl.querySelectorAll('.bar-step-btn');
+  const stepBtns = rowEl.querySelectorAll('.pb-step-btn');
   for (const btn of stepBtns) {
     const dir = Number(/** @type {HTMLElement} */ (btn).dataset.step);
 

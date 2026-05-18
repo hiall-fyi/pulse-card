@@ -128,29 +128,29 @@ function renderZoneRow(zs) {
   let deltaHtml;
 
   if (zs.isUnavailable) {
-    tempsHtml = `<span class="home-status-actual off">--</span>`
-      + `<span class="home-status-arrow">→</span>`
-      + `<span class="home-status-target">Unavailable</span>`;
-    deltaHtml = `<div class="home-status-delta">`
-      + `<div class="home-status-bar-track"><div class="home-status-bar-center"></div></div>`
-      + `<span class="home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">--</span>`
+    tempsHtml = `<span class="pc-home-status-actual pc-off">--</span>`
+      + `<span class="pc-home-status-arrow">→</span>`
+      + `<span class="pc-home-status-target">Unavailable</span>`;
+    deltaHtml = `<div class="pc-home-status-delta">`
+      + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
+      + `<span class="pc-home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">--</span>`
       + `</div>`;
   } else if (!isActive) {
     const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
       ? `${escapeHtml(zs.currentTemp)}${unit}` : '--';
-    tempsHtml = `<span class="home-status-actual off">${actualDisplay}</span>`
-      + `<span class="home-status-arrow"></span>`
-      + `<span class="home-status-target">Off</span>`;
-    deltaHtml = `<div class="home-status-delta">`
-      + `<div class="home-status-bar-track"><div class="home-status-bar-center"></div></div>`
-      + `<span class="home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">Off</span>`
+    tempsHtml = `<span class="pc-home-status-actual pc-off">${actualDisplay}</span>`
+      + `<span class="pc-home-status-arrow"></span>`
+      + `<span class="pc-home-status-target">Off</span>`;
+    deltaHtml = `<div class="pc-home-status-delta">`
+      + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
+      + `<span class="pc-home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">Off</span>`
       + `</div>`;
   } else {
     const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
       ? `${escapeHtml(zs.currentTemp)}${unit}` : '--';
-    tempsHtml = `<span class="home-status-actual">${actualDisplay}</span>`
-      + `<span class="home-status-arrow">→</span>`
-      + `<span class="home-status-target">${escapeHtml(zs.targetTemp)}${unit}</span>`;
+    tempsHtml = `<span class="pc-home-status-actual">${actualDisplay}</span>`
+      + `<span class="pc-home-status-arrow">→</span>`
+      + `<span class="pc-home-status-target">${escapeHtml(zs.targetTemp)}${unit}</span>`;
 
     // Deviation bar — only meaningful with non-null currentTemp
     if (zs.currentTemp !== null && zs.currentTemp !== undefined) {
@@ -164,24 +164,24 @@ function renderZoneRow(zs) {
       const sign = delta >= 0 ? '+' : '−';
       const deltaText = `${sign}${escapeHtml(absDelta.toFixed(1))}°`;
 
-      deltaHtml = `<div class="home-status-delta">`
-        + `<div class="home-status-bar-track">`
-        + `<div class="home-status-bar-center"></div>`
-        + `<div class="home-status-bar-fill" style="left:${barLeft};width:${barWidth};background:${sanitizeCssValue(barColor)}"></div>`
+      deltaHtml = `<div class="pc-home-status-delta">`
+        + `<div class="pc-home-status-bar-track">`
+        + `<div class="pc-home-status-bar-center"></div>`
+        + `<div class="pc-home-status-bar-fill" style="left:${barLeft};width:${barWidth};background:${sanitizeCssValue(barColor)}"></div>`
         + `</div>`
-        + `<span class="home-status-delta-text" style="color:${sanitizeCssValue(barColor)}">${deltaText}</span>`
+        + `<span class="pc-home-status-delta-text" style="color:${sanitizeCssValue(barColor)}">${deltaText}</span>`
         + `</div>`;
     } else {
-      deltaHtml = `<div class="home-status-delta">`
-        + `<div class="home-status-bar-track"><div class="home-status-bar-center"></div></div>`
-        + `<span class="home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">--</span>`
+      deltaHtml = `<div class="pc-home-status-delta">`
+        + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
+        + `<span class="pc-home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">--</span>`
         + `</div>`;
     }
   }
 
-  return `<div class="home-status-row" role="button" tabindex="0" data-entity="${entityAttr}">`
-    + `<span class="home-status-zone-name">${name}</span>`
-    + `<div class="home-status-temps">${tempsHtml}</div>`
+  return `<div class="pc-home-status-row" role="button" tabindex="0" data-entity="${entityAttr}">`
+    + `<span class="pc-home-status-zone-name">${name}</span>`
+    + `<div class="pc-home-status-temps">${tempsHtml}</div>`
     + deltaHtml
     + `</div>`;
 }
@@ -221,29 +221,29 @@ export function renderHomeStatusSection(zones, states, discovery) {
   const summary = computeSummary(activeZones);
 
   // Build HTML
-  let html = `<div class="section section-home-status">`;
-  html += `<div class="section-label">Home Status</div>`;
+  let html = `<div class="pc-section pc-section-home-status">`;
+  html += `<div class="pulse-section-label">Home Status</div>`;
 
   // Hero block
-  html += `<div class="home-status-hero">`;
-  html += `<ha-icon class="home-status-icon" icon="${escapeHtml(heroIcon)}" style="color:${sanitizeCssValue(heroColor)}"></ha-icon>`;
-  html += `<div class="home-status-label" style="color:${sanitizeCssValue(heroColor)}">${escapeHtml(hero.label)}</div>`;
-  html += `<div class="home-status-detail">${escapeHtml(hero.detail)}</div>`;
+  html += `<div class="pc-home-status-hero">`;
+  html += `<ha-icon class="pc-home-status-icon" icon="${escapeHtml(heroIcon)}" style="color:${sanitizeCssValue(heroColor)}"></ha-icon>`;
+  html += `<div class="pc-home-status-label" style="color:${sanitizeCssValue(heroColor)}">${escapeHtml(hero.label)}</div>`;
+  html += `<div class="pc-home-status-detail">${escapeHtml(hero.detail)}</div>`;
   html += `</div>`;
 
   // Zone rows
-  html += `<div class="home-status-zones">`;
+  html += `<div class="pc-home-status-zones">`;
   for (const zs of sorted) {
     html += renderZoneRow(zs);
   }
   html += `</div>`;
 
   // Summary footer
-  html += `<div class="home-status-summary">`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.onTarget)}</div><div class="stat-label">On Target</div></div>`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.avgActual)}</div><div class="stat-label">Avg Actual</div></div>`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.avgTarget)}</div><div class="stat-label">Avg Target</div></div>`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.avgPower)}</div><div class="stat-label">Avg Power</div></div>`;
+  html += `<div class="pc-home-status-summary">`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.onTarget)}</div><div class="pc-stat-label">On Target</div></div>`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.avgActual)}</div><div class="pc-stat-label">Avg Actual</div></div>`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.avgTarget)}</div><div class="pc-stat-label">Avg Target</div></div>`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.avgPower)}</div><div class="pc-stat-label">Avg Power</div></div>`;
   html += `</div>`;
 
   html += `</div>`;

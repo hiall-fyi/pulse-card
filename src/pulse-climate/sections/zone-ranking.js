@@ -136,26 +136,26 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
   const displayUnit = def.unit !== null ? def.unit : (zoneData[0]?.unit || '°C');
 
   // Build HTML
-  let html = `<div class="section section-zone-ranking" data-metric="${escapeHtml(metric)}">`;
+  let html = `<div class="pc-section pc-section-zone-ranking" data-metric="${escapeHtml(metric)}">`;
 
   // Header: label + tabs
-  html += `<div class="ranking-header">`;
-  html += `<div class="section-label">Zone Ranking</div>`;
-  html += `<div class="ranking-tabs">`;
+  html += `<div class="pc-ranking-header">`;
+  html += `<div class="pulse-section-label">Zone Ranking</div>`;
+  html += `<div class="pc-ranking-tabs">`;
   for (const key of available) {
     const d = METRIC_DEFS[key];
     if (!d) continue;
-    const activeClass = key === metric ? ' active' : '';
-    html += `<div class="ranking-tab${activeClass}" data-metric="${escapeHtml(key)}">${escapeHtml(d.label)}</div>`;
+    const activeClass = key === metric ? ' pc-active' : '';
+    html += `<div class="pc-ranking-tab${activeClass}" data-metric="${escapeHtml(key)}">${escapeHtml(d.label)}</div>`;
   }
   html += `</div></div>`;
 
   // Rank rows
-  html += `<div class="ranking-list">`;
+  html += `<div class="pc-ranking-list">`;
   for (let i = 0; i < zoneData.length; i++) {
     const z = zoneData[i];
     const rank = i + 1;
-    const topClass = rank === 1 && z.value !== null ? ' top' : '';
+    const topClass = rank === 1 && z.value !== null ? ' pc-top' : '';
     const pct = z.value !== null && scaleMax > 0 ? Math.round((z.value / scaleMax) * 100) : 0;
     const barColor = z.value !== null ? def.colorFn(z.value) : '';
     const barWidth = z.value !== null ? `${pct}%` : '0%';
@@ -169,11 +169,11 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
       displayValue = `${z.value}${displayUnit}`;
     }
 
-    html += `<div class="rank-row" role="button" tabindex="0" data-entity="${escapeHtml(z.entityId)}">`;
-    html += `<div class="rank-num${topClass}">${rank}</div>`;
-    html += `<div class="rank-name">${escapeHtml(z.name)}</div>`;
-    html += `<div class="rank-bar-track"><div class="rank-bar-fill" style="width:${sanitizeCssValue(barWidth)};background:${sanitizeCssValue(barColor)}"></div></div>`;
-    html += `<div class="rank-value">${escapeHtml(displayValue)}</div>`;
+    html += `<div class="pc-rank-row" role="button" tabindex="0" data-entity="${escapeHtml(z.entityId)}">`;
+    html += `<div class="pc-rank-num${topClass}">${rank}</div>`;
+    html += `<div class="pc-rank-name">${escapeHtml(z.name)}</div>`;
+    html += `<div class="pc-rank-bar-track"><div class="pc-rank-bar-fill" style="width:${sanitizeCssValue(barWidth)};background:${sanitizeCssValue(barColor)}"></div></div>`;
+    html += `<div class="pc-rank-value">${escapeHtml(displayValue)}</div>`;
     html += `</div>`;
   }
   html += `</div>`;
@@ -181,11 +181,11 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
   // Summary footer
   const summaryValues = zoneData.map((z) => z.value);
   const summary = computeRankingSummary(summaryValues, displayUnit);
-  html += `<div class="ranking-summary">`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.avg)}</div><div class="stat-label">Average</div></div>`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.high)}</div><div class="stat-label">Highest</div></div>`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.low)}</div><div class="stat-label">Lowest</div></div>`;
-  html += `<div class="stat"><div class="stat-value">${escapeHtml(summary.spread)}</div><div class="stat-label">Spread</div></div>`;
+  html += `<div class="pc-ranking-summary">`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.avg)}</div><div class="pc-stat-label">Average</div></div>`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.high)}</div><div class="pc-stat-label">Highest</div></div>`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.low)}</div><div class="pc-stat-label">Lowest</div></div>`;
+  html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.spread)}</div><div class="pc-stat-label">Spread</div></div>`;
   html += `</div>`;
 
   html += `</div>`;

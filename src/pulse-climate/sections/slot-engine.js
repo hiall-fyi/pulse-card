@@ -87,14 +87,14 @@ export function computeSlots(data, slots, windowMs) {
  */
 export function renderTimelineStrip(slotData, colorFn, options = {}) {
   const slots = slotData.length;
-  if (slots === 0) return '<div class="strip-container"><div class="chart-empty" style="height:14px;font-size:10px">No data</div></div>';
+  if (slots === 0) return '<div class="pc-strip-container"><div class="pc-chart-empty" style="height:14px;font-size:10px">No data</div></div>';
 
   const emptyColor = options.emptyColor || 'var(--disabled-color, #9E9E9E)';
   const emptyOpacity = options.emptyOpacity ?? 0.3;
   const ariaLabel = options.ariaLabel || '';
   const slotsJson = JSON.stringify(slotData.map((s) => ({ v: s.value, l: s.label })));
 
-  let html = `<div class="strip-container" data-slots='${escapeHtml(slotsJson)}'>`;
+  let html = `<div class="pc-strip-container" data-slots='${escapeHtml(slotsJson)}'>`;
   html += `<svg viewBox="0 0 ${slots} 1" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(ariaLabel)}" style="width:100%;height:100%;display:block">`;
 
   for (let s = 0; s < slots; s++) {
@@ -107,7 +107,7 @@ export function renderTimelineStrip(slotData, colorFn, options = {}) {
 
   if (options.nowPct !== undefined) {
     const pct = Math.min(100, Math.max(0, options.nowPct));
-    html += `<div class="now-marker" style="left:${pct.toFixed(1)}%"></div>`;
+    html += `<div class="pc-now-marker" style="left:${pct.toFixed(1)}%"></div>`;
   }
   html += `</div>`;
   return html;
@@ -122,18 +122,18 @@ export function renderTimelineStrip(slotData, colorFn, options = {}) {
  */
 export function renderHeatmapStrip(slotData, colorFn, _options = {}) {
   const slots = slotData.length;
-  if (slots === 0) return '<div class="cells"><div class="chart-empty" style="height:16px;font-size:10px">No data</div></div>';
+  if (slots === 0) return '<div class="pc-cells"><div class="pc-chart-empty" style="height:16px;font-size:10px">No data</div></div>';
 
   const slotsJson = JSON.stringify(slotData.map((s) => ({ v: s.value, l: s.label })));
-  let html = `<div class="cells" data-slots='${escapeHtml(slotsJson)}'>`;
+  let html = `<div class="pc-cells" data-slots='${escapeHtml(slotsJson)}'>`;
   for (let s = 0; s < slots; s++) {
     const val = slotData[s].value;
     const label = slotData[s].label;
     if (val !== null) {
       const color = colorFn(val);
-      html += `<div class="cell" style="background:${sanitizeCssValue(color)}" data-hour="${escapeHtml(label)}" data-score="${val}"></div>`;
+      html += `<div class="pc-cell" style="background:${sanitizeCssValue(color)}" data-hour="${escapeHtml(label)}" data-score="${val}"></div>`;
     } else {
-      html += `<div class="cell cell-empty" data-hour="${escapeHtml(label)}"></div>`;
+      html += `<div class="pc-cell pc-cell-empty" data-hour="${escapeHtml(label)}"></div>`;
     }
   }
   html += `</div>`;
@@ -149,7 +149,7 @@ export function renderHeatmapStrip(slotData, colorFn, _options = {}) {
  */
 export function createStripTooltip() {
   const el = document.createElement('div');
-  el.className = 'strip-tooltip';
+  el.className = 'pc-strip-tooltip';
   el.style.display = 'none';
 
   /** @type {ReturnType<typeof setTimeout>|null} */
@@ -176,7 +176,7 @@ export function createStripTooltip() {
  */
 export function createFixedTooltip() {
   const el = document.createElement('div');
-  el.className = 'strip-tooltip strip-tooltip-fixed';
+  el.className = 'pc-strip-tooltip pc-strip-tooltip-fixed';
   el.style.display = 'none';
 
   /** @type {ReturnType<typeof setTimeout>|null} */
@@ -211,9 +211,9 @@ export function renderTimeLabels(windowMs, labels = 5) {
   let html = '';
   for (let i = 0; i < labels - 1; i++) {
     const t = new Date(windowStart + (i / (labels - 1)) * windowMs);
-    html += `<span class="time-label">${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}</span>`;
+    html += `<span class="pc-time-label">${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}</span>`;
   }
-  html += `<span class="time-label">${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}</span>`;
+  html += `<span class="pc-time-label">${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}</span>`;
   return html;
 }
 
@@ -309,7 +309,7 @@ export function bindDragSelect(container, slots, tooltip, unit = '') {
     /** @type {HTMLElement} */ (container).setPointerCapture(ev.pointerId);
     if (!highlight) {
       highlight = document.createElement('div');
-      highlight.className = 'strip-drag-highlight';
+      highlight.className = 'pc-strip-drag-highlight';
       /** @type {HTMLElement} */ (container).style.position = 'relative';
       container.appendChild(highlight);
     }

@@ -30,14 +30,14 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
     ? HK_COLOR
     : 'var(--label-badge-red, #F44336)';
   const connLabel = connected ? 'Connected' : 'Disconnected';
-  const dotClass = connected ? 'pulse-dot connected' : 'pulse-dot disconnected';
+  const dotClass = connected ? 'pc-pulse-dot pc-connected' : 'pc-pulse-dot pc-disconnected';
 
   const attrs = connState.attributes || {};
   const uptime = attrs.uptime || '';
   const mappedZones = attrs.mapped_zones;
   const reconnectCount = attrs.reconnect_count;
 
-  // Reads/writes saved — prefer standalone entities (Tado CE beta.9+), fall back to attributes
+  // Reads/writes saved — prefer standalone entities, fall back to attributes
   const readsEntity = hubEntities.homekit_reads_saved ? states[hubEntities.homekit_reads_saved] : null;
   const writesEntity = hubEntities.homekit_writes_saved ? states[hubEntities.homekit_writes_saved] : null;
   const readsSaved = readsEntity ? (Number(readsEntity.state) || 0) : (Number(attrs.reads_saved_today) || 0);
@@ -45,22 +45,22 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
   const totalSaved = readsSaved + writesSaved;
 
   // Section header — include total saved when available
-  let html = `<div class="section section-homekit">`;
+  let html = `<div class="pc-section pc-section-homekit">`;
   const totalLabel = totalSaved > 0 ? ` · ${totalSaved} saved` : '';
-  html += `<div class="section-label">HomeKit${escapeHtml(totalLabel)}</div>`;
+  html += `<div class="pulse-section-label">HomeKit${escapeHtml(totalLabel)}</div>`;
 
   // Connection status with pulse dot + uptime
-  html += `<div class="zone-chips">`;
-  html += `<span class="chip" data-entity="${escapeHtml(hubEntities.homekit_connected)}" style="color:${sanitizeCssValue(connColor)}">`;
+  html += `<div class="pc-zone-chips">`;
+  html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.homekit_connected)}" style="color:${sanitizeCssValue(connColor)}">`;
   html += `<span class="${dotClass}"></span>`;
   html += `${escapeHtml(connLabel)}`;
   if (uptime) html += ` <span style="opacity:0.6;font-size:10px">${escapeHtml(uptime)}</span>`;
   html += `</span>`;
   if (mappedZones !== undefined) {
-    html += `<span class="chip">${escapeHtml(mappedZones)} zones</span>`;
+    html += `<span class="pc-chip">${escapeHtml(mappedZones)} zones</span>`;
   }
   if (reconnectCount !== undefined && reconnectCount > 0) {
-    html += `<span class="chip" style="color:var(--label-badge-yellow, #FF9800)">Reconnects: ${escapeHtml(reconnectCount)}</span>`;
+    html += `<span class="pc-chip" style="color:var(--label-badge-yellow, #FF9800)">Reconnects: ${escapeHtml(reconnectCount)}</span>`;
   }
   html += `</div>`;
 
@@ -70,10 +70,10 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
 
     // Reads/writes bar — green for reads, purple for writes
     html += `<div style="margin-top:4px">`;
-    html += `<div class="power-bar-container">`;
-    html += `<div class="power-bar-track"></div>`;
-    html += `<div class="power-bar-fill" style="width:100%;background:${sanitizeCssValue(HK_WRITE_COLOR)}"></div>`;
-    html += `<div class="power-bar-fill" style="width:${sanitizeCssValue(readsPct.toFixed(1))}%;background:${sanitizeCssValue(HK_COLOR)}"></div>`;
+    html += `<div class="pc-power-bar-container">`;
+    html += `<div class="pc-power-bar-track"></div>`;
+    html += `<div class="pc-power-bar-fill" style="width:100%;background:${sanitizeCssValue(HK_WRITE_COLOR)}"></div>`;
+    html += `<div class="pc-power-bar-fill" style="width:${sanitizeCssValue(readsPct.toFixed(1))}%;background:${sanitizeCssValue(HK_COLOR)}"></div>`;
     html += `</div>`;
     html += `</div>`;
 
@@ -85,12 +85,12 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
     }
 
     // Reads/writes chips
-    html += `<div class="zone-chips">`;
+    html += `<div class="pc-zone-chips">`;
     const readsDataEntity = hubEntities.homekit_reads_saved || '';
     const writesDataEntity = hubEntities.homekit_writes_saved || '';
-    html += `<span class="chip"${readsDataEntity ? ` data-entity="${escapeHtml(readsDataEntity)}"` : ''} style="color:${sanitizeCssValue(HK_COLOR)}">Reads: ${escapeHtml(readsSaved)}</span>`;
+    html += `<span class="pc-chip"${readsDataEntity ? ` data-entity="${escapeHtml(readsDataEntity)}"` : ''} style="color:${sanitizeCssValue(HK_COLOR)}">Reads: ${escapeHtml(readsSaved)}</span>`;
     if (writesSaved > 0) {
-      html += `<span class="chip"${writesDataEntity ? ` data-entity="${escapeHtml(writesDataEntity)}"` : ''} style="color:${sanitizeCssValue(HK_WRITE_COLOR)}">Writes: ${escapeHtml(writesSaved)}</span>`;
+      html += `<span class="pc-chip"${writesDataEntity ? ` data-entity="${escapeHtml(writesDataEntity)}"` : ''} style="color:${sanitizeCssValue(HK_WRITE_COLOR)}">Writes: ${escapeHtml(writesSaved)}</span>`;
     }
     html += `</div>`;
   }
@@ -101,11 +101,11 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
   const writeFallbacks = Number(attrs.write_fallbacks) || 0;
   const writeLatency = Number(attrs.write_avg_latency_ms) || 0;
   if (writeAttempts > 0 || writeSuccesses > 0 || writeFallbacks > 0) {
-    html += `<div class="zone-chips">`;
-    if (writeAttempts > 0) html += `<span class="chip">Attempts: ${escapeHtml(writeAttempts)}</span>`;
-    if (writeSuccesses > 0) html += `<span class="chip">Successes: ${escapeHtml(writeSuccesses)}</span>`;
-    if (writeFallbacks > 0) html += `<span class="chip" style="color:var(--label-badge-yellow, #FF9800)">Fallbacks: ${escapeHtml(writeFallbacks)}</span>`;
-    if (writeLatency > 0) html += `<span class="chip">Latency: ${escapeHtml(writeLatency)}ms</span>`;
+    html += `<div class="pc-zone-chips">`;
+    if (writeAttempts > 0) html += `<span class="pc-chip">Attempts: ${escapeHtml(writeAttempts)}</span>`;
+    if (writeSuccesses > 0) html += `<span class="pc-chip">Successes: ${escapeHtml(writeSuccesses)}</span>`;
+    if (writeFallbacks > 0) html += `<span class="pc-chip" style="color:var(--label-badge-yellow, #FF9800)">Fallbacks: ${escapeHtml(writeFallbacks)}</span>`;
+    if (writeLatency > 0) html += `<span class="pc-chip">Latency: ${escapeHtml(writeLatency)}ms</span>`;
     html += `</div>`;
   }
 

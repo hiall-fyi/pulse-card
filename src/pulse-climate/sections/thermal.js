@@ -15,8 +15,8 @@ import { extractZoneName } from '../zone-resolver.js';
  */
 export function renderThermalSection(zones, states, discovery) {
   let hasAny = false;
-  let html = `<div class="section section-thermal">`;
-  html += `<div class="section-label">Thermal Analytics</div>`;
+  let html = `<div class="pc-section pc-section-thermal">`;
+  html += `<div class="pulse-section-label">Thermal Analytics</div>`;
 
   for (const zoneConfig of zones) {
     const zoneName = extractZoneName(zoneConfig.entity);
@@ -32,26 +32,26 @@ export function renderThermalSection(zones, states, discovery) {
     hasAny = true;
 
     const friendlyName = zoneConfig.name || states[zoneConfig.entity]?.attributes?.friendly_name || zoneName;
-    html += `<div class="system-row"><span class="system-label">${escapeHtml(friendlyName)}</span>`;
-    html += `<div class="zone-chips">`;
+    html += `<div class="pc-system-row"><span class="pc-system-label">${escapeHtml(friendlyName)}</span>`;
+    html += `<div class="pc-zone-chips">`;
 
     if (hasRate) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.heating_rate)}"><ha-icon icon="mdi:trending-up"></ha-icon>${escapeHtml(states[entities.heating_rate].state)}${escapeHtml(states[entities.heating_rate]?.attributes?.unit_of_measurement || '°C/hr')}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.heating_rate)}"><ha-icon icon="mdi:trending-up"></ha-icon>${escapeHtml(states[entities.heating_rate].state)}${escapeHtml(states[entities.heating_rate]?.attributes?.unit_of_measurement || '°C/hr')}</span>`;
     }
     if (hasInertia) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.thermal_inertia)}"><ha-icon icon="mdi:speedometer"></ha-icon>${escapeHtml(states[entities.thermal_inertia].state)}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.thermal_inertia)}"><ha-icon icon="mdi:speedometer"></ha-icon>${escapeHtml(states[entities.thermal_inertia].state)}</span>`;
     }
     if (hasPreheat) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.preheat_time)}"><ha-icon icon="mdi:timer-outline"></ha-icon>${escapeHtml(states[entities.preheat_time].state)} min</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.preheat_time)}"><ha-icon icon="mdi:timer-outline"></ha-icon>${escapeHtml(states[entities.preheat_time].state)} min</span>`;
     }
     if (hasConf) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.confidence)}"><ha-icon icon="mdi:check-circle-outline"></ha-icon>${escapeHtml(states[entities.confidence].state)}%</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.confidence)}"><ha-icon icon="mdi:check-circle-outline"></ha-icon>${escapeHtml(states[entities.confidence].state)}%</span>`;
     }
     if (hasAccel) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.heat_accel)}"><ha-icon icon="mdi:rocket-launch"></ha-icon>${escapeHtml(states[entities.heat_accel].state)}${escapeHtml(states[entities.heat_accel]?.attributes?.unit_of_measurement || '')}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.heat_accel)}"><ha-icon icon="mdi:rocket-launch"></ha-icon>${escapeHtml(states[entities.heat_accel].state)}${escapeHtml(states[entities.heat_accel]?.attributes?.unit_of_measurement || '')}</span>`;
     }
     if (hasApproach) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.approach_factor)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.approach_factor].state)}${escapeHtml(states[entities.approach_factor]?.attributes?.unit_of_measurement || '')}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.approach_factor)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.approach_factor].state)}${escapeHtml(states[entities.approach_factor]?.attributes?.unit_of_measurement || '')}</span>`;
     }
 
     html += `</div></div>`;

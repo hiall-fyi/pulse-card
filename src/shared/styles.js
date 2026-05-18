@@ -125,65 +125,23 @@ export const SHARED_STYLES = `
   border: 1px solid var(--pulse-glass-border);
 }
 
-/* Stat value — light weight, tabular numbers */
-.pulse-stat-value {
-  font-weight: var(--pulse-weight-light);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Stat label — caption size, uppercase */
-.pulse-stat-label {
-  font-size: var(--pulse-font-caption);
-  color: var(--pulse-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-/* Interactive base — pointer, tap-highlight, focus ring */
-.pulse-interactive {
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.pulse-interactive:focus-visible {
-  outline: 2px solid var(--pulse-accent);
-  outline-offset: 2px;
-  border-radius: var(--pulse-radius-small);
-}
-
-/* Unavailable / disabled state */
-.pulse-unavailable {
-  opacity: 0.5;
-}
-
-/* Hero value — ultra-thin weight for large numbers (Dark Sky DNA) */
-.pulse-hero-value {
-  font-weight: var(--pulse-weight-hero, 100);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-/* Flat stats row — Dark Sky style, border-top separator */
+/* Stats row — grid layout primitive shared across the Pulse card
+   family. Children are stat tiles emitted by each card's own type
+   builder (e.g. pulse-weather's pt.stat). The row controls only
+   layout: column count, divider, gap, margin.
+   - data-cols: "3" | "4" — column count (default 4)
+   - data-divided: "true" — adds a 1px hairline at the top so the row
+     reads as a footer rather than a flush block. */
 .pulse-stats-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--pulse-space-tight) var(--pulse-space-element);
+  margin-top: var(--pulse-space-section);
+}
+.pulse-stats-row[data-cols="3"] { grid-template-columns: repeat(3, 1fr); }
+.pulse-stats-row[data-divided="true"] {
   padding-top: var(--pulse-space-section);
   border-top: 1px solid var(--pulse-border-subtle);
-}
-
-.pulse-stats-row .stat {
-  flex: 1;
-  text-align: center;
-  padding: 6px 0;
-}
-
-/* Ultra-muted label */
-.pulse-muted-label {
-  color: var(--pulse-text-secondary);
-  opacity: 0.25;
 }
 
 /* Precipitation bar — Dark Sky signature element */

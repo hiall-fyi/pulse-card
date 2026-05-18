@@ -10,7 +10,7 @@ import { resolveZoneState, resolveHvacVisual, tempToPosition, computeGlowStdDev 
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor } from '../sensor-resolver.js';
 import { temperatureToColor, buildFilledSparkline, buildSparklineDataAttr } from '../chart-primitives.js';
-import { buildSparklinePath } from '../../utils.js';
+import { buildSparklinePath } from '../../shared/utils.js';
 
 /**
  * Render a single zone row HTML.
@@ -23,7 +23,7 @@ import { buildSparklinePath } from '../../utils.js';
 function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
   const showTempBar = zoneConfig.show_temp_bar ?? cardConfig.show_temp_bar ?? true;
   const showPowerBar = zoneConfig.show_power_bar ?? cardConfig.show_power_bar ?? true;
-  const unavailableClass = zs.isUnavailable ? ' unavailable' : '';
+  const unavailableClass = zs.isUnavailable ? ' pc-unavailable' : '';
 
   // Zone header
   const tempDisplay = zs.isUnavailable
@@ -32,23 +32,23 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
       ? `${formatNumericDisplay(zs.currentTemp)}${escapeHtml(zs.unit)}`
       : '--';
   const targetDisplay = (!zs.isUnavailable && zs.targetTemp !== null)
-    ? `<span class="zone-target">→ ${formatNumericDisplay(zs.targetTemp)}${escapeHtml(zs.unit)}</span>`
+    ? `<span class="pc-zone-target">→ ${formatNumericDisplay(zs.targetTemp)}${escapeHtml(zs.unit)}</span>`
     : '';
 
   // Humidity inline with zone name — e.g. "💧 53% Dining"
   const humidityDisplay = (!zs.isUnavailable && zs.humidity !== null)
-    ? ` <span class="zone-humidity"><ha-icon icon="mdi:water-percent"></ha-icon>${Math.round(zs.humidity)}%</span>`
+    ? ` <span class="pc-zone-humidity"><ha-icon icon="mdi:water-percent"></ha-icon>${Math.round(zs.humidity)}%</span>`
     : '';
 
   const ariaLabel = zs.isUnavailable
     ? `${escapeHtml(zs.name)}: Unavailable`
     : `${escapeHtml(zs.name)}: ${tempDisplay}${zs.targetTemp !== null ? `, target ${formatNumericDisplay(zs.targetTemp)}${zs.unit}` : ''}${zs.humidity !== null ? `, ${Math.round(zs.humidity)}% humidity` : ''}, ${zs.hvacAction}`;
 
-  let html = `<div class="zone-row${unavailableClass}" tabindex="0" role="button"
+  let html = `<div class="pc-zone-row${unavailableClass}" tabindex="0" role="button"
     aria-label="${escapeHtml(ariaLabel)}" data-entity="${escapeHtml(zs.entityId)}">`;
-  html += `<div class="zone-header">`;
-  html += `<span class="zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}${humidityDisplay}</span>`;
-  html += `<span class="zone-temp">${tempDisplay}${targetDisplay}</span>`;
+  html += `<div class="pc-zone-header">`;
+  html += `<span class="pc-zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}${humidityDisplay}</span>`;
+  html += `<span class="pc-zone-temp">${tempDisplay}${targetDisplay}</span>`;
   html += `</div>`;
 
   // Temperature gauge bar — gradient background via temperatureToColor
@@ -66,11 +66,11 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
     const hotColor = temperatureToColor(zs.maxTemp);
     const gradientBg = `linear-gradient(to right, ${sanitizeCssValue(coldColor)}, ${sanitizeCssValue(warmColor)}, ${sanitizeCssValue(hotColor)})`;
 
-    html += `<div class="temp-gauge">`;
-    html += `<div class="temp-gauge-bg" style="background:${gradientBg}"></div>`;
-    html += `<div class="temp-gauge-current" style="left:${sanitizeCssValue(currentPos.toFixed(1))}%"></div>`;
+    html += `<div class="pc-temp-gauge">`;
+    html += `<div class="pc-temp-gauge-bg" style="background:${gradientBg}"></div>`;
+    html += `<div class="pc-temp-gauge-current" style="left:${sanitizeCssValue(currentPos.toFixed(1))}%"></div>`;
     if (targetPos !== null) {
-      html += `<div class="temp-gauge-target" style="left:${sanitizeCssValue(targetPos.toFixed(1))}%"></div>`;
+      html += `<div class="pc-temp-gauge-target" style="left:${sanitizeCssValue(targetPos.toFixed(1))}%"></div>`;
     }
     html += `</div>`;
   }
@@ -85,22 +85,22 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
 
     if (power > 0 || zs.hvacAction === 'heating' || zs.hvacAction === 'cooling') {
       const fillWidth = Math.min(100, Math.max(0, power));
-      const activeClass = power > 0 ? ' bar-active' : '';
-      html += `<div class="power-bar-container">`;
-      html += `<div class="power-bar-track"></div>`;
-      html += `<div class="power-bar-fill${activeClass}" style="width:${sanitizeCssValue(fillWidth.toFixed(1))}%;background:${sanitizeCssValue(barColor)};--bar-glow-color:${sanitizeCssValue(hvacVis.fallback)}40"></div>`;
+      const activeClass = power > 0 ? ' pc-bar-active' : '';
+      html += `<div class="pc-power-bar-container">`;
+      html += `<div class="pc-power-bar-track"></div>`;
+      html += `<div class="pc-power-bar-fill${activeClass}" style="width:${sanitizeCssValue(fillWidth.toFixed(1))}%;background:${sanitizeCssValue(barColor)};--pc-bar-glow:${sanitizeCssValue(hvacVis.fallback)}40"></div>`;
       html += `</div>`;
     }
   }
 
   // Chips
   if (zs.chips.length > 0) {
-    html += `<div class="zone-chips">`;
+    html += `<div class="pc-zone-chips">`;
     for (const chip of zs.chips) {
-      const severityClass = chip.severity ? ` severity-${chip.severity.toLowerCase()}` : '';
+      const severityClass = chip.severity ? ` pc-severity-${chip.severity.toLowerCase()}` : '';
       const colorStyle = chip.color ? ` style="color:${sanitizeCssValue(chip.color)}"` : '';
       const entityAttr = chip.entityId ? ` data-entity="${escapeHtml(chip.entityId)}"` : '';
-      html += `<span class="chip${severityClass}"${colorStyle}${entityAttr} data-chip-type="${escapeHtml(chip.type)}">`;
+      html += `<span class="pc-chip${severityClass}"${colorStyle}${entityAttr} data-chip-type="${escapeHtml(chip.type)}">`;
       html += `<ha-icon icon="${escapeHtml(chip.icon)}"></ha-icon>`;
       html += `${escapeHtml(chip.label)}`;
       html += `</span>`;
@@ -161,7 +161,7 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
   const targetDisplay = zs.targetTemp !== null ? `→ ${formatNumericDisplay(zs.targetTemp)}${escapeHtml(zs.unit)}` : '';
 
   const ariaLabel = `${escapeHtml(zs.name)}: ${tempDisplay}, ${actionText}`;
-  const rowClass = `zone-row zone-row-pulse${isHeating ? ' heating' : ''}`;
+  const rowClass = `pc-zone-row pc-zone-row-pulse${isHeating ? ' pc-heating' : ''}`;
 
   const dataAttr = buildSparklineDataAttr(sparklineData || [], 24, zs.unit);
   let html = `<div class="${rowClass}" tabindex="0" role="button"
@@ -173,7 +173,7 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
     if (result) {
       const gradId = `pulse-grad-${entitySlug}`;
       const filterId = `pulse-glow-${entitySlug}`;
-      const glowClass = isActive ? ' heating-glow' : '';
+      const glowClass = isActive ? ' pc-heating-glow' : '';
 
       // Active: vivid fill (0.55 top). Idle: subtle fill (0.2 top).
       const fillTopOpacity = isActive ? '0.55' : '0.2';
@@ -183,7 +183,7 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
       const strokeWidth = isActive ? '2' : '1.5';
       const strokeOpacity = isActive ? '1' : '0.5';
 
-      html += `<svg class="pulse-bg" viewBox="0 0 360 56" preserveAspectRatio="none">`;
+      html += `<svg class="pc-pulse-bg" viewBox="0 0 360 56" preserveAspectRatio="none">`;
       html += `<defs>`;
       html += `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">`;
       html += `<stop offset="0%" stop-color="${safeColor}" stop-opacity="${fillTopOpacity}"/>`;
@@ -203,18 +203,18 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
   }
 
   // Zone info overlay
-  html += `<div class="pulse-info">`;
-  html += `<div class="pulse-info-left">`;
-  html += `<div class="zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}</div>`;
-  html += `<div class="pulse-status">`;
-  html += `<span class="status-dot" style="background:${safeColor}"></span>`;
+  html += `<div class="pc-pulse-info">`;
+  html += `<div class="pc-pulse-info-left">`;
+  html += `<div class="pc-zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}</div>`;
+  html += `<div class="pc-pulse-status">`;
+  html += `<span class="pc-status-dot" style="background:${safeColor}"></span>`;
   html += `${escapeHtml(actionText)}`;
   html += `</div>`;
   html += `</div>`;
-  html += `<div class="pulse-info-right">`;
-  html += `<span class="pulse-current">${escapeHtml(tempDisplay)}</span>`;
+  html += `<div class="pc-pulse-info-right">`;
+  html += `<span class="pc-pulse-current">${escapeHtml(tempDisplay)}</span>`;
   if (targetDisplay) {
-    html += `<span class="zone-target">${targetDisplay}</span>`;
+    html += `<span class="pc-zone-target">${targetDisplay}</span>`;
   }
   html += `</div>`;
   html += `</div>`;
@@ -245,7 +245,7 @@ function renderProminentSparkline(lineColor, data, unit, entityId) {
     // Fallback to line-only sparkline
     const path = buildSparklinePath(data, 300, 40, 48, 'avg', true);
     if (!path) return '';
-    return `<div class="sparkline-prominent"><svg viewBox="0 0 300 40" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${sanitizeCssValue(lineColor)}" stroke-width="1.5" opacity="0.7" /></svg></div>`;
+    return `<div class="pc-sparkline-prominent"><svg viewBox="0 0 300 40" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${sanitizeCssValue(lineColor)}" stroke-width="1.5" opacity="0.7" /></svg></div>`;
   }
 
   // Use entity ID hash for unique gradient ID — prevents color bleeding between zones
@@ -253,7 +253,7 @@ function renderProminentSparkline(lineColor, data, unit, entityId) {
   const gradId = `prom-grad-${gradSuffix}`;
   const safeColor = sanitizeCssValue(lineColor);
   const dataAttr = buildSparklineDataAttr(data, 24, unit);
-  let html = `<div class="sparkline-filled" style="height:40px"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
+  let html = `<div class="pc-sparkline-filled" style="height:40px"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
   html += `<svg viewBox="0 0 300 40" preserveAspectRatio="none">`;
   html += `<defs><linearGradient id="${escapeHtml(gradId)}" x1="0" y1="0" x2="0" y2="1">`;
   html += `<stop offset="0%" stop-color="${safeColor}" stop-opacity="0.3"/>`;
@@ -278,12 +278,12 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
   if (!zones || zones.length === 0) return '';
 
   const columns = Number(config.columns) || 1;
-  const columnsClass = columns > 1 ? ' columns' : '';
+  const columnsClass = columns > 1 ? ' pc-columns' : '';
   const gridStyle = columns > 1
     ? ` style="grid-template-columns:repeat(${Number(columns)}, 1fr)"`
     : '';
 
-  let html = `<div class="section section-zones${columnsClass}"${gridStyle}>`;
+  let html = `<div class="pc-section pc-section-zones${columnsClass}"${gridStyle}>`;
 
   // Section header with optional Home/Away presence badge
   const homeEntity = discovery?.hubEntities?.home_state;
@@ -294,12 +294,12 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
     const homeLabel = isHome ? 'Home' : 'Away';
     const homeColor = isHome ? 'var(--label-badge-green, #4CAF50)' : 'var(--secondary-text-color)';
     html += `<div style="display:flex;justify-content:space-between;align-items:center">`;
-    html += `<div class="section-label">Zones</div>`;
-    html += `<span class="chip" data-entity="${escapeHtml(homeEntity)}" style="color:${sanitizeCssValue(homeColor)}">`;
+    html += `<div class="pulse-section-label">Zones</div>`;
+    html += `<span class="pc-chip" data-entity="${escapeHtml(homeEntity)}" style="color:${sanitizeCssValue(homeColor)}">`;
     html += `<ha-icon icon="${escapeHtml(homeIcon)}"></ha-icon>${escapeHtml(homeLabel)}</span>`;
     html += `</div>`;
   } else {
-    html += `<div class="section-label">Zones</div>`;
+    html += `<div class="pulse-section-label">Zones</div>`;
   }
 
   for (const zoneConfig of zones) {
@@ -329,7 +329,7 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
 export function updateZonesSection(sectionEl, zones, config, states, discovery, prevStates) {
   if (!sectionEl || !zones) return;
 
-  const zoneRows = sectionEl.querySelectorAll('.zone-row');
+  const zoneRows = sectionEl.querySelectorAll('.pc-zone-row');
 
   for (let i = 0; i < zones.length; i++) {
     const zoneConfig = zones[i];
@@ -347,7 +347,7 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
     if (!row) continue;
 
     // Update temperature display
-    const tempEl = row.querySelector('.zone-temp');
+    const tempEl = row.querySelector('.pc-zone-temp');
     if (tempEl) {
       const tempDisplay = zoneState.isUnavailable
         ? 'Unavailable'
@@ -355,18 +355,14 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
           ? `${formatNumericDisplay(zoneState.currentTemp)}${zoneState.unit}`
           : '--';
       const targetDisplay = (!zoneState.isUnavailable && zoneState.targetTemp !== null)
-        ? `<span class="zone-target">→ ${formatNumericDisplay(zoneState.targetTemp)}${escapeHtml(zoneState.unit)}</span>`
+        ? `<span class="pc-zone-target">→ ${formatNumericDisplay(zoneState.targetTemp)}${escapeHtml(zoneState.unit)}</span>`
         : '';
-      // SECURITY-AUDIT: Differential update recomposes zone-temp block from displayValue / targetTemp which
-      // SECURITY-AUDIT: flow through escapeHtml() (display) or formatNumericDisplay (numeric). The only direct
-      // SECURITY-AUDIT: interpolation of a raw attribute is the unit-of-measurement string, which is itself
-      // SECURITY-AUDIT: escaped.
-      // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+      // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped (escapeHtml + formatNumericDisplay)
       tempEl.innerHTML = `${escapeHtml(tempDisplay)}${targetDisplay}`;
     }
 
     // Update power bar fill
-    const fillEl = /** @type {HTMLElement|null} */ (row.querySelector('.power-bar-fill'));
+    const fillEl = /** @type {HTMLElement|null} */ (row.querySelector('.pc-power-bar-fill'));
     if (fillEl) {
       const power = zoneState.heatingPower || zoneState.coolingPower || 0;
       const hvacVis = resolveHvacVisual(zoneState.hvacAction);
@@ -375,25 +371,25 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
         : hvacVis.fallback;
       fillEl.style.width = `${Math.min(100, Math.max(0, power)).toFixed(1)}%`;
       fillEl.style.background = barColor;
-      fillEl.style.setProperty('--bar-glow-color', `${hvacVis.fallback}40`);
-      fillEl.classList.toggle('bar-active', power > 0);
+      fillEl.style.setProperty('--pc-bar-glow', `${hvacVis.fallback}40`);
+      fillEl.classList.toggle('pc-bar-active', power > 0);
     }
 
     // Update gauge markers
-    const currentMarker = /** @type {HTMLElement|null} */ (row.querySelector('.temp-gauge-current'));
+    const currentMarker = /** @type {HTMLElement|null} */ (row.querySelector('.pc-temp-gauge-current'));
     if (currentMarker && zoneState.currentTemp !== null) {
       const pos = tempToPosition(zoneState.currentTemp, zoneState.minTemp, zoneState.maxTemp);
       currentMarker.style.left = `${pos.toFixed(1)}%`;
     }
 
-    const targetMarker = /** @type {HTMLElement|null} */ (row.querySelector('.temp-gauge-target'));
+    const targetMarker = /** @type {HTMLElement|null} */ (row.querySelector('.pc-temp-gauge-target'));
     if (targetMarker && zoneState.targetTemp !== null) {
       const pos = tempToPosition(zoneState.targetTemp, zoneState.minTemp, zoneState.maxTemp);
       targetMarker.style.left = `${pos.toFixed(1)}%`;
     }
 
     // Update gauge gradient background
-    const gaugeBg = /** @type {HTMLElement|null} */ (row.querySelector('.temp-gauge-bg'));
+    const gaugeBg = /** @type {HTMLElement|null} */ (row.querySelector('.pc-temp-gauge-bg'));
     if (gaugeBg && !zoneState.isUnavailable) {
       const coldColor = temperatureToColor(zoneState.minTemp);
       const warmColor = temperatureToColor((zoneState.minTemp + zoneState.maxTemp) / 2);
@@ -403,9 +399,9 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
 
     // Update unavailable class
     if (zoneState.isUnavailable) {
-      row.classList.add('unavailable');
+      row.classList.add('pc-unavailable');
     } else {
-      row.classList.remove('unavailable');
+      row.classList.remove('pc-unavailable');
     }
   }
 }

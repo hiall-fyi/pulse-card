@@ -30,7 +30,7 @@ import { buildFilledSparkline, temperatureToColor } from './chart-primitives.js'
 import { createStripTooltip, createFixedTooltip, pointerToSlotIndex, bindDragSelect, bindCrosshair } from './sections/slot-engine.js';
 import { executeAction as sharedExecuteAction, fireEvent, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
 import { attachRipple } from '../shared/ripple.js';
-import { fetchSparklineData } from '../utils.js';
+import { fetchSparklineData } from '../shared/utils.js';
 
 /** Module-level flag — log discovery results once per page load across all card instances. */
 let _discoveryLogged = false;
@@ -65,22 +65,22 @@ const HISTORY_SECTIONS = new Set([
 
 /** @type {Record<string, string>} Section type → CSS selector mapping. */
 const SECTION_SELECTORS = {
-  zones: '.section-zones',
-  api: '.section-api',
-  graph: '.section-graph',
-  bridge: '.section-bridge',
-  thermal_strip: '.section-thermal-strip',
-  comfort_strip: '.section-comfort-strip',
-  homekit: '.section-homekit',
-  weather: '.section-weather',
-  radial: '.section-radial',
-  donut: '.section-donut',
-  environment: '.section-environment',
-  thermal: '.section-thermal',
-  schedule: '.section-schedule',
-  energy_flow: '.section-energy-flow',
-  home_status: '.section-home-status',
-  zone_ranking: '.section-zone-ranking',
+  zones: '.pc-section-zones',
+  api: '.pc-section-api',
+  graph: '.pc-section-graph',
+  bridge: '.pc-section-bridge',
+  thermal_strip: '.pc-section-thermal-strip',
+  comfort_strip: '.pc-section-comfort-strip',
+  homekit: '.pc-section-homekit',
+  weather: '.pc-section-weather',
+  radial: '.pc-section-radial',
+  donut: '.pc-section-donut',
+  environment: '.pc-section-environment',
+  thermal: '.pc-section-thermal',
+  schedule: '.pc-section-schedule',
+  energy_flow: '.pc-section-energy-flow',
+  home_status: '.pc-section-home-status',
+  zone_ranking: '.pc-section-zone-ranking',
 };
 
 class PulseClimateCard extends HTMLElement {
@@ -254,7 +254,7 @@ class PulseClimateCard extends HTMLElement {
 
     this._rerenderTargets = [
       {
-        selector: '.section-zones',
+        selector: '.pc-section-zones',
         watchIds: [hubEntities.home_state].filter(Boolean),
         render: () => {
           const config = /** @type {import('./types.js').PulseClimateConfig} */ (this._config);
@@ -263,7 +263,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-api',
+        selector: '.pc-section-api',
         watchIds: [hubEntities.api_usage, hubEntities.api_limit, hubEntities.api_status, hubEntities.next_sync, hubEntities.token_status].filter(Boolean),
         render: () => {
           const states = this._hass?.states || {};
@@ -273,7 +273,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-homekit',
+        selector: '.pc-section-homekit',
         watchIds: [hubEntities.homekit_connected, hubEntities.homekit_reads_saved, hubEntities.homekit_writes_saved].filter(Boolean),
         render: () => {
           const states = this._hass?.states || {};
@@ -281,7 +281,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-bridge',
+        selector: '.pc-section-bridge',
         watchIds: [hubEntities.bridge_connected, hubEntities.boiler_flow_temp, hubEntities.wc_status, hubEntities.wc_target_flow].filter(Boolean),
         render: () => {
           const states = this._hass?.states || {};
@@ -289,7 +289,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-weather',
+        selector: '.pc-section-weather',
         watchIds: [hubEntities.outside_temp, hubEntities.weather, hubEntities.solar_intensity].filter(Boolean),
         render: () => {
           const states = this._hass?.states || {};
@@ -297,7 +297,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-environment',
+        selector: '.pc-section-environment',
         watchIds: zones.flatMap((z) => {
           const zn = extractZoneName(z.entity);
           const ze = discovery.zoneEntities?.[zn] || {};
@@ -309,7 +309,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-thermal',
+        selector: '.pc-section-thermal',
         watchIds: zones.flatMap((z) => {
           const zn = extractZoneName(z.entity);
           const ze = discovery.zoneEntities?.[zn] || {};
@@ -321,7 +321,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-schedule',
+        selector: '.pc-section-schedule',
         watchIds: zones.flatMap((z) => {
           const zn = extractZoneName(z.entity);
           const ze = discovery.zoneEntities?.[zn] || {};
@@ -333,7 +333,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-radial',
+        selector: '.pc-section-radial',
         watchIds: zones.map((z) => z.entity),
         render: () => {
           const states = this._hass?.states || {};
@@ -343,7 +343,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-donut',
+        selector: '.pc-section-donut',
         watchIds: (() => {
           const sections = this._config?.sections || [];
           const donutSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'donut');
@@ -360,7 +360,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-graph',
+        selector: '.pc-section-graph',
         watchIds: [],
         render: () => {
           const states = this._hass?.states || {};
@@ -370,7 +370,7 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-home-status',
+        selector: '.pc-section-home-status',
         watchIds: zones.map((z) => z.entity),
         render: () => {
           const states = this._hass?.states || {};
@@ -378,11 +378,11 @@ class PulseClimateCard extends HTMLElement {
         },
       },
       {
-        selector: '.section-zone-ranking',
+        selector: '.pc-section-zone-ranking',
         watchIds: zones.map((z) => z.entity),
         render: () => {
           const states = this._hass?.states || {};
-          const existing = this._shadow.querySelector('.section-zone-ranking');
+          const existing = this._shadow.querySelector('.pc-section-zone-ranking');
           const activeMetric = existing?.getAttribute('data-metric') || 'power';
           return renderZoneRankingSection(zones, states, discovery, activeMetric);
         },
@@ -412,7 +412,7 @@ class PulseClimateCard extends HTMLElement {
 
     // Card wrapper
     if (!isEntityRow) {
-      html += `<ha-card${isCompact ? ' class="compact"' : ''}>`;
+      html += `<ha-card${isCompact ? ' class="pc-compact"' : ''}>`;
     }
 
     // Title
@@ -430,17 +430,12 @@ class PulseClimateCard extends HTMLElement {
       html += `</ha-card>`;
     }
 
-    // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
-    // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
-    // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name strings
-    // SECURITY-AUDIT: are static literals. Detail panels (zone-detail, radial-detail, comfort-detail) likewise
-    // SECURITY-AUDIT: pre-escape every value before interpolation — see audit-C1 §2q trace.
-    // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+    // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
     this._shadow.innerHTML = html;
 
     // Cache DOM refs
-    this._elements.zonesSection = this._shadow.querySelector('.section-zones');
-    this._elements.apiSection = this._shadow.querySelector('.section-api');
+    this._elements.zonesSection = this._shadow.querySelector('.pc-section-zones');
+    this._elements.apiSection = this._shadow.querySelector('.pc-section-api');
     this._cacheWatchedStates();
 
     // Bind action listeners on zone rows
@@ -458,7 +453,7 @@ class PulseClimateCard extends HTMLElement {
   /** Bind tap/hold/double-tap actions on zone rows. */
   _bindZoneActions() {
     if (!this._config || !this._hass) return;
-    const rows = this._shadow.querySelectorAll('.zone-row');
+    const rows = this._shadow.querySelectorAll('.pc-zone-row');
     const zones = this._config._zones || [];
 
     for (let i = 0; i < rows.length && i < zones.length; i++) {
@@ -550,12 +545,12 @@ class PulseClimateCard extends HTMLElement {
     this._chipAbort = new AbortController();
     const { signal: chipSignal } = this._chipAbort;
     const zones = this._config._zones || [];
-    const rows = this._shadow.querySelectorAll('.zone-row');
+    const rows = this._shadow.querySelectorAll('.pc-zone-row');
 
     for (let i = 0; i < rows.length && i < zones.length; i++) {
       const zoneConfig = zones[i];
       const zoneEntityId = zoneConfig.entity;
-      const chips = rows[i].querySelectorAll('.chip');
+      const chips = rows[i].querySelectorAll('.pc-chip');
 
       for (const chip of chips) {
         const chipEl = /** @type {HTMLElement} */ (chip);
@@ -604,13 +599,13 @@ class PulseClimateCard extends HTMLElement {
     if (this._sectionChipAbort) this._sectionChipAbort.abort();
     this._sectionChipAbort = new AbortController();
     const { signal: sectionChipSignal } = this._sectionChipAbort;
-    const tappables = this._shadow.querySelectorAll('.section [data-entity]');
+    const tappables = this._shadow.querySelectorAll('.pc-section [data-entity]');
     for (const el of tappables) {
       const tappable = /** @type {HTMLElement} */ (el);
       // Skip zone row chips — they're handled by _bindChipActions
-      if (tappable.closest('.zone-row') && tappable.classList.contains('chip')) continue;
+      if (tappable.closest('.pc-zone-row') && tappable.classList.contains('pc-chip')) continue;
       // Skip zone rows themselves — they're handled by _bindZoneActions
-      if (tappable.classList.contains('zone-row')) continue;
+      if (tappable.classList.contains('pc-zone-row')) continue;
 
       tappable.style.cursor = 'pointer';
       attachRipple(tappable);
@@ -652,11 +647,11 @@ class PulseClimateCard extends HTMLElement {
     if (this._radialAbort) this._radialAbort.abort();
     this._radialAbort = new AbortController();
     const { signal: radialSignal } = this._radialAbort;
-    const arcs = this._shadow.querySelectorAll('.arc-group');
-    const legendItems = this._shadow.querySelectorAll('.radial-legend .legend-item');
+    const arcs = this._shadow.querySelectorAll('.pc-arc-group');
+    const legendItems = this._shadow.querySelectorAll('.pc-radial-legend .pc-legend-item');
     const centerEl = this._shadow.querySelector('#radial-center');
     const detailEl = this._shadow.querySelector('#radial-detail');
-    const svgEl = this._shadow.querySelector('.section-radial svg');
+    const svgEl = this._shadow.querySelector('.pc-section-radial svg');
     if (arcs.length === 0 || !centerEl) return;
 
     // Get SVG center for proper scale transform origin
@@ -667,9 +662,9 @@ class PulseClimateCard extends HTMLElement {
     /** @type {number|null} */
     let selectedIdx = null;
 
-    const outsideTempEntityConfig = this._shadow.querySelector('.section-radial')?.getAttribute('data-outdoor-temp-entity');
-    const radialAttribute = this._shadow.querySelector('.section-radial')?.getAttribute('data-attribute') || 'temperature';
-    const outsideHumEntityConfig = this._shadow.querySelector('.section-radial')?.getAttribute('data-outdoor-humidity-entity');
+    const outsideTempEntityConfig = this._shadow.querySelector('.pc-section-radial')?.getAttribute('data-outdoor-temp-entity');
+    const radialAttribute = this._shadow.querySelector('.pc-section-radial')?.getAttribute('data-attribute') || 'temperature';
+    const outsideHumEntityConfig = this._shadow.querySelector('.pc-section-radial')?.getAttribute('data-outdoor-humidity-entity');
 
     /** Compute default center text from current state. */
     const getDefaults = () => {
@@ -728,9 +723,9 @@ class PulseClimateCard extends HTMLElement {
         : 'Idle';
 
       // Update center
-      const valueEl = centerEl.querySelector('.center-value');
-      const labelEl = centerEl.querySelector('.center-label');
-      const subEl = centerEl.querySelector('.center-sub');
+      const valueEl = centerEl.querySelector('.pc-center-value');
+      const labelEl = centerEl.querySelector('.pc-center-label');
+      const subEl = centerEl.querySelector('.pc-center-sub');
       if (valueEl) valueEl.textContent = temp !== undefined ? `${formatNumericDisplay(temp)}${zd.unit}` : '--';
       if (labelEl) labelEl.textContent = name;
       const humText = humidity !== undefined ? ` · ${humidity}%` : '';
@@ -738,8 +733,8 @@ class PulseClimateCard extends HTMLElement {
 
       // Dim/select arcs — scale from SVG center for consistent outward push
       arcs.forEach((/** @type {Element} */ a, /** @type {number} */ i) => {
-        a.classList.toggle('dimmed', i !== idx);
-        a.classList.toggle('selected', i === idx);
+        a.classList.toggle('pc-dimmed', i !== idx);
+        a.classList.toggle('pc-selected', i === idx);
         if (i === idx) {
           a.setAttribute('transform', `translate(${svgCenter}, ${svgCenter}) scale(1.06) translate(${-svgCenter}, ${-svgCenter})`);
         } else {
@@ -747,39 +742,33 @@ class PulseClimateCard extends HTMLElement {
         }
       });
       legendItems.forEach((/** @type {Element} */ l, /** @type {number} */ i) => {
-        l.classList.toggle('selected', i === idx);
+        l.classList.toggle('pc-selected', i === idx);
       });
 
       // Detail panel
       if (detailEl) {
-        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
-        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
-        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
-        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
-        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
-        // SECURITY-AUDIT: §2q trace.
-        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
-        detailEl.innerHTML = `<div class="detail-stats">
-          <div class="stat"><div class="stat-value">${target !== undefined ? escapeHtml(target) + escapeHtml(zd.unit) : '--'}</div><div class="stat-label">Target</div></div>
-          <div class="stat"><div class="stat-value">${humidity !== undefined ? escapeHtml(humidity) + '%' : '--'}</div><div class="stat-label">Humidity</div></div>
-          <div class="stat"><div class="stat-value">${escapeHtml(action)}</div><div class="stat-label">Action</div></div>
+        // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
+        detailEl.innerHTML = `<div class="pc-detail-stats">
+          <div class="pc-stat"><div class="pc-stat-value">${target !== undefined ? escapeHtml(target) + escapeHtml(zd.unit) : '--'}</div><div class="pc-stat-label">Target</div></div>
+          <div class="pc-stat"><div class="pc-stat-value">${humidity !== undefined ? escapeHtml(humidity) + '%' : '--'}</div><div class="pc-stat-label">Humidity</div></div>
+          <div class="pc-stat"><div class="pc-stat-value">${escapeHtml(action)}</div><div class="pc-stat-label">Action</div></div>
         </div>`;
-        detailEl.classList.add('active');
+        detailEl.classList.add('pc-active');
       }
     };
 
     const deselectZone = () => {
       selectedIdx = null;
       const { center: defaultCenter, centerSub: defaultCenterSub } = getDefaults();
-      const valueEl = centerEl.querySelector('.center-value');
-      const labelEl = centerEl.querySelector('.center-label');
-      const subEl = centerEl.querySelector('.center-sub');
+      const valueEl = centerEl.querySelector('.pc-center-value');
+      const labelEl = centerEl.querySelector('.pc-center-label');
+      const subEl = centerEl.querySelector('.pc-center-sub');
       if (valueEl) valueEl.textContent = defaultCenter;
       if (labelEl) labelEl.textContent = 'Outdoor';
       if (subEl) subEl.textContent = defaultCenterSub;
-      arcs.forEach((/** @type {Element} */ a) => { a.classList.remove('dimmed', 'selected'); a.removeAttribute('transform'); });
-      legendItems.forEach((/** @type {Element} */ l) => { l.classList.remove('selected'); });
-      if (detailEl) { detailEl.classList.remove('active'); detailEl.innerHTML = ''; }
+      arcs.forEach((/** @type {Element} */ a) => { a.classList.remove('pc-dimmed', 'pc-selected'); a.removeAttribute('transform'); });
+      legendItems.forEach((/** @type {Element} */ l) => { l.classList.remove('pc-selected'); });
+      if (detailEl) { detailEl.classList.remove('pc-active'); detailEl.innerHTML = ''; }
     };
 
     arcs.forEach((/** @type {Element} */ arc, /** @type {number} */ i) => {
@@ -898,12 +887,12 @@ class PulseClimateCard extends HTMLElement {
     if (this._timelineAbort) this._timelineAbort.abort();
     this._timelineAbort = new AbortController();
     const { signal: timelineSignal } = this._timelineAbort;
-    const rows = this._shadow.querySelectorAll('.section-thermal-strip .timeline-row');
-    const detailEl = this._shadow.querySelector('.section-thermal-strip');
+    const rows = this._shadow.querySelectorAll('.pc-section-thermal-strip .pc-timeline-row');
+    const detailEl = this._shadow.querySelector('.pc-section-thermal-strip');
     if (rows.length === 0 || !detailEl) return;
 
     const zones = this._config?._zones || [];
-    const subtitleEl = detailEl.querySelector('.section-subtitle');
+    const subtitleEl = detailEl.querySelector('.pc-section-subtitle');
     const defaultSubtitle = 'Tap a zone for details';
     const tempUnit = this._hass?.states?.[zones[0]?.entity]?.attributes?.unit_of_measurement || '°C';
     /** @type {number|null} */
@@ -917,7 +906,7 @@ class PulseClimateCard extends HTMLElement {
      */
     const removeComparison = (detail) => {
       comparisonIdx = null;
-      const overlay = detail.querySelector('.comparison-path');
+      const overlay = detail.querySelector('.pc-comparison-path');
       if (overlay) overlay.remove();
       const legend = detail.querySelector('.comparison-legend');
       if (legend) legend.remove();
@@ -932,12 +921,12 @@ class PulseClimateCard extends HTMLElement {
         const historyCache = this._historyCache;
 
         // Clear any drag-select highlights
-        detailEl.querySelectorAll('.strip-drag-highlight').forEach((/** @type {Element} */ h) => { /** @type {HTMLElement} */ (h).style.display = 'none'; });
+        detailEl.querySelectorAll('.pc-strip-drag-highlight').forEach((/** @type {Element} */ h) => { /** @type {HTMLElement} */ (h).style.display = 'none'; });
 
         // If detail panel is open and tapping a different zone → comparison overlay
         if (selectedIdx !== null && selectedIdx !== i) {
-          const detail = detailEl.querySelector('.zone-detail');
-          const sparkSvg = detail?.querySelector('.detail-sparkline svg');
+          const detail = detailEl.querySelector('.pc-zone-detail');
+          const sparkSvg = detail?.querySelector('.pc-detail-sparkline svg');
           if (detail && sparkSvg) {
             // Toggle off if same comparison zone tapped again
             if (comparisonIdx === i) {
@@ -965,7 +954,7 @@ class PulseClimateCard extends HTMLElement {
                 cmpPath.setAttribute('stroke', 'var(--info-color, #4FC3F7)');
                 cmpPath.setAttribute('stroke-width', '1.5');
                 cmpPath.setAttribute('opacity', '0.5');
-                cmpPath.classList.add('comparison-path');
+                cmpPath.classList.add('pc-comparison-path');
                 sparkSvg.appendChild(cmpPath);
               }
             }
@@ -975,15 +964,9 @@ class PulseClimateCard extends HTMLElement {
             const primaryName = resolveZoneDisplay(primaryConfig?.entity || '', states, primaryConfig).name;
             const cmpName = resolveZoneDisplay(cmpEntityId, states, cmpConfig).name;
             const legendEl = document.createElement('div');
-            legendEl.className = 'comparison-legend';
+            legendEl.className = 'pc-comparison-legend';
             legendEl.style.cssText = 'display:flex;gap:12px;font-size:10px;margin-top:4px;color:var(--secondary-text-color,#8e8e93)';
-            // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields
-            // SECURITY-AUDIT: (zone names, sensor states, units) via escapeHtml() and sanitize CSS values via
-            // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
-            // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
-            // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see
-            // SECURITY-AUDIT: audit-C1 §2q trace.
-            // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+            // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
             legendEl.innerHTML = `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:4px"></span>${escapeHtml(primaryName)}</span>` +
               `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--info-color, #4FC3F7);margin-right:4px"></span>${escapeHtml(cmpName)}</span>`;
             detail.appendChild(legendEl);
@@ -994,14 +977,14 @@ class PulseClimateCard extends HTMLElement {
         if (selectedIdx === i) {
           selectedIdx = null;
           comparisonIdx = null;
-          rows.forEach((/** @type {Element} */ r) => r.classList.remove('selected'));
-          const existing = detailEl.querySelector('.zone-detail');
-          if (existing) existing.classList.remove('active');
+          rows.forEach((/** @type {Element} */ r) => r.classList.remove('pc-selected'));
+          const existing = detailEl.querySelector('.pc-zone-detail');
+          if (existing) existing.classList.remove('pc-active');
           if (subtitleEl) subtitleEl.textContent = defaultSubtitle;
           return;
         }
         selectedIdx = i;
-        rows.forEach((/** @type {Element} */ r, /** @type {number} */ j) => r.classList.toggle('selected', j === i));
+        rows.forEach((/** @type {Element} */ r, /** @type {number} */ j) => r.classList.toggle('pc-selected', j === i));
 
         const zoneConfig = zones[i];
         if (!zoneConfig) return;
@@ -1070,7 +1053,7 @@ class PulseClimateCard extends HTMLElement {
           const result = this._sparklinePathCache.get(sensorId) || buildFilledSparkline(historyData, 340, 36, 48);
           if (result) {
             const gradId = `tl-detail-grad-${i}`;
-            sparklineHtml = `<div class="detail-sparkline sparkline-filled" style="height:36px;margin-top:10px">` +
+            sparklineHtml = `<div class="pc-detail-sparkline pc-sparkline-filled" style="height:36px;margin-top:10px">` +
               `<svg viewBox="0 0 340 36" preserveAspectRatio="none">` +
               `<defs><linearGradient id="${escapeHtml(gradId)}" x1="0" y1="0" x2="0" y2="1">` +
               `<stop offset="0%" stop-color="${safeColor}" stop-opacity="0.3"/>` +
@@ -1082,34 +1065,28 @@ class PulseClimateCard extends HTMLElement {
           }
         }
 
-        let detail = detailEl.querySelector('.zone-detail');
+        let detail = detailEl.querySelector('.pc-zone-detail');
         if (!detail) {
           detail = document.createElement('div');
-          detail.className = 'zone-detail';
-          detailEl.insertBefore(detail, detailEl.querySelector('.timeline-row'));
+          detail.className = 'pc-zone-detail';
+          detailEl.insertBefore(detail, detailEl.querySelector('.pc-timeline-row'));
         }
-        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
-        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
-        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
-        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
-        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
-        // SECURITY-AUDIT: §2q trace.
-        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
-        detail.innerHTML = `<div class="detail-header"><span class="detail-name">${escapeHtml(name)}</span><span class="detail-close">✕ Close</span></div>
-          <div class="detail-stats">
-            <div class="stat"><div class="stat-value">${temp !== undefined ? escapeHtml(temp) + escapeHtml(zd.unit) : '--'}</div><div class="stat-label">Current</div>${trendLabel ? `<div class="stat-sub">${escapeHtml(trendLabel)}</div>` : ''}</div>
-            <div class="stat"><div class="stat-value">${target !== undefined ? escapeHtml(target) + escapeHtml(zd.unit) : '--'}</div><div class="stat-label">Target</div>${powerLabel ? `<div class="stat-sub">${escapeHtml(powerLabel)}</div>` : ''}</div>
-            <div class="stat"><div class="stat-value">${humidity !== undefined ? escapeHtml(humidity) + '%' : '--'}</div><div class="stat-label">Humidity</div>${rangeLabel ? `<div class="stat-sub">${escapeHtml(rangeLabel)}</div>` : ''}</div>
+        // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
+        detail.innerHTML = `<div class="pc-detail-header"><span class="pc-detail-name">${escapeHtml(name)}</span><span class="pc-detail-close">✕ Close</span></div>
+          <div class="pc-detail-stats">
+            <div class="pc-stat"><div class="pc-stat-value">${temp !== undefined ? escapeHtml(temp) + escapeHtml(zd.unit) : '--'}</div><div class="pc-stat-label">Current</div>${trendLabel ? `<div class="pc-stat-sub">${escapeHtml(trendLabel)}</div>` : ''}</div>
+            <div class="pc-stat"><div class="pc-stat-value">${target !== undefined ? escapeHtml(target) + escapeHtml(zd.unit) : '--'}</div><div class="pc-stat-label">Target</div>${powerLabel ? `<div class="pc-stat-sub">${escapeHtml(powerLabel)}</div>` : ''}</div>
+            <div class="pc-stat"><div class="pc-stat-value">${humidity !== undefined ? escapeHtml(humidity) + '%' : '--'}</div><div class="pc-stat-label">Humidity</div>${rangeLabel ? `<div class="pc-stat-sub">${escapeHtml(rangeLabel)}</div>` : ''}</div>
           </div>${sparklineHtml}`;
-        detail.classList.add('active');
+        detail.classList.add('pc-active');
 
-        const closeBtn = detail.querySelector('.detail-close');
+        const closeBtn = detail.querySelector('.pc-detail-close');
         if (closeBtn) closeBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           selectedIdx = null;
           comparisonIdx = null;
-          rows.forEach((/** @type {Element} */ r) => r.classList.remove('selected'));
-          detail.classList.remove('active');
+          rows.forEach((/** @type {Element} */ r) => r.classList.remove('pc-selected'));
+          detail.classList.remove('pc-active');
           if (subtitleEl) subtitleEl.textContent = defaultSubtitle;
         }, { signal: timelineSignal });
       }, { signal: timelineSignal });
@@ -1117,14 +1094,14 @@ class PulseClimateCard extends HTMLElement {
 
     // Per-slot tooltip — handles both timeline (.strip-container) and heatmap (.cells) modes
     const tooltip = createStripTooltip();
-    const stripRows = detailEl.querySelector('.strip-rows');
+    const stripRows = detailEl.querySelector('.pc-strip-rows');
     if (stripRows) {
       /** @type {HTMLElement} */ (stripRows).style.position = 'relative';
       stripRows.appendChild(tooltip.element);
     }
 
     // Timeline mode: per-slot tooltip via data-slots JSON
-    const strips = detailEl.querySelectorAll('.strip-container');
+    const strips = detailEl.querySelectorAll('.pc-strip-container');
     strips.forEach((/** @type {Element} */ strip) => {
       // Parse slot data once at bind time — avoid JSON.parse on every pointermove
       const slotsAttr = strip.getAttribute('data-slots');
@@ -1157,11 +1134,11 @@ class PulseClimateCard extends HTMLElement {
     });
 
     // Heatmap mode: per-cell tooltip
-    const cellContainers = detailEl.querySelectorAll('.cells');
+    const cellContainers = detailEl.querySelectorAll('.pc-cells');
     cellContainers.forEach((/** @type {Element} */ container) => {
       container.addEventListener('pointermove', (/** @type {*} */ ev) => {
         if (ev.pointerType === 'touch') return;
-        const cellEl = ev.target?.closest?.('.cell');
+        const cellEl = ev.target?.closest?.('.pc-cell');
         if (!cellEl) { tooltip.hide(); return; }
         const hour = cellEl.getAttribute('data-hour') || '';
         const val = cellEl.getAttribute('data-score');
@@ -1172,7 +1149,7 @@ class PulseClimateCard extends HTMLElement {
       container.addEventListener('pointerleave', () => tooltip.hide(), { signal: timelineSignal });
       container.addEventListener('pointerdown', (/** @type {*} */ ev) => {
         if (ev.pointerType !== 'touch') return;
-        const cellEl = ev.target?.closest?.('.cell');
+        const cellEl = ev.target?.closest?.('.pc-cell');
         if (!cellEl) return;
         const hour = cellEl.getAttribute('data-hour') || '';
         const val = cellEl.getAttribute('data-score');
@@ -1184,15 +1161,15 @@ class PulseClimateCard extends HTMLElement {
     });
 
     // Crosshair — vertical line across all zone rows
-    const crosshair = stripRows?.querySelector('.strip-crosshair');
-    const firstRef = stripRows?.querySelector('.strip-container') || stripRows?.querySelector('.cells');
+    const crosshair = stripRows?.querySelector('.pc-strip-crosshair');
+    const firstRef = stripRows?.querySelector('.pc-strip-container') || stripRows?.querySelector('.pc-cells');
     if (stripRows && crosshair && firstRef) {
       const labelOffset = firstRef.getBoundingClientRect().left - stripRows.getBoundingClientRect().left;
       bindCrosshair(stripRows, /** @type {HTMLElement} */ (crosshair), firstRef, labelOffset);
     }
 
     // Drag-to-select time range — handles both .strip-container and .cells
-    const dragContainers = detailEl.querySelectorAll('.strip-container, .cells');
+    const dragContainers = detailEl.querySelectorAll('.pc-strip-container, .pc-cells');
     dragContainers.forEach((/** @type {Element} */ container) => {
       const slotsAttr = container.getAttribute('data-slots');
       /** @type {*[]|null} */
@@ -1207,7 +1184,7 @@ class PulseClimateCard extends HTMLElement {
     if (this._heatmapAbort) this._heatmapAbort.abort();
     this._heatmapAbort = new AbortController();
     const { signal: heatmapSignal } = this._heatmapAbort;
-    const rows = this._shadow.querySelectorAll('.section-comfort-strip .heatmap-row');
+    const rows = this._shadow.querySelectorAll('.pc-section-comfort-strip .pc-heatmap-row');
     const detailEl = this._shadow.querySelector('#heatmap-detail');
     if (rows.length === 0 || !detailEl) return;
 
@@ -1218,19 +1195,19 @@ class PulseClimateCard extends HTMLElement {
       attachRipple(/** @type {HTMLElement} */ (row));
       row.addEventListener('click', () => {
         // Clear any drag-select highlights
-        const sectionRoot = this._shadow.querySelector('.section-comfort-strip');
-        if (sectionRoot) sectionRoot.querySelectorAll('.strip-drag-highlight').forEach((/** @type {Element} */ h) => { /** @type {HTMLElement} */ (h).style.display = 'none'; });
+        const sectionRoot = this._shadow.querySelector('.pc-section-comfort-strip');
+        if (sectionRoot) sectionRoot.querySelectorAll('.pc-strip-drag-highlight').forEach((/** @type {Element} */ h) => { /** @type {HTMLElement} */ (h).style.display = 'none'; });
         if (selectedIdx === i) {
           selectedIdx = null;
-          rows.forEach((/** @type {Element} */ r) => r.classList.remove('selected'));
-          detailEl.classList.remove('active');
+          rows.forEach((/** @type {Element} */ r) => r.classList.remove('pc-selected'));
+          detailEl.classList.remove('pc-active');
           return;
         }
         selectedIdx = i;
-        rows.forEach((/** @type {Element} */ r, /** @type {number} */ j) => r.classList.toggle('selected', j === i));
+        rows.forEach((/** @type {Element} */ r, /** @type {number} */ j) => r.classList.toggle('pc-selected', j === i));
 
         // Compute stats from cells (heatmap mode) or data-slots JSON (timeline mode)
-        const cells = row.querySelectorAll('.cell');
+        const cells = row.querySelectorAll('.pc-cell');
         /** @type {number[]} */
         const scores = [];
         /** @type {string[]} */
@@ -1242,7 +1219,7 @@ class PulseClimateCard extends HTMLElement {
           });
         } else {
           // Timeline mode — parse data-slots JSON from .strip-container
-          const stripEl = row.querySelector('.strip-container');
+          const stripEl = row.querySelector('.pc-strip-container');
           const slotsAttr = stripEl?.getAttribute('data-slots');
           if (slotsAttr) {
             try {
@@ -1265,51 +1242,45 @@ class PulseClimateCard extends HTMLElement {
         const bestHour = labels[bestIdx] || '--';
         const worstHour = labels[worstIdx] || '--';
         const barColor = avg >= 80 ? 'var(--label-badge-green, #34c759)' : avg >= 50 ? 'var(--label-badge-yellow, #ff9f0a)' : 'var(--label-badge-red, #ff453a)';
-        const zoneName = row.querySelector('.zone-label')?.textContent || '';
+        const zoneName = row.querySelector('.pc-zone-label')?.textContent || '';
 
-        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
-        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
-        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
-        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
-        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
-        // SECURITY-AUDIT: §2q trace.
-        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
-        detailEl.innerHTML = `<div class="detail-header"><span class="detail-name">${escapeHtml(zoneName)}</span><span class="detail-close">✕ Close</span></div>
-          <div class="detail-stats">
-            <div class="stat"><div class="stat-value">${avg}</div><div class="stat-label">Avg Score</div></div>
-            <div class="stat"><div class="stat-value">${escapeHtml(bestHour)}</div><div class="stat-label">Best Hour</div></div>
-            <div class="stat"><div class="stat-value">${escapeHtml(worstHour)}</div><div class="stat-label">Worst Hour</div></div>
+        // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
+        detailEl.innerHTML = `<div class="pc-detail-header"><span class="pc-detail-name">${escapeHtml(zoneName)}</span><span class="pc-detail-close">✕ Close</span></div>
+          <div class="pc-detail-stats">
+            <div class="pc-stat"><div class="pc-stat-value">${avg}</div><div class="pc-stat-label">Avg Score</div></div>
+            <div class="pc-stat"><div class="pc-stat-value">${escapeHtml(bestHour)}</div><div class="pc-stat-label">Best Hour</div></div>
+            <div class="pc-stat"><div class="pc-stat-value">${escapeHtml(worstHour)}</div><div class="pc-stat-label">Worst Hour</div></div>
           </div>
-          <div class="detail-bar"><div class="detail-bar-fill" style="width:${avg}%;background:${sanitizeCssValue(barColor)}"></div></div>`;
-        detailEl.classList.add('active');
-        const closeBtn = detailEl.querySelector('.detail-close');
+          <div class="pc-detail-bar"><div class="pc-detail-bar-fill" style="width:${avg}%;background:${sanitizeCssValue(barColor)}"></div></div>`;
+        detailEl.classList.add('pc-active');
+        const closeBtn = detailEl.querySelector('.pc-detail-close');
         if (closeBtn) closeBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           selectedIdx = null;
-          rows.forEach((/** @type {Element} */ r) => r.classList.remove('selected'));
-          detailEl.classList.remove('active');
+          rows.forEach((/** @type {Element} */ r) => r.classList.remove('pc-selected'));
+          detailEl.classList.remove('pc-active');
         }, { signal: heatmapSignal });
       }, { signal: heatmapSignal });
     });
 
     // Per-cell/slot tooltip — handles both heatmap (.cells) and timeline (.strip-container) modes
-    const sectionEl = this._shadow.querySelector('.section-comfort-strip');
+    const sectionEl = this._shadow.querySelector('.pc-section-comfort-strip');
     if (!sectionEl) return;
     const heatmapTooltip = createStripTooltip();
-    const heatmapBody = sectionEl.querySelector('.heatmap-body');
+    const heatmapBody = sectionEl.querySelector('.pc-heatmap-body');
     if (heatmapBody) {
       /** @type {HTMLElement} */ (heatmapBody).style.position = 'relative';
       heatmapBody.appendChild(heatmapTooltip.element);
     }
     // Reference element for crosshair positioning — first .cells or .strip-container
-    const firstRef = heatmapBody?.querySelector('.cells') || heatmapBody?.querySelector('.strip-container');
+    const firstRef = heatmapBody?.querySelector('.pc-cells') || heatmapBody?.querySelector('.pc-strip-container');
 
     // Heatmap mode: per-cell tooltip
-    const cellContainersForTooltip = sectionEl.querySelectorAll('.cells');
+    const cellContainersForTooltip = sectionEl.querySelectorAll('.pc-cells');
     cellContainersForTooltip.forEach((/** @type {Element} */ container) => {
       container.addEventListener('pointermove', (/** @type {*} */ ev) => {
         if (ev.pointerType === 'touch') return;
-        const cellEl = ev.target?.closest?.('.cell');
+        const cellEl = ev.target?.closest?.('.pc-cell');
         if (!cellEl) { heatmapTooltip.hide(); return; }
         const hour = cellEl.getAttribute('data-hour') || '';
         const score = cellEl.getAttribute('data-score');
@@ -1322,7 +1293,7 @@ class PulseClimateCard extends HTMLElement {
       container.addEventListener('pointerleave', () => heatmapTooltip.hide(), { signal: heatmapSignal });
       container.addEventListener('pointerdown', (/** @type {*} */ ev) => {
         if (ev.pointerType !== 'touch') return;
-        const cellEl = ev.target?.closest?.('.cell');
+        const cellEl = ev.target?.closest?.('.pc-cell');
         if (!cellEl) return;
         const hour = cellEl.getAttribute('data-hour') || '';
         const score = cellEl.getAttribute('data-score');
@@ -1336,7 +1307,7 @@ class PulseClimateCard extends HTMLElement {
     });
 
     // Timeline mode: per-slot tooltip via data-slots JSON
-    const stripContainers = sectionEl.querySelectorAll('.strip-container');
+    const stripContainers = sectionEl.querySelectorAll('.pc-strip-container');
     stripContainers.forEach((/** @type {Element} */ strip) => {
       const slotsAttr = strip.getAttribute('data-slots');
       /** @type {*[]|null} */
@@ -1368,14 +1339,14 @@ class PulseClimateCard extends HTMLElement {
     });
 
     // Crosshair — vertical line across all zone rows
-    const heatmapCrosshair = heatmapBody?.querySelector('.strip-crosshair');
+    const heatmapCrosshair = heatmapBody?.querySelector('.pc-strip-crosshair');
     if (heatmapBody && heatmapCrosshair && firstRef) {
       const heatmapLabelOffset = firstRef.getBoundingClientRect().left - heatmapBody.getBoundingClientRect().left;
       bindCrosshair(heatmapBody, /** @type {HTMLElement} */ (heatmapCrosshair), firstRef, heatmapLabelOffset);
     }
 
     // Drag-to-select time range — handles both .cells and .strip-container
-    const dragContainers = sectionEl.querySelectorAll('.cells, .strip-container');
+    const dragContainers = sectionEl.querySelectorAll('.pc-cells, .pc-strip-container');
     dragContainers.forEach((/** @type {Element} */ container) => {
       const slotsAttr = container.getAttribute('data-slots');
       /** @type {*[]|null} */
@@ -1399,19 +1370,19 @@ class PulseClimateCard extends HTMLElement {
     let selectedZone = null;
 
     ribbons.forEach((/** @type {Element} */ ribbon) => {
-      ribbon.classList.add('ribbon');
+      ribbon.classList.add('pc-ribbon');
       ribbon.addEventListener('click', () => {
         // Energy flow detail is simpler — just dim/undim ribbons
         const zone = ribbon.getAttribute('data-zone');
         if (!zone) return;
         if (selectedZone === zone) {
           selectedZone = null;
-          ribbons.forEach((/** @type {Element} */ r) => r.classList.remove('dimmed'));
+          ribbons.forEach((/** @type {Element} */ r) => r.classList.remove('pc-dimmed'));
           return;
         }
         selectedZone = zone;
         ribbons.forEach((/** @type {Element} */ r) => {
-          r.classList.toggle('dimmed', r.getAttribute('data-zone') !== zone);
+          r.classList.toggle('pc-dimmed', r.getAttribute('data-zone') !== zone);
         });
       }, { signal: energyFlowSignal });
     });
@@ -1423,11 +1394,11 @@ class PulseClimateCard extends HTMLElement {
     this._sparklineAbort = new AbortController();
     const { signal: sparklineSignal } = this._sparklineAbort;
     // Clean up previous instances (prevents accumulation on re-bind after history refresh)
-    this._shadow.querySelectorAll('.strip-tooltip-fixed').forEach((el) => el.remove());
+    this._shadow.querySelectorAll('.pc-strip-tooltip-fixed').forEach((el) => el.remove());
     this._shadow.querySelectorAll('.sparkline-crosshair').forEach((el) => el.remove());
 
     const containers = this._shadow.querySelectorAll(
-      '.section-zones .sparkline-filled, .section-zones .zone-row-pulse',
+      '.pc-section-zones .pc-sparkline-filled, .pc-section-zones .pc-zone-row-pulse',
     );
     if (containers.length === 0) return;
 
@@ -1440,7 +1411,7 @@ class PulseClimateCard extends HTMLElement {
       el.style.position = 'relative';
 
       const crosshair = document.createElement('div');
-      crosshair.className = 'strip-crosshair sparkline-crosshair';
+      crosshair.className = 'pc-strip-crosshair pc-sparkline-crosshair';
       crosshair.style.display = 'none';
       crosshair.style.top = '0';
       crosshair.style.bottom = '0';
@@ -1515,9 +1486,9 @@ class PulseClimateCard extends HTMLElement {
    * Reads the clicked tab's data-metric, re-renders the section, and re-binds.
    */
   _bindZoneRankingTabs() {
-    const sectionEl = this._shadow.querySelector('.section-zone-ranking');
+    const sectionEl = this._shadow.querySelector('.pc-section-zone-ranking');
     if (!sectionEl) return;
-    const tabs = sectionEl.querySelectorAll('.ranking-tab');
+    const tabs = sectionEl.querySelectorAll('.pc-ranking-tab');
     if (tabs.length === 0) return;
 
     const zones = this._config?._zones || [];
@@ -1532,13 +1503,7 @@ class PulseClimateCard extends HTMLElement {
         const html = renderZoneRankingSection(zones, states, discovery, newMetric);
         if (!html) return;
         const tpl = document.createElement('template');
-        // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
-        // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
-        // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
-        // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
-        // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see audit-C1
-        // SECURITY-AUDIT: §2q trace.
-        // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+        // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
         tpl.innerHTML = html;
         const newEl = tpl.content.firstElementChild;
         if (newEl) {
@@ -1605,24 +1570,24 @@ class PulseClimateCard extends HTMLElement {
     /** @param {Element|null} el */
     const flash = (el) => {
       if (!el) return;
-      el.classList.add('temp-transitioning');
-      setTimeout(() => el.classList.remove('temp-transitioning'), 1100);
+      el.classList.add('pc-temp-transitioning');
+      setTimeout(() => el.classList.remove('pc-temp-transitioning'), 1100);
     };
 
     // Power bar fill in default/compact layout
-    const rows = this._shadow.querySelectorAll('.zone-row');
+    const rows = this._shadow.querySelectorAll('.pc-zone-row');
     if (rows[zoneIndex]) {
-      flash(rows[zoneIndex].querySelector('.power-bar-fill'));
+      flash(rows[zoneIndex].querySelector('.pc-power-bar-fill'));
     }
 
     // Pulse mode row
-    const pulseRows = this._shadow.querySelectorAll('.zone-row-pulse');
+    const pulseRows = this._shadow.querySelectorAll('.pc-zone-row-pulse');
     flash(pulseRows[zoneIndex] || null);
 
     // Radial arc path
-    const arcGroups = this._shadow.querySelectorAll('.arc-group');
+    const arcGroups = this._shadow.querySelectorAll('.pc-arc-group');
     if (arcGroups[zoneIndex]) {
-      flash(arcGroups[zoneIndex].querySelector('.arc-path'));
+      flash(arcGroups[zoneIndex].querySelector('.pc-arc-path'));
     }
   }
 
@@ -1686,12 +1651,7 @@ class PulseClimateCard extends HTMLElement {
       const html = target.render();
       if (!html) continue;
       const tpl = document.createElement('template');
-      // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
-      // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
-      // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name strings
-      // SECURITY-AUDIT: are static literals. Detail panels (zone-detail, radial-detail, comfort-detail)
-      // SECURITY-AUDIT: likewise pre-escape every value before interpolation — see audit-C1 §2q trace.
-      // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+      // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
       tpl.innerHTML = html;
       const newEl = tpl.content.firstElementChild;
       if (newEl) {
@@ -1704,27 +1664,27 @@ class PulseClimateCard extends HTMLElement {
     // Section chip actions exist on system sections (api, bridge, homekit, etc.)
     // — skip re-bind if only non-chip sections (graph, donut) were replaced.
     const chipSections = new Set([
-      '.section-zones', '.section-api', '.section-bridge', '.section-homekit',
-      '.section-weather', '.section-environment', '.section-thermal', '.section-schedule',
-      '.section-home-status', '.section-zone-ranking',
+      '.pc-section-zones', '.pc-section-api', '.pc-section-bridge', '.pc-section-homekit',
+      '.pc-section-weather', '.pc-section-environment', '.pc-section-thermal', '.pc-section-schedule',
+      '.pc-section-home-status', '.pc-section-zone-ranking',
     ]);
     const hasReplacedChipSection = [...replaced].some((s) => chipSections.has(s));
     if (hasReplacedChipSection) {
       this._bindSectionChipActions();
     }
-    if (replaced.has('.section-zones')) {
-      this._elements.zonesSection = this._shadow.querySelector('.section-zones');
+    if (replaced.has('.pc-section-zones')) {
+      this._elements.zonesSection = this._shadow.querySelector('.pc-section-zones');
       this._bindZoneActions();
       this._bindChipActions();
     }
-    if (replaced.has('.section-api')) {
-      this._elements.apiSection = this._shadow.querySelector('.section-api');
+    if (replaced.has('.pc-section-api')) {
+      this._elements.apiSection = this._shadow.querySelector('.pc-section-api');
       this._startCountdownTimer();
     }
-    if (replaced.has('.section-radial')) {
+    if (replaced.has('.pc-section-radial')) {
       this._bindRadialInteractions();
     }
-    if (replaced.has('.section-zone-ranking')) {
+    if (replaced.has('.pc-section-zone-ranking')) {
       this._bindZoneRankingTabs();
     }
 
@@ -1750,13 +1710,7 @@ class PulseClimateCard extends HTMLElement {
           const html = renderEnergyFlowSection(zones, states, discovery);
           if (html) {
             const tpl = document.createElement('template');
-            // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields
-            // SECURITY-AUDIT: (zone names, sensor states, units) via escapeHtml() and sanitize CSS values via
-            // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name
-            // SECURITY-AUDIT: strings are static literals. Detail panels (zone-detail, radial-detail,
-            // SECURITY-AUDIT: comfort-detail) likewise pre-escape every value before interpolation — see
-            // SECURITY-AUDIT: audit-C1 §2q trace.
-            // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+            // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
             tpl.innerHTML = html;
             const newEl = tpl.content.firstElementChild;
             if (newEl) {
@@ -1802,12 +1756,7 @@ class PulseClimateCard extends HTMLElement {
 
       // Swap the section element
       const tpl = document.createElement('template');
-      // SECURITY-AUDIT: html is composed from section renderers which individually escape user fields (zone
-      // SECURITY-AUDIT: names, sensor states, units) via escapeHtml() and sanitize CSS values via
-      // SECURITY-AUDIT: sanitizeCssValue() (shared/utils.js). Surrounding ha-card wrapper + class-name strings
-      // SECURITY-AUDIT: are static literals. Detail panels (zone-detail, radial-detail, comfort-detail)
-      // SECURITY-AUDIT: likewise pre-escape every value before interpolation — see audit-C1 §2q trace.
-      // eslint-disable-next-line no-unsanitized/property -- see SECURITY-AUDIT comment above
+      // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
       tpl.innerHTML = html;
       const newEl = tpl.content.firstElementChild;
       if (newEl) {
@@ -1820,13 +1769,13 @@ class PulseClimateCard extends HTMLElement {
 
     // Re-cache DOM refs for sections that were replaced
     if (replacedTypes.includes('zones')) {
-      this._elements.zonesSection = this._shadow.querySelector('.section-zones');
+      this._elements.zonesSection = this._shadow.querySelector('.pc-section-zones');
       this._bindZoneActions();
       this._bindChipActions();
       this._bindSparklineCrosshairs();
     }
     if (replacedTypes.includes('api')) {
-      this._elements.apiSection = this._shadow.querySelector('.section-api');
+      this._elements.apiSection = this._shadow.querySelector('.pc-section-api');
       this._startCountdownTimer();
     }
     if (replacedTypes.includes('radial')) {
@@ -1988,7 +1937,7 @@ class PulseClimateCard extends HTMLElement {
     // Stop radial shimmer / sheen animation chains.
     this._stopRadialAnimations();
     // Clean up action listeners to prevent leaks
-    const rows = this._shadow?.querySelectorAll('.zone-row') || [];
+    const rows = this._shadow?.querySelectorAll('.pc-zone-row') || [];
     for (const row of rows) {
       const cleanup = /** @type {*} */ (row).__pulseCleanup;
       if (typeof cleanup === 'function') cleanup();

@@ -116,9 +116,9 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   const labelMap = { temperature: 'Home Thermal View', humidity: 'Home Humidity View', both: 'Home Climate View' };
   const sectionLabel = labelMap[attribute] || 'Home Thermal View';
 
-  let html = `<div class="section section-radial" data-attribute="${escapeHtml(attribute)}"${outsideTempEntityConfig ? ` data-outdoor-temp-entity="${escapeHtml(outsideTempEntityConfig)}"` : ''}${outsideHumEntityConfig ? ` data-outdoor-humidity-entity="${escapeHtml(outsideHumEntityConfig)}"` : ''}>`;
-  html += `<div class="section-label">${escapeHtml(sectionLabel)}</div>`;
-  html += `<div class="radial-container">`;
+  let html = `<div class="pc-section pc-section-radial" data-attribute="${escapeHtml(attribute)}"${outsideTempEntityConfig ? ` data-outdoor-temp-entity="${escapeHtml(outsideTempEntityConfig)}"` : ''}${outsideHumEntityConfig ? ` data-outdoor-humidity-entity="${escapeHtml(outsideHumEntityConfig)}"` : ''}>`;
+  html += `<div class="pulse-section-label">${escapeHtml(sectionLabel)}</div>`;
+  html += `<div class="pc-radial-container">`;
 
   // Per-render unique suffix prevents <defs> id collisions across multiple
   // card instances on the same dashboard. Without this, two cards on one
@@ -160,7 +160,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     const startAngle = i * (arcAngle + gapDeg) - 90;
     const endAngle = startAngle + arcAngle;
     const isActive = z.power > 0 || z.hvacAction === 'heating' || z.hvacAction === 'cooling';
-    const activeClass = isActive ? ' arc-active' : '';
+    const activeClass = isActive ? ' pc-arc-active' : '';
 
     // Build title text
     const titleParts = [escapeHtml(z.name)];
@@ -169,7 +169,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     titleParts.push(isActive ? `${z.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${z.power}%` : 'Idle');
     const titleText = titleParts.join(', ');
 
-    html += `<g class="arc-group${activeClass}" data-idx="${i}">`;
+    html += `<g class="pc-arc-group${activeClass}" data-idx="${i}">`;
 
     // Invisible hit area — wider than visible arcs for easier touch targeting
     const hitOuterR = showHumidity && attribute === 'both'
@@ -177,7 +177,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       : baseOuterR + 4;
     const hitInnerR = baseOuterR - 28 - 4;
     const hitD = arcPath(cx, cy, hitOuterR, hitInnerR, startAngle - gapDeg / 2, endAngle + gapDeg / 2);
-    html += `<path d="${hitD}" fill="transparent" class="arc-hit"/>`;
+    html += `<path d="${hitD}" fill="transparent" class="pc-arc-hit"/>`;
 
     // Temperature arc
     if (showTemp) {
@@ -186,7 +186,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       const tempInnerR = baseOuterR - tempThickness;
       const tempD = arcPath(cx, cy, baseOuterR, tempInnerR, startAngle, endAngle);
 
-      html += `<path d="${tempD}" fill="${sanitizeCssValue(tempColor)}" class="arc-path"`;
+      html += `<path d="${tempD}" fill="${sanitizeCssValue(tempColor)}" class="pc-arc-path"`;
       // Shimmer takes precedence over glow for high-power zones
       const shimmerScale = computeShimmerScale(z.power, size);
       if (shimmerScale > 0 && !reducedMotion) {
@@ -217,7 +217,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
         humInnerR = baseOuterR - humThickness;
       }
       const humD = arcPath(cx, cy, humOuterR, humInnerR, startAngle, endAngle);
-      html += `<path d="${humD}" fill="${sanitizeCssValue(humColor)}" class="arc-path" opacity="0.8">`;
+      html += `<path d="${humD}" fill="${sanitizeCssValue(humColor)}" class="pc-arc-path" opacity="0.8">`;
       html += `<title>${titleText}</title>`;
       html += `</path>`;
     }
@@ -230,19 +230,19 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   // Center info — fixed circular size based on inner arc radius
   // Smallest inner radius = baseOuterR - 28 (at max power). No gap — glass border provides separation.
   const centerDiameter = Math.round((baseOuterR - 28) * 2);
-  html += `<div class="center-info" id="radial-center" style="width:${centerDiameter}px;height:${centerDiameter}px">`;
-  html += `<div class="center-sheen" id="radial-sheen"></div>`;
-  html += `<div class="center-value">${centerValue}</div>`;
-  html += `<div class="center-label">Outdoor</div>`;
-  html += `<div class="center-sub">${centerSub}</div>`;
+  html += `<div class="pc-center-info" id="radial-center" style="width:${centerDiameter}px;height:${centerDiameter}px">`;
+  html += `<div class="pc-center-sheen" id="radial-sheen"></div>`;
+  html += `<div class="pc-center-value">${centerValue}</div>`;
+  html += `<div class="pc-center-label">Outdoor</div>`;
+  html += `<div class="pc-center-sub">${centerSub}</div>`;
   html += `</div>`;
   html += `</div>`;
 
   // Detail panel placeholder
-  html += `<div class="zone-detail" id="radial-detail"></div>`;
+  html += `<div class="pc-zone-detail" id="radial-detail"></div>`;
 
   // Legend
-  html += `<div class="radial-legend">`;
+  html += `<div class="pc-radial-legend">`;
   for (let i = 0; i < zoneData.length; i++) {
     const z = zoneData[i];
     const dotColor = attribute === 'humidity'
@@ -252,9 +252,9 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     if (showTemp) valueText += z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--';
     if (showTemp && showHumidity) valueText += ' · ';
     if (showHumidity) valueText += z.humidity !== null ? `${Math.round(z.humidity)}%` : '--';
-    html += `<div class="legend-item" data-idx="${i}">`;
-    html += `<span class="legend-dot" style="background:${sanitizeCssValue(dotColor)}"></span>`;
-    html += `${escapeHtml(z.name)} <span class="legend-temp">${escapeHtml(valueText)}</span>`;
+    html += `<div class="pc-legend-item" data-idx="${i}">`;
+    html += `<span class="pc-legend-dot" style="background:${sanitizeCssValue(dotColor)}"></span>`;
+    html += `${escapeHtml(z.name)} <span class="pc-legend-temp">${escapeHtml(valueText)}</span>`;
     html += `</div>`;
   }
   html += `</div>`;

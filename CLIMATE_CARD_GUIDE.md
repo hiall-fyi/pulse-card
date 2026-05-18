@@ -147,7 +147,7 @@ zones:
 
 ### Zone Actions
 
-Each zone supports tap, hold, and double-tap actions — same as Pulse Card (see the [Pulse Card Guide](PULSE_CARD_GUIDE.md#tap-actions) for the full list of available actions).
+Each zone supports tap, hold, and double-tap actions — same as the Bar Card (see the [Bar Card Guide](BAR_CARD_GUIDE.md#tap-actions) for the full list of available actions).
 
 ```yaml
 zones:
@@ -621,27 +621,122 @@ The `radial` section renders a circular compass with one arc per zone. Arc colou
 
 The `thermal_strip` section shows colour-coded temperature timelines — one row per zone, with each time slot coloured from cool blue to warm red. The `comfort_strip` section shows a similar heatmap but based on comfort scores across zones and time.
 
-### CSS Custom Properties
+---
 
-You can fine-tune the card's appearance using CSS custom properties. Set these in your HA theme or in a `card-mod` style block:
+## Styling with `card-mod`
 
-| Property | Default | Description |
+Climate Card exposes three layers you can target from `card-mod` or an HA theme: CSS custom properties for colour and sizing knobs, class selectors for layout-level overrides, and data attributes for state-driven styling.
+
+### CSS custom properties
+
+Family-shared tokens (used by every Pulse card) live on the `--pulse-*` prefix — change them once and every card in your dashboard picks up the new value. Climate-Card-only knobs use the `--pc-*` prefix.
+
+**Family tokens** (used by every card in the family):
+
+| Variable | Controls | Default |
 |---|---|---|
-| `--pulse-card-background` | HA card background | Card background colour |
-| `--pulse-font-size` | `14px` | Base font size for zone names and temperatures |
-| `--pulse-name-color` | Primary text colour | Zone name colour |
-| `--pulse-value-color` | Primary text colour | Temperature value colour |
-| `--pulse-chip-color` | Secondary text colour | Chip text colour |
-| `--pulse-gauge-height` | `6px` | Temperature gauge bar height |
-| `--pulse-gauge-radius` | `3px` | Temperature gauge bar corner radius |
-| `--pulse-bar-height` | `8px` | Power bar height |
-| `--pulse-bar-radius` | `4px` | Power bar corner radius |
-| `--pulse-row-bg` | HA secondary background | Pulse mode zone row background |
-| `--pulse-gap` | `16px` | Gap between zones in multi-column layout |
-| `--pulse-graph-height` | `80px` | Graph section height |
-| `--pulse-chart-line-width` | `1.5` | Graph line stroke width |
-| `--pulse-glass-bg` | HA card background | Frosted glass panel background colour |
-| `--pulse-glass-blur` | `8px` | Frosted glass blur radius |
+| `--pulse-bg-card` | Card background colour | HA theme card background |
+| `--pulse-bg-secondary` | Zone row background (pulse layout), detail bar background | HA secondary background |
+| `--pulse-text-primary` | Zone name and temperature colour | HA theme primary text |
+| `--pulse-text-secondary` | Chip text, target / humidity colour | HA theme secondary text |
+| `--pulse-font-body` | Base font size for zone names and temperatures | `14px` |
+| `--pulse-glass-bg` | Frosted glass panel background colour | HA card background |
+| `--pulse-glass-blur` | Frosted glass blur radius | `8px` |
+
+**Climate-Card-only tokens:**
+
+| Variable | Controls | Default |
+|---|---|---|
+| `--pc-gauge-height` | Temperature gauge bar height | `6px` |
+| `--pc-gauge-radius` | Temperature gauge bar corner radius | `3px` |
+| `--pc-bar-height` | Power bar height | `8px` |
+| `--pc-bar-radius` | Power bar corner radius | `4px` |
+| `--pc-gap` | Gap between zones in multi-column layout | `16px` |
+| `--pc-graph-height` | Graph section height | `80px` |
+| `--pc-chart-line-width` | Graph line stroke width | `1.5` |
+
+```yaml
+type: custom:pulse-climate-card
+zones:
+  - entity: climate.living_room
+card_mod:
+  style: |
+    :host {
+      --pulse-bg-secondary: rgba(139, 92, 222, 0.08);
+      --pulse-text-primary: rgba(255, 255, 255, 0.9);
+      --pc-bar-height: 10px;
+    }
+```
+
+### Class selectors
+
+Use these for structural changes that custom properties don't cover — padding, borders, hover states, layout tweaks. Each section root is a `.pc-section`; each zone row is a `.pc-zone-row` (default layout) or `.pc-zone-row-pulse` (cinematic SVG-backed layout).
+
+**Card chrome**
+
+| Selector | What it targets |
+|---|---|
+| `.pc-section` | Every section root (one per declared section, sits inside `<ha-card>`) |
+| `.pulse-title` | The card title row (family-shared with Bar Card) |
+| `.pulse-section-label` | The label above each section (family-shared with Bar Card) |
+
+**Zones**
+
+| Selector | What it targets |
+|---|---|
+| `.pc-section-zones` | The zones section's outer container |
+| `.pc-section-zones.pc-columns` | The same container when multi-column layout is active |
+| `.pc-zone-row` | One zone row in default layout |
+| `.pc-zone-row.pc-unavailable` | A default-layout row when its climate entity is unavailable (greyed out) |
+| `.pc-zone-row-pulse` | One zone row in pulse layout (SVG background, focus ring, info split) |
+| `.pc-zone-row-pulse.pc-heating` | A pulse-layout row when the zone is actively heating (red wash) |
+| `.pc-heating-glow` | The SVG `<filter>` element that produces the heating glow |
+| `.pc-zone-name`, `.pc-zone-temp`, `.pc-zone-target`, `.pc-zone-humidity` | Name, current temperature, target, and humidity inside a row |
+| `.pc-zone-chips` | The chip strip below the zone header |
+| `.pc-chip` | One chip (sensor pill) — pair with `.pc-severity-medium / .pc-severity-high / .pc-severity-critical` for severity tone |
+| `.pc-temp-gauge`, `.pc-temp-gauge-bg`, `.pc-temp-gauge-current`, `.pc-temp-gauge-target` | The temperature gauge bar and its layered parts |
+| `.pc-power-bar-container`, `.pc-power-bar-track`, `.pc-power-bar-fill` | The three power bar layers |
+| `.pc-power-bar-fill.pc-bar-active` | The animated fill that appears when the zone is drawing power |
+
+**Other sections**
+
+| Selector | What it targets |
+|---|---|
+| `.pc-section-radial`, `.pc-section-thermal-strip`, `.pc-section-comfort-strip`, `.pc-section-zone-ranking`, `.pc-section-home-status`, `.pc-section-energy-flow`, `.pc-section-graph`, `.pc-section-donut`, `.pc-section-api`, `.pc-section-bridge`, `.pc-section-homekit`, `.pc-section-weather`, `.pc-section-environment`, `.pc-section-thermal`, `.pc-section-schedule` | Each named section's outer container — pair with `.pc-section` rules for one-off overrides |
+| `.pc-rank-row`, `.pc-rank-num`, `.pc-rank-name`, `.pc-rank-value` | Zone Ranking row pieces — `.pc-rank-num.pc-top` highlights the rank-1 row |
+| `.pc-ranking-tab`, `.pc-ranking-tab.pc-active` | Zone Ranking metric tabs and the selected one |
+| `.pc-home-status-row`, `.pc-home-status-hero`, `.pc-home-status-zones` | Home Status row, hero block, and per-zone strip |
+| `.pc-comparison-path`, `.pc-comparison-legend` | The overlay path and legend chip in the zone-graph comparison view |
+
+### Data attributes for state-driven styling
+
+Several elements carry data attributes you can pair with their class to style differently per zone, per metric, or per chip type.
+
+- `data-entity` — the entity ID (on chips, home-status rows, and bridge / API / environment chips)
+- `data-zone` — the zone name (on `.pc-heatmap-row`, energy-flow ribbons, and ranking rows)
+- `data-metric` — the active metric key (on `.pc-section-zone-ranking`)
+- `data-chip-type` — the chip family (on `.pc-chip` — values like `mold_risk`, `battery`, `humidity`)
+
+```yaml
+type: custom:pulse-climate-card
+zones:
+  - entity: climate.living_room
+  - entity: climate.bedroom
+card_mod:
+  style: |
+    .pc-zone-row.pc-unavailable {
+      opacity: 0.5;
+      filter: grayscale(0.4);
+    }
+    .pc-zone-row-pulse.pc-heating {
+      box-shadow: 0 0 12px rgba(255, 100, 50, 0.3);
+    }
+    .pc-chip[data-chip-type="mold_risk"] {
+      font-weight: 600;
+    }
+```
+
+v1.5.0 reorganised the design tokens. Concerns shared with other cards in the family (text colour, body type size, card chrome, surface tint) moved to the `--pulse-*` family prefix; Climate-only knobs (gauge / bar / graph dimensions) sit under `--pc-*`. Class selectors moved from various unprefixed names to `.pc-*`. If you upgraded from v1.4.0 and your `card-mod` styles stopped applying, see the migration tables in [CHANGELOG.md](CHANGELOG.md#150---2026-05-20) for the old-name → new-name mapping.
 
 ---
 
@@ -671,7 +766,7 @@ Tap, hold, or double-tap a zone row to trigger an action. By default, tapping op
 
 Available actions: `more-info`, `navigate`, `call-service`, `url`, `toggle`, `none`
 
-Set these at the card level for all zones, or per-zone for individual overrides. See the [Pulse Card Guide](PULSE_CARD_GUIDE.md#tap-actions) for detailed action configuration.
+Set these at the card level for all zones, or per-zone for individual overrides. See the [Bar Card Guide](BAR_CARD_GUIDE.md#tap-actions) for detailed action configuration.
 
 ### Chip Tap Actions
 

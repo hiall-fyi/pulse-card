@@ -27,16 +27,10 @@ function isNonEmptyString(val) {
  * Resolve the best temperature sensor entity for history data.
  *
  * Resolution chain (first non-empty match wins):
- * 1. zoneConfig.temperature_entity  (YAML override)
+ * 1. zoneConfig.temperature_entity  (YAML override — no existence check; user intent wins)
  * 2. climate attributes.external_temp_sensor  (Tado CE external sensor)
  * 3. discovery.zoneEntities[zoneName].temperature  (auto-discovered)
  * 4. climateEntityId  (climate entity fallback)
- *
- * Step 1 (YAML override) intentionally does NOT validate entity existence.
- * This is a deliberate design choice — the user explicitly configured this
- * entity ID, so we respect their intent even if the entity is temporarily
- * unavailable. This differs from step 2 (external sensor) which validates
- * existence because it's auto-detected, not user-specified.
  *
  * @param {string} climateEntityId - The climate.* entity ID for this zone.
  * @param {Record<string, *>} states - hass.states object.
@@ -45,24 +39,20 @@ function isNonEmptyString(val) {
  * @returns {ResolvedSensor}
  */
 export function resolveHistoryTempSensor(climateEntityId, states, zoneEntities, zoneConfig) {
-  // 1. YAML override — highest priority, no existence check (user explicit choice)
   if (isNonEmptyString(zoneConfig?.temperature_entity)) {
     return { entityId: /** @type {string} */ (zoneConfig.temperature_entity), source: 'yaml_override' };
   }
 
-  // 2. External sensor from Tado CE climate entity attributes
   const attrs = states[climateEntityId]?.attributes;
   const externalId = attrs?.external_temp_sensor;
   if (isNonEmptyString(externalId) && states[externalId]) {
     return { entityId: externalId, source: 'external' };
   }
 
-  // 3. Discovered Tado CE sensor
   if (isNonEmptyString(zoneEntities?.temperature)) {
     return { entityId: zoneEntities.temperature, source: 'discovery' };
   }
 
-  // 4. Climate entity fallback
   return { entityId: climateEntityId, source: 'climate_fallback' };
 }
 
@@ -70,13 +60,10 @@ export function resolveHistoryTempSensor(climateEntityId, states, zoneEntities, 
  * Resolve the best humidity sensor entity for history data.
  *
  * Resolution chain (first non-empty match wins):
- * 1. zoneConfig.humidity_entity  (YAML override)
+ * 1. zoneConfig.humidity_entity  (YAML override — no existence check; user intent wins)
  * 2. climate attributes.external_humidity_sensor  (Tado CE external sensor)
  * 3. discovery.zoneEntities[zoneName].humidity  (auto-discovered)
  * 4. null  (no humidity data available)
- *
- * Step 1 (YAML override) intentionally does NOT validate entity existence —
- * same rationale as resolveHistoryTempSensor.
  *
  * @param {string} climateEntityId - The climate.* entity ID for this zone.
  * @param {Record<string, *>} states - hass.states object.
@@ -85,24 +72,20 @@ export function resolveHistoryTempSensor(climateEntityId, states, zoneEntities, 
  * @returns {ResolvedSensor|null} - null when no humidity sensor is available.
  */
 export function resolveHistoryHumSensor(climateEntityId, states, zoneEntities, zoneConfig) {
-  // 1. YAML override — highest priority, no existence check (user explicit choice)
   if (isNonEmptyString(zoneConfig?.humidity_entity)) {
     return { entityId: /** @type {string} */ (zoneConfig.humidity_entity), source: 'yaml_override' };
   }
 
-  // 2. External sensor from Tado CE climate entity attributes
   const attrs = states[climateEntityId]?.attributes;
   const externalId = attrs?.external_humidity_sensor;
   if (isNonEmptyString(externalId) && states[externalId]) {
     return { entityId: externalId, source: 'external' };
   }
 
-  // 3. Discovered Tado CE sensor
   if (isNonEmptyString(zoneEntities?.humidity)) {
     return { entityId: zoneEntities.humidity, source: 'discovery' };
   }
 
-  // 4. No humidity data
   return null;
 }
 

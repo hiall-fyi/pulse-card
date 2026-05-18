@@ -8,7 +8,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { EDITOR_NAME } from './constants.js';
 import {
-  loadEditorHelpers, renderReorderButtons, computeLabel,
+  loadEditorHelpers, renderReorderButtons, computeLabel, SHARED_EDITOR_STYLES,
 } from '../shared/editor-helpers.js';
 
 /** Layout options for dropdown. */
@@ -27,6 +27,8 @@ const SECTION_GROUPS = [
     label: 'Charts & Visuals',
     sections: [
       { value: 'zones', label: 'Zones' },
+      { value: 'home_status', label: 'Home status' },
+      { value: 'zone_ranking', label: 'Zone ranking' },
       { value: 'graph', label: 'Graph' },
       { value: 'radial', label: 'Radial' },
       { value: 'donut', label: 'Donut' },
@@ -268,7 +270,7 @@ class PulseClimateCardEditor extends LitElement {
     switch (type) {
       case 'graph':
         return html`
-          <div class="section-settings">
+          <div class="pc-editor-section-settings">
             <ha-form
               .hass=${hass}
               .data=${{
@@ -301,7 +303,7 @@ class PulseClimateCardEditor extends LitElement {
         const showTempEntity = radialAttr === 'temperature' || radialAttr === 'both';
         const showHumEntity = radialAttr === 'humidity' || radialAttr === 'both';
         return html`
-          <div class="section-settings">
+          <div class="pc-editor-section-settings">
             <ha-form
               .hass=${hass}
               .data=${{ attribute: radialAttr }}
@@ -346,7 +348,7 @@ class PulseClimateCardEditor extends LitElement {
 
       case 'thermal_strip':
         return html`
-          <div class="section-settings">
+          <div class="pc-editor-section-settings">
             <ha-form
               .hass=${hass}
               .data=${{
@@ -378,7 +380,7 @@ class PulseClimateCardEditor extends LitElement {
 
       case 'comfort_strip':
         return html`
-          <div class="section-settings">
+          <div class="pc-editor-section-settings">
             <ha-form
               .hass=${hass}
               .data=${{
@@ -429,13 +431,13 @@ class PulseClimateCardEditor extends LitElement {
     const enabledCount = sections.length;
 
     return html`
-      <div class="editor">
+      <div class="pc-editor">
         <h3>Zones</h3>
-        <div class="entities">
+        <div class="pc-editor-entities">
           ${zones.map(
             (/** @type {*} */ z, /** @type {number} */ i) => html`
-              <div class="entity-row">
-                <div class="entity-row-main">
+              <div class="pc-editor-entity-row">
+                <div class="pc-editor-entity-row-main">
                   <ha-entity-picker
                     .hass=${hass}
                     .value=${z.entity}
@@ -454,7 +456,7 @@ class PulseClimateCardEditor extends LitElement {
           )}
         </div>
         <ha-entity-picker
-          class="add-entity"
+          class="pc-editor-add-entity"
           .hass=${hass}
           .includeDomains=${['climate', 'water_heater']}
           @value-changed=${this._addZone}
@@ -470,15 +472,15 @@ class PulseClimateCardEditor extends LitElement {
         ></ha-form>
 
         ${enabledCount === 0 ? html`
-          <div class="section-hint">No sections enabled — the card will be empty.</div>
+          <div class="pc-editor-section-hint">No sections enabled — the card will be empty.</div>
         ` : nothing}
 
         ${SECTION_GROUPS.map((group) => html`
           <ha-expansion-panel .header=${group.label} outlined>
             ${group.hint ? html`<div slot="secondary">${group.hint}</div>` : nothing}
-            <div class="section-grid">
+            <div class="pc-editor-section-grid">
               ${group.sections.map((opt) => html`
-                <label class="section-chip ${sections.includes(opt.value) ? 'active' : ''}">
+                <label class="pc-editor-section-chip ${sections.includes(opt.value) ? 'pc-editor-active' : ''}">
                   <ha-switch
                     .checked=${sections.includes(opt.value)}
                     @change=${(/** @type {Event} */ ev) =>
@@ -497,7 +499,7 @@ class PulseClimateCardEditor extends LitElement {
 
   static get styles() {
     return css`
-      .editor {
+      .pc-editor {
         display: flex;
         flex-direction: column;
       }
@@ -508,12 +510,12 @@ class PulseClimateCardEditor extends LitElement {
         color: var(--primary-text-color);
       }
       h3:first-child { margin-top: 0; }
-      .entities {
+      .pc-editor-entities {
         display: flex;
         flex-direction: column;
         gap: 8px;
       }
-      .entity-row {
+      .pc-editor-entity-row {
         display: flex;
         flex-direction: column;
         gap: 4px;
@@ -521,36 +523,29 @@ class PulseClimateCardEditor extends LitElement {
         border: 1px solid var(--divider-color, #e0e0e0);
         border-radius: 8px;
       }
-      .entity-row-main {
+      .pc-editor-entity-row-main {
         display: flex;
         align-items: center;
       }
-      .entity-row-main ha-entity-picker {
+      .pc-editor-entity-row-main ha-entity-picker {
         flex: 1;
         min-width: 0;
       }
-      .move-icon {
-        color: var(--secondary-text-color);
-        --mdc-icon-button-size: 36px;
-      }
-      .remove-icon {
-        color: var(--secondary-text-color);
-        --mdc-icon-button-size: 36px;
-      }
-      .add-entity {
+      ${SHARED_EDITOR_STYLES}
+      .pc-editor-add-entity {
         display: block;
         margin-top: 8px;
       }
       ha-expansion-panel {
         margin-bottom: 4px;
       }
-      .section-grid {
+      .pc-editor-section-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 8px;
         padding: 8px 0;
       }
-      .section-chip {
+      .pc-editor-section-chip {
         display: flex;
         align-items: center;
         gap: 6px;
@@ -558,15 +553,18 @@ class PulseClimateCardEditor extends LitElement {
         color: var(--primary-text-color);
         cursor: pointer;
       }
-      .section-chip ha-switch {
+      .pc-editor-section-chip ha-switch {
         --switch-unchecked-button-color: var(--disabled-color, #bdbdbd);
       }
-      .section-settings {
+      .pc-editor-section-chip.pc-editor-active {
+        /* Reserved for future active styling. */
+      }
+      .pc-editor-section-settings {
         padding: 4px 0 8px;
         border-top: 1px solid var(--divider-color, rgba(255,255,255,0.08));
         margin-top: 4px;
       }
-      .section-hint {
+      .pc-editor-section-hint {
         font-size: 12px;
         color: var(--warning-color, #FF9800);
         padding: 4px 0 8px;

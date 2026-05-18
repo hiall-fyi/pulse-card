@@ -58,7 +58,7 @@ export {};
 
 /**
  * Fully-resolved sparkline config with all defaults applied.
- * Returned by PulseCard._resolveSparklineConfig().
+ * Returned by PulseBarCard._resolveSparklineConfig().
  * @typedef {object} ResolvedSparklineConfig
  * @property {number} hours - Hours of history to show (default 24).
  * @property {number} pointsPerHour - Data points per hour (default 1).

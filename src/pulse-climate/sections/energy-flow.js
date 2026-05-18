@@ -86,16 +86,16 @@ export function renderEnergyFlowSection(zones, states, discovery) {
     ? Math.round(zoneData.reduce((s, z) => s + z.power, 0) / zoneData.length)
     : 0;
 
-  let html = `<div class="section section-energy-flow">`;
+  let html = `<div class="pc-section pc-section-energy-flow">`;
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
-  html += `<div class="section-label">Energy Flow</div>`;
+  html += `<div class="pulse-section-label">Energy Flow</div>`;
   if (hasAttribute) {
-    html += `<span class="energy-flow-header-value" style="font-size:11px;color:${sanitizeCssValue(HVAC_VISUALS.heating.fallback)};font-weight:500">${escapeHtml(totalPower)}% avg</span>`;
+    html += `<span class="pc-energy-flow-header-value" style="font-size:11px;color:${sanitizeCssValue(HVAC_VISUALS.heating.fallback)};font-weight:500">${escapeHtml(totalPower)}% avg</span>`;
   }
   html += `</div>`;
 
   if (!hasAttribute) {
-    html += `<div class="chart-empty">No heating data</div></div>`;
+    html += `<div class="pc-chart-empty">No heating data</div></div>`;
     return html;
   }
 
@@ -172,7 +172,7 @@ export function renderEnergyFlowSection(zones, states, discovery) {
       ? minRibbonW + (zone.power / 100) * (maxRibbonW - minRibbonW)
       : minRibbonW;
     const active = zone.power > 0 || zone.hvacAction === 'heating' || zone.hvacAction === 'cooling';
-    const ribbonClass = active ? ' class="ribbon-active"' : '';
+    const ribbonClass = active ? ' class="pc-ribbon-active"' : '';
 
     // Source Y offset per zone for fan-out effect — proportional to boiler height
     const fanSourceY = sourceY + (i - (zoneData.length - 1) / 2) * fanSpacing;
@@ -189,7 +189,7 @@ export function renderEnergyFlowSection(zones, states, discovery) {
       const glowR = (r * 0.8).toFixed(1);
       const motionPath = buildRibbonCenterPath(fanSourceY, destY, sourceX + boilerW / 2, destX - 12);
 
-      html += `<g class="flow-particles" data-zone="${escapeHtml(zone.name)}" data-zone-idx="${i}" style="will-change:transform">`;
+      html += `<g class="pc-flow-particles" data-zone="${escapeHtml(zone.name)}" data-zone-idx="${i}" style="will-change:transform">`;
       for (let p = 0; p < count; p++) {
         const beginOffset = (p * (dur / count)).toFixed(2);
         html += `<circle r="${r.toFixed(1)}" fill="${sanitizeCssValue(heatingColor)}" opacity="0.8"`;
@@ -299,10 +299,10 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
 
     // Update ribbon class + filter
     if (active) {
-      ribbon.classList.add('ribbon-active');
+      ribbon.classList.add('pc-ribbon-active');
       ribbon.setAttribute('filter', 'url(#flow-glow)');
     } else {
-      ribbon.classList.remove('ribbon-active');
+      ribbon.classList.remove('pc-ribbon-active');
       ribbon.removeAttribute('filter');
     }
 

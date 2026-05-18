@@ -41,20 +41,20 @@ export function renderWeatherSection(hubEntities, states, historyCache) {
   const condition = states[hubEntities.weather]?.state || '';
   const solar = hubEntities.solar_intensity ? states[hubEntities.solar_intensity]?.state : null;
 
-  let html = `<div class="section section-weather">`;
-  html += `<div class="section-label">Weather</div>`;
-  html += `<div class="zone-chips">`;
+  let html = `<div class="pc-section pc-section-weather">`;
+  html += `<div class="pulse-section-label">Weather</div>`;
+  html += `<div class="pc-zone-chips">`;
 
   if (condition) {
-    html += `<span class="chip"${hubEntities.weather ? ` data-entity="${escapeHtml(hubEntities.weather)}"` : ''}><ha-icon icon="${escapeHtml(weatherIcon(condition))}"></ha-icon>${escapeHtml(condition)}</span>`;
+    html += `<span class="pc-chip"${hubEntities.weather ? ` data-entity="${escapeHtml(hubEntities.weather)}"` : ''}><ha-icon icon="${escapeHtml(weatherIcon(condition))}"></ha-icon>${escapeHtml(condition)}</span>`;
   }
 
   if (temp !== undefined && temp !== null) {
-    html += `<span class="chip" data-entity="${escapeHtml(hubEntities.outside_temp)}"><ha-icon icon="mdi:thermometer"></ha-icon>${escapeHtml(temp)}${escapeHtml(states[hubEntities.outside_temp]?.attributes?.unit_of_measurement || '°C')}</span>`;
+    html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.outside_temp)}"><ha-icon icon="mdi:thermometer"></ha-icon>${escapeHtml(temp)}${escapeHtml(states[hubEntities.outside_temp]?.attributes?.unit_of_measurement || '°C')}</span>`;
   }
 
   if (solar !== undefined && solar !== null) {
-    html += `<span class="chip"${hubEntities.solar_intensity ? ` data-entity="${escapeHtml(hubEntities.solar_intensity)}"` : ''}><ha-icon icon="mdi:white-balance-sunny"></ha-icon>${escapeHtml(solar)}%</span>`;
+    html += `<span class="pc-chip"${hubEntities.solar_intensity ? ` data-entity="${escapeHtml(hubEntities.solar_intensity)}"` : ''}><ha-icon icon="mdi:white-balance-sunny"></ha-icon>${escapeHtml(solar)}%</span>`;
   }
 
   html += `</div>`;

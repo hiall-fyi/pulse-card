@@ -15,8 +15,8 @@ import { extractZoneName } from '../zone-resolver.js';
  */
 export function renderScheduleSection(zones, states, discovery) {
   let hasAny = false;
-  let html = `<div class="section section-schedule">`;
-  html += `<div class="section-label">Schedule</div>`;
+  let html = `<div class="pc-section pc-section-schedule">`;
+  html += `<div class="pulse-section-label">Schedule</div>`;
 
   for (const zoneConfig of zones) {
     const zoneName = extractZoneName(zoneConfig.entity);
@@ -30,23 +30,23 @@ export function renderScheduleSection(zones, states, discovery) {
     hasAny = true;
 
     const friendlyName = zoneConfig.name || states[zoneConfig.entity]?.attributes?.friendly_name || zoneName;
-    html += `<div class="system-row"><span class="system-label">${escapeHtml(friendlyName)}</span>`;
-    html += `<div class="zone-chips">`;
+    html += `<div class="pc-system-row"><span class="pc-system-label">${escapeHtml(friendlyName)}</span>`;
+    html += `<div class="pc-zone-chips">`;
 
     if (hasNext) {
       const nextTemp = entities.next_sched_temp && states[entities.next_sched_temp]
         ? ` → ${escapeHtml(states[entities.next_sched_temp].state)}${escapeHtml(states[entities.next_sched_temp]?.attributes?.unit_of_measurement || '°C')}`
         : '';
-      html += `<span class="chip" data-entity="${escapeHtml(entities.next_schedule)}"><ha-icon icon="mdi:calendar-clock"></ha-icon>${escapeHtml(states[entities.next_schedule].state)}${nextTemp}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.next_schedule)}"><ha-icon icon="mdi:calendar-clock"></ha-icon>${escapeHtml(states[entities.next_schedule].state)}${nextTemp}</span>`;
     }
     if (hasDeviation) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.schedule_deviation)}"><ha-icon icon="mdi:swap-vertical"></ha-icon>${escapeHtml(states[entities.schedule_deviation].state)}${escapeHtml(states[entities.schedule_deviation]?.attributes?.unit_of_measurement || '°C')}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.schedule_deviation)}"><ha-icon icon="mdi:swap-vertical"></ha-icon>${escapeHtml(states[entities.schedule_deviation].state)}${escapeHtml(states[entities.schedule_deviation]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
     if (hasAdvisor) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.preheat_advisor)}"><ha-icon icon="mdi:radiator"></ha-icon>${escapeHtml(states[entities.preheat_advisor].state)}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.preheat_advisor)}"><ha-icon icon="mdi:radiator"></ha-icon>${escapeHtml(states[entities.preheat_advisor].state)}</span>`;
     }
     if (hasComfort) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.comfort_target)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.comfort_target].state)}${escapeHtml(states[entities.comfort_target]?.attributes?.unit_of_measurement || '°C')}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.comfort_target)}"><ha-icon icon="mdi:target"></ha-icon>${escapeHtml(states[entities.comfort_target].state)}${escapeHtml(states[entities.comfort_target]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
 
     html += `</div></div>`;

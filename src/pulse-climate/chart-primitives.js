@@ -167,12 +167,12 @@ export function buildDonutArcs(segments, size, outerRadius, innerRadius) {
  */
 export function buildLegendChips(items) {
   if (!items || items.length === 0) return '';
-  let html = '<div class="chart-legend">';
+  let html = '<div class="pc-chart-legend">';
   for (const item of items) {
     const color = sanitizeCssValue(item.color);
     const label = escapeHtml(item.label);
     const value = item.value !== undefined && item.value !== null ? ` ${escapeHtml(item.value)}` : '';
-    html += `<span class="legend-chip"><span class="legend-dot" style="background:${color}"></span>${label}${value}</span>`;
+    html += `<span class="pc-legend-chip"><span class="pc-legend-dot" style="background:${color}"></span>${label}${value}</span>`;
   }
   html += '</div>';
   return html;
@@ -355,7 +355,7 @@ export function renderSparklineHtml(data, width, height, color, gradientId, aria
   const result = buildFilledSparkline(data, width, height, 24);
   if (!result) return '';
   const safeColor = sanitizeCssValue(color);
-  let html = `<div class="sparkline-filled" style="height:${height}px">`;
+  let html = `<div class="pc-sparkline-filled" style="height:${height}px">`;
   html += `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" preserveAspectRatio="none" style="width:100%;height:${height}px;display:block">`;
   html += `<defs><linearGradient id="${escapeHtml(gradientId)}" x1="0" y1="0" x2="0" y2="1">`;
   html += `<stop offset="0%" stop-color="${safeColor}" stop-opacity="0.3"/>`;

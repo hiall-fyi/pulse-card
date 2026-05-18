@@ -5,6 +5,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.5.0] - 2026-05-20
+
+**Bar Card and Climate Card naming sweep — shared design tokens are now under one `--pulse-*` family prefix and card-specific knobs use `--pb-*` or `--pc-*`. CSS class selectors are slug-prefixed to match. If you customise either card with `card-mod` or a custom HA theme, you'll need to update a handful of variable names. Plus a Climate Card editor fix that lets you tick on the Home Status and Zone Ranking sections without hand-editing YAML.**
+
+### ⚠️ Upgrade Notes
+
+- **Card-mod and custom HA theme variables have been renamed.** Tokens that both cards share (text colour, body type size, card chrome background, surface tint) now live under one family prefix `--pulse-*`. Tokens that are genuinely card-specific use `--pb-*` (Bar Card) or `--pc-*` (Climate Card). If you set any of the variables in the migration table below via `card-mod` or a custom theme, swap them to the new names. Variables you didn't override aren't affected — defaults still work.
+
+  | Old name | New name | Card |
+  |---|---|---|
+  | `--pulse-card-background` | `--pulse-bg-card` | family-shared (used by every card) |
+  | `--pulse-font-size` | `--pulse-font-body` | family-shared |
+  | `--pulse-name-color` | `--pulse-text-primary` | family-shared |
+  | `--pulse-value-color` | `--pulse-text-primary` | family-shared |
+  | `--pulse-secondary-color` | `--pulse-text-secondary` | family-shared |
+  | `--pulse-icon-color` | `--pulse-text-secondary` | family-shared |
+  | `--pulse-row-bg` | `--pulse-bg-secondary` | family-shared |
+  | `--pulse-chip-color` | `--pulse-text-secondary` | family-shared |
+  | `--pulse-indicator-color` | `--pb-indicator-color` | Bar Card (per-card override) |
+  | `--pulse-track-opacity` | `--pb-track-opacity` | Bar Card |
+  | `--pulse-sparkline-color` | `--pb-sparkline-color` | Bar Card |
+  | `--pulse-bar-height` | `--pc-bar-height` | Climate Card |
+  | `--pulse-bar-radius` | `--pc-bar-radius` | Climate Card |
+  | `--pulse-gauge-height` | `--pc-gauge-height` | Climate Card |
+  | `--pulse-gauge-radius` | `--pc-gauge-radius` | Climate Card |
+  | `--pulse-gap` | `--pc-gap` | Climate Card |
+  | `--pulse-graph-height` | `--pc-graph-height` | Climate Card |
+  | `--pulse-chart-line-width` | `--pc-chart-line-width` | Climate Card |
+
+- **CSS class selectors used in `card-mod` styles have been renamed.** If you target any of the Bar Card's chrome class or any Climate Card section / element class with `card-mod`, the new names use the `.pb-*` and `.pc-*` prefixes:
+
+  | Old selector | New selector |
+  |---|---|
+  | `.pulse-card` (Bar Card chrome) | `.pb-card` |
+  | `.zone-row`, `.zone-name`, `.zone-temp`, `.zone-target`, `.zone-humidity`, `.zone-chips` | `.pc-zone-row`, `.pc-zone-name`, etc. |
+  | `.section`, `.section-label` | `.pc-section`, `.pulse-section-label` (the latter is family-shared) |
+  | `.section-zones`, `.section-radial`, `.section-thermal-strip`, `.section-comfort-strip`, `.section-zone-ranking`, `.section-home-status`, `.section-energy-flow`, `.section-graph`, `.section-donut`, `.section-api`, `.section-bridge`, `.section-homekit`, `.section-weather`, `.section-environment`, `.section-thermal`, `.section-schedule` | Each one prefixed with `pc-` |
+  | `.chip`, `.severity-high`, `.severity-medium`, `.severity-critical` | `.pc-chip`, `.pc-severity-*` |
+  | `.power-bar-container`, `.power-bar-fill`, `.power-bar-track` | `.pc-power-bar-container`, `.pc-power-bar-fill`, `.pc-power-bar-track` |
+  | `.temp-gauge`, `.temp-gauge-bg`, `.temp-gauge-current`, `.temp-gauge-target` | `.pc-temp-gauge`, `.pc-temp-gauge-bg`, `.pc-temp-gauge-current`, `.pc-temp-gauge-target` |
+  | `.legend-item`, `.legend-chip`, `.legend-dot` | `.pc-legend-item`, `.pc-legend-chip`, `.pc-legend-dot` |
+  | `.rank-row`, `.rank-num`, `.rank-name`, `.rank-value`, `.top` (rank-1 highlight) | `.pc-rank-row`, `.pc-rank-num`, `.pc-rank-name`, `.pc-rank-value`, `.pc-top` |
+  | `.home-status-*` | `.pc-home-status-*` |
+  | `.zone-row-pulse`, `.heating` (chained on `.zone-row-pulse`), `.heating-glow` (SVG glow filter) | `.pc-zone-row-pulse`, `.pc-heating`, `.pc-heating-glow` |
+  | `.unavailable` (chained on `.zone-row`), `.bar-active` (chained on `.power-bar-fill`) | `.pc-unavailable`, `.pc-bar-active` |
+  | `.columns` (chained on `.section-zones`, multi-column grid), `.active` (chained on `.ranking-tab`, selected tab) | `.pc-columns`, `.pc-active` |
+  | `.comparison-path`, `.comparison-legend` (zone-graph comparison overlay) | `.pc-comparison-path`, `.pc-comparison-legend` |
+
+  `.pulse-title` and `.pulse-section-label` stay on the family-shared prefix because both cards share them. The full list of renamed Climate Card classes is in the updated [CLIMATE_CARD_GUIDE.md](CLIMATE_CARD_GUIDE.md). The dashboard YAML config (`type: custom:pulse-card`, `type: custom:pulse-climate-card`) and per-zone options haven't changed — only the CSS hooks for advanced styling.
+
+- **Heads-up: `type: custom:pulse-card` is deprecated and will be removed in v2.0.0.** It still works in v1.5.0 — your existing dashboards keep loading without YAML changes — but the canonical name is now `type: custom:pulse-bar-card`. When you next edit a dashboard, swap `pulse-card` for `pulse-bar-card` in the `type` field. There's no rush; this release won't break anything. The v2.0.0 release will drop the alias entirely, so any dashboard still on `pulse-card` at that point will fail to load until you update the YAML. The filename `pulse-card.js` (and the HACS folder `/hacsfiles/pulse-card/`) is unchanged — only the YAML `type:` value is renaming.
+
+### Bug Fixes
+
+- **Climate Card editor now lets you tick on Home Status and Zone Ranking** — both sections shipped in v1.3.0 but the visual editor never listed them in the section picker, so you had to hand-edit the YAML to enable either. They now appear in the "Charts & Visuals" group alongside Zones, Graph, Radial, etc.
+- **Climate Card visual states no longer briefly flash uncoloured on first paint** — the connection-status pulse dot, the radial section's selected zone arc, the zone ranking gold marker on rank 1, and chip severity colours all rendered without the matching CSS class on the very first render in some scenarios. They picked up the class within the first state update, so the gap was usually milliseconds — but if you tap into a card during the initial load you may have noticed the brief flicker. Markup and selectors are now pinned to the same prefix everywhere, so first paint matches steady state.
+
+### Improvements
+
+- **Card-mod and theme variable names map cleanly to where they belong.** Anything both cards share — text colour, body type size, card chrome, surface tint — lives on a single `--pulse-*` token, so styling that you set once flows to every card in the family. `--pb-*` and `--pc-*` are reserved for genuinely card-specific knobs (Bar Card sparkline colour, Climate Card gauge height, etc.). If you've ever wondered "is this variable for Bar or Climate?" while writing a theme, the answer is now visible at a glance.
+- **The Bar Card's `pb-card` chrome class no longer collides with anything.** It used to be `pulse-card`, which conflicted with the legacy custom-element name and made `.pulse-card` selectors ambiguous between "the card chrome" and "any card in the family". Resolved by renaming the chrome class.
+
+### Notes
+
+- **No YAML config changes.** Your dashboard YAML keeps working as-is — every option name (`zones`, `entity`, `sections`, `tap_action`, `interactive`, etc.) is unchanged.
+- **Theme defaults are unchanged.** If you don't set any of the renamed variables yourself, the cards look identical to v1.4.0.
+- **Why the rename?** With Bar Card and Climate Card both in the family today (and Weather Card in development), mixing every card under `.pulse-*` had become genuinely confusing — both for users writing card-mod and for anyone reading the source. Shared concerns (text colour, body type size, card chrome) now sit under a single `--pulse-*` family prefix that flows to every card; only the card-specific knobs carry a slug prefix. Ownership is now obvious from the name.
+- **`PULSE_CARD_GUIDE.md` renamed to `BAR_CARD_GUIDE.md`** to match the card's name. README links updated. The old filename is the only thing that's moved — content is the same plus the v1.5.0 token rename.
+
+
 ## [1.4.0] - 2026-05-12
 
 **Security, reliability, and diagnostics — chip text hardening, animation timer cleanup, and the Climate Card now tells you when something's wrong instead of silently breaking.**

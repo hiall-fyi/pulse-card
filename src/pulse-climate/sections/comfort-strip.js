@@ -118,18 +118,18 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
 
   const modeLabel = mode === 'timeline' ? 'Comfort Timeline' : 'Comfort Heatmap';
 
-  let html = `<div class="section section-comfort-strip">`;
+  let html = `<div class="pc-section pc-section-comfort-strip">`;
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
-  html += `<div class="section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(modeLabel)}</div>`;
-  html += `<span class="card-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
+  html += `<div class="pulse-section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(modeLabel)}</div>`;
+  html += `<span class="pc-card-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
   html += `</div>`;
 
   // Detail panel placeholder (populated by JS on select)
-  html += `<div class="zone-detail" id="heatmap-detail"></div>`;
+  html += `<div class="pc-zone-detail" id="heatmap-detail"></div>`;
 
   // Heatmap rows
-  html += `<div class="heatmap-body" style="position:relative">`;
-  html += `<div class="strip-crosshair" style="display:none"></div>`;
+  html += `<div class="pc-heatmap-body" style="position:relative">`;
+  html += `<div class="pc-strip-crosshair" style="display:none"></div>`;
   for (let z = 0; z < zones.length; z++) {
     const zoneConfig = zones[z];
     const entityId = zoneConfig.entity;
@@ -175,8 +175,8 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
       slotData.push({ value: lastScore, time: slotMid, label: hourLabel });
     }
 
-    html += `<div class="heatmap-row" data-zone="${escapeHtml(zoneName)}" data-idx="${z}">`;
-    html += `<span class="zone-label">${escapeHtml(friendlyName)}</span>`;
+    html += `<div class="pc-heatmap-row" data-zone="${escapeHtml(zoneName)}" data-idx="${z}">`;
+    html += `<span class="pc-zone-label">${escapeHtml(friendlyName)}</span>`;
     const ariaLabel = `${friendlyName} comfort over ${hours}h`;
     if (mode === 'timeline') {
       html += renderTimelineStrip(slotData, scoreToColor, { ariaLabel, nowPct });
@@ -188,15 +188,15 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
   html += `</div>`;
 
   // Time axis
-  html += `<div class="heatmap-time-axis">`;
+  html += `<div class="pc-heatmap-time-axis">`;
   html += renderTimeLabels(windowMs);
   html += `</div>`;
 
   // Legend
-  html += `<div class="heatmap-legend">`;
-  html += `<div class="legend-item"><div class="legend-swatch" style="background:rgba(52,199,89,0.7)"></div>≥80</div>`;
-  html += `<div class="legend-item"><div class="legend-swatch" style="background:rgba(255,159,10,0.65)"></div>50–79</div>`;
-  html += `<div class="legend-item"><div class="legend-swatch" style="background:rgba(255,69,58,0.6)"></div>&lt;50</div>`;
+  html += `<div class="pc-heatmap-legend">`;
+  html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(52,199,89,0.7)"></div>≥80</div>`;
+  html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(255,159,10,0.65)"></div>50–79</div>`;
+  html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(255,69,58,0.6)"></div>&lt;50</div>`;
   html += `</div>`;
 
   html += `</div>`;

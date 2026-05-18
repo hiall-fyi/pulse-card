@@ -16,8 +16,8 @@ import { extractZoneName } from '../zone-resolver.js';
  */
 export function renderEnvironmentSection(zones, states, discovery) {
   let hasAny = false;
-  let html = `<div class="section section-environment">`;
-  html += `<div class="section-label">Environment</div>`;
+  let html = `<div class="pc-section pc-section-environment">`;
+  html += `<div class="pulse-section-label">Environment</div>`;
 
   for (const zoneConfig of zones) {
     const zoneName = extractZoneName(zoneConfig.entity);
@@ -32,29 +32,29 @@ export function renderEnvironmentSection(zones, states, discovery) {
     hasAny = true;
 
     const friendlyName = zoneConfig.name || states[zoneConfig.entity]?.attributes?.friendly_name || zoneName;
-    html += `<div class="system-row"><span class="system-label">${escapeHtml(friendlyName)}</span>`;
-    html += `<div class="zone-chips">`;
+    html += `<div class="pc-system-row"><span class="pc-system-label">${escapeHtml(friendlyName)}</span>`;
+    html += `<div class="pc-zone-chips">`;
 
     if (hasMold) {
       const val = states[entities.mold_risk].state;
       const color = resolveRiskColor(val);
-      html += `<span class="chip" data-entity="${escapeHtml(entities.mold_risk)}" style="color:${sanitizeCssValue(color.fallback)}">`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.mold_risk)}" style="color:${sanitizeCssValue(color.fallback)}">`;
       html += `<ha-icon icon="mdi:mushroom"></ha-icon>${escapeHtml(val)}</span>`;
     }
     if (hasCond) {
       const val = states[entities.condensation].state;
       const color = resolveRiskColor(val);
-      html += `<span class="chip" data-entity="${escapeHtml(entities.condensation)}" style="color:${sanitizeCssValue(color.fallback)}">`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.condensation)}" style="color:${sanitizeCssValue(color.fallback)}">`;
       html += `<ha-icon icon="mdi:water-alert"></ha-icon>${escapeHtml(val)}</span>`;
     }
     if (hasComfort) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.comfort_level)}"><ha-icon icon="mdi:emoticon-outline"></ha-icon>${escapeHtml(states[entities.comfort_level].state)}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.comfort_level)}"><ha-icon icon="mdi:emoticon-outline"></ha-icon>${escapeHtml(states[entities.comfort_level].state)}</span>`;
     }
     if (hasSurface) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.surface_temp)}"><ha-icon icon="mdi:texture-box"></ha-icon>${escapeHtml(states[entities.surface_temp].state)}${escapeHtml(states[entities.surface_temp]?.attributes?.unit_of_measurement || '°C')}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.surface_temp)}"><ha-icon icon="mdi:texture-box"></ha-icon>${escapeHtml(states[entities.surface_temp].state)}${escapeHtml(states[entities.surface_temp]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
     if (hasDew) {
-      html += `<span class="chip" data-entity="${escapeHtml(entities.dew_point)}"><ha-icon icon="mdi:water-thermometer"></ha-icon>${escapeHtml(states[entities.dew_point].state)}${escapeHtml(states[entities.dew_point]?.attributes?.unit_of_measurement || '°C')}</span>`;
+      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.dew_point)}"><ha-icon icon="mdi:water-thermometer"></ha-icon>${escapeHtml(states[entities.dew_point].state)}${escapeHtml(states[entities.dew_point]?.attributes?.unit_of_measurement || '°C')}</span>`;
     }
 
     html += `</div></div>`;

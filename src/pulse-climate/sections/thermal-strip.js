@@ -39,18 +39,18 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
   const typeLabel = isHumidity ? 'Humidity' : 'Thermal';
   const modeLabel = mode === 'heatmap' ? 'Heatmap' : 'Timeline';
 
-  let html = `<div class="section section-thermal-strip">`;
+  let html = `<div class="pc-section pc-section-thermal-strip">`;
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
-  html += `<div class="section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(typeLabel)} ${escapeHtml(modeLabel)}</div>`;
-  html += `<span class="card-subtitle section-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
+  html += `<div class="pulse-section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(typeLabel)} ${escapeHtml(modeLabel)}</div>`;
+  html += `<span class="pc-card-subtitle pc-section-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
   html += `</div>`;
 
   // Detail panel placeholder
-  html += `<div class="zone-detail" id="timeline-detail"></div>`;
+  html += `<div class="pc-zone-detail" id="timeline-detail"></div>`;
 
   // Crosshair element
-  html += `<div class="strip-rows" style="position:relative">`;
-  html += `<div class="strip-crosshair" style="display:none"></div>`;
+  html += `<div class="pc-strip-rows" style="position:relative">`;
+  html += `<div class="pc-strip-crosshair" style="display:none"></div>`;
 
   for (const zoneConfig of zones) {
     const entityId = zoneConfig.entity;
@@ -64,15 +64,15 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
     const friendlyName = zoneConfig.name || states[entityId]?.attributes?.friendly_name || zoneName;
     const data = historyCache?.data?.[sensorId] || [];
 
-    html += `<div class="timeline-row" data-zone="${escapeHtml(zoneName)}" data-entity="${escapeHtml(entityId)}">`;
-    html += `<span class="zone-label">${escapeHtml(friendlyName)}</span>`;
+    html += `<div class="pc-timeline-row" data-zone="${escapeHtml(zoneName)}" data-entity="${escapeHtml(entityId)}">`;
+    html += `<span class="pc-zone-label">${escapeHtml(friendlyName)}</span>`;
 
     if (data.length < 2) {
       // Distinguish "waiting for data" (entity exists but no history yet) from "no data"
       const entityExists = !!states[sensorId];
       const hasCacheEntry = sensorId in (historyCache?.data || {});
       const emptyMsg = (entityExists && !hasCacheEntry) ? 'Waiting for data' : 'No data';
-      html += `<div class="strip-container"><div class="chart-empty" style="height:14px;font-size:10px">`
+      html += `<div class="pc-strip-container"><div class="pc-chart-empty" style="height:14px;font-size:10px">`
         + `${escapeHtml(emptyMsg)}</div></div>`;
     } else {
       const slotData = computeSlots(data, slots, windowMs);
@@ -92,7 +92,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
   html += `</div>`;
 
   // Time axis
-  html += `<div class="time-axis" style="margin-left:76px">`;
+  html += `<div class="pc-time-axis" style="margin-left:76px">`;
   html += renderTimeLabels(windowMs);
   html += `</div>`;
 

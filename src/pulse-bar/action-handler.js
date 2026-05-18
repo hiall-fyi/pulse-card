@@ -5,7 +5,7 @@
  */
 
 import { warn } from './utils.js';
-import { executeAction, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from './shared/action-handler.js';
+import { executeAction, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
 
 /**
  * Resolve action config with fallback chain: entity → card → default.
@@ -41,9 +41,9 @@ export function handleAction(element, hass, cardConfig, entityConfig, actionType
 }
 
 /**
- * Clean up action listeners previously bound to a bar row element.
+ * Clean up action listeners on a bar row element.
  * Clears pending timers and removes all event listeners via AbortController.
- * @param {HTMLElement} rowEl - The .bar-row element.
+ * @param {HTMLElement} rowEl - The .pb-row element.
  */
 export function cleanupActionListeners(rowEl) {
   const cleanup = /** @type {*} */ (rowEl).__pulseCleanup;
@@ -53,7 +53,7 @@ export function cleanupActionListeners(rowEl) {
 /**
  * Bind tap, hold, and double-tap listeners to a bar row element.
  * Stores a cleanup function on the element for disconnectedCallback.
- * @param {HTMLElement} rowEl - The .bar-row element.
+ * @param {HTMLElement} rowEl - The .pb-row element.
  * @param {{_hass: import('./types.js').Hass|null}} cardEl - Card element with _hass property.
  * @param {import('./types.js').Hass|null} _hass - Unused (kept for signature compat). Use cardEl._hass instead.
  * @param {import('./types.js').PulseCardConfig} cardConfig - Card-level config.

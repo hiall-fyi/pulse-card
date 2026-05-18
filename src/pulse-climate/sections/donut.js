@@ -35,15 +35,15 @@ export function renderDonutSection(sectionConfig, hubEntities, states) {
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   const arcs = buildDonutArcs(segments, size);
 
-  let html = `<div class="section section-donut">`;
+  let html = `<div class="pc-section pc-section-donut">`;
   /** @type {Record<string, string>} */
   const titleMap = { api_breakdown: 'API Breakdown', homekit_saved: 'HomeKit Saved' };
   const title = (source && titleMap[source]) || 'Breakdown';
-  html += `<div class="section-label">${escapeHtml(title)}</div>`;
+  html += `<div class="pulse-section-label">${escapeHtml(title)}</div>`;
 
   // SVG donut
   const ariaLabel = segments.map((s) => `${s.label} ${s.value}`).join(', ');
-  html += `<div class="donut-container" style="width:${sanitizeCssValue(size)}px;height:${sanitizeCssValue(size)}px">`;
+  html += `<div class="pc-donut-container" style="width:${sanitizeCssValue(size)}px;height:${sanitizeCssValue(size)}px">`;
   html += `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="${escapeHtml(ariaLabel)}">`;
 
   // Background ring (grey) for empty state or as base
@@ -57,7 +57,7 @@ export function renderDonutSection(sectionConfig, hubEntities, states) {
   html += '</svg>';
 
   // Center label
-  html += `<div class="donut-center">${escapeHtml(Math.round(total))}</div>`;
+  html += `<div class="pc-donut-center">${escapeHtml(Math.round(total))}</div>`;
   html += '</div>';
 
   // Legend
@@ -93,7 +93,6 @@ function resolveApiBreakdown(hubEntities, states) {
 
 /**
  * Resolve segments from HomeKit saved entities.
- * Prefers standalone entities (Tado CE beta.9+), falls back to attributes.
  * @param {Record<string, string>} hubEntities
  * @param {Record<string, *>} states
  * @returns {import('../types.js').ResolvedSegment[]}
@@ -105,7 +104,7 @@ function resolveHomekitSaved(hubEntities, states) {
   if (!connState) return [];
   const attrs = connState.attributes || {};
 
-  // Prefer standalone entities (Tado CE beta.9+), fall back to attributes
+  // Prefer standalone entities, fall back to attributes
   const readsEntity = hubEntities.homekit_reads_saved ? states[hubEntities.homekit_reads_saved] : null;
   const writesEntity = hubEntities.homekit_writes_saved ? states[hubEntities.homekit_writes_saved] : null;
   const readsSaved = readsEntity ? (Number(readsEntity.state) || 0) : (Number(attrs.reads_saved_today) || 0);

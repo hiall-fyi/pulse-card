@@ -6,7 +6,27 @@
  * editors live here.
  */
 
-import { html, nothing } from 'lit';
+import { html, nothing, css } from 'lit';
+
+// ── Shared editor styles ────────────────────────────────────────────
+// Every Pulse card editor uses renderReorderButtons() which emits
+// .pulse-move-icon and .pulse-remove-icon. Each editor inlines the
+// same selector — promote here so the family is the single source of
+// truth and the styles travel with the helper that emits them.
+export const SHARED_EDITOR_STYLES = css`
+  .pulse-move-icon {
+    color: var(--secondary-text-color);
+    --mdc-icon-button-size: 36px;
+  }
+  .pulse-remove-icon {
+    color: var(--secondary-text-color);
+    --mdc-icon-button-size: 36px;
+  }
+  .pulse-move-icon[disabled] {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+`;
 
 // ── SVG icon paths (MDI) ────────────────────────────────────────────
 
@@ -66,14 +86,14 @@ export function renderReorderButtons(index, total, onMove, onRemove) {
       <ha-icon-button
         .label=${'Move up'}
         .path=${ICON_MOVE_UP}
-        class="move-icon"
+        class="pulse-move-icon"
         .disabled=${index === 0}
         @click=${() => onMove(index, -1)}
       ></ha-icon-button>
       <ha-icon-button
         .label=${'Move down'}
         .path=${ICON_MOVE_DOWN}
-        class="move-icon"
+        class="pulse-move-icon"
         .disabled=${index === total - 1}
         @click=${() => onMove(index, 1)}
       ></ha-icon-button>
@@ -81,7 +101,7 @@ export function renderReorderButtons(index, total, onMove, onRemove) {
     <ha-icon-button
       .label=${'Remove'}
       .path=${ICON_REMOVE}
-      class="remove-icon"
+      class="pulse-remove-icon"
       @click=${() => onRemove(index)}
     ></ha-icon-button>
   `;

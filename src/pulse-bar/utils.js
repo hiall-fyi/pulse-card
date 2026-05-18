@@ -6,8 +6,8 @@
 
 import { DEFAULTS, LOG_PREFIX } from './constants.js';
 // Re-export shared utilities for backward compatibility
-export { escapeHtml, sanitizeCssValue, clamp, cssValue } from './shared/utils.js';
-import { clamp } from './shared/utils.js';
+export { escapeHtml, sanitizeCssValue, clamp, cssValue, fetchSparklineData, buildSparklinePath } from '../shared/utils.js';
+import { clamp } from '../shared/utils.js';
 
 /** Known HA active/truthy states — O(1) Set lookup. */
 const BINARY_ACTIVE = new Set(['on', 'open', 'home', 'locked', 'playing', 'active']);
@@ -346,7 +346,7 @@ function preSortSeverity(severity) {
 
 /**
  * Validate and normalize card config. Throws on invalid config.
- * Used by PulseCard.setConfig() and testable independently.
+ * Used by PulseBarCard.setConfig() and testable independently.
  * @param {Record<string, *>} config - Raw user config.
  * @returns {import('./types.js').PulseCardConfig & {entities: import('./types.js').EntityConfig[]}} Normalized config with defaults merged.
  */
@@ -375,6 +375,15 @@ export function normalizeConfig(config) {
     merged.severity = preSortSeverity(merged.severity);
   }
 
+  // Legacy promote: pre-v1.5.0 configs used `indicator: { show: true }`
+  // without a `positions.indicator` setting and relied on a runtime
+  // auto-promote to render the arrow. v1.5.0 makes `positions.indicator`
+  // the single source of truth — promote here so editor and runtime
+  // agree without a runtime fallback rule the user can't see.
+  if (merged.indicator?.show === true && merged.positions.indicator === 'off') {
+    merged.positions = { ...merged.positions, indicator: 'outside' };
+  }
+
   merged.entities = config.entities
     ? config.entities.map(/** @param {*} e */ (e) => {
         const ec = typeof e === 'string' ? { entity: e } : { ...e };
@@ -383,6 +392,12 @@ export function normalizeConfig(config) {
         // Attach card-level secondary_info as fallback
         if (!ec.secondary_info && merged.secondary_info) {
           ec._cardSecondaryInfo = merged.secondary_info;
+        }
+        // Same legacy promote at the per-entity level
+        if (ec.indicator?.show === true && ec.positions && ec.positions.indicator === 'off') {
+          ec.positions = { ...ec.positions, indicator: 'outside' };
+        } else if (ec.indicator?.show === true && !ec.positions?.indicator) {
+          ec.positions = { ...(ec.positions || {}), indicator: 'outside' };
         }
         return ec;
       })
@@ -531,191 +546,10 @@ export function computeBarWidthScale(ec, cfg) {
   return raw !== undefined && raw !== null ? Math.max(1, Math.min(100, raw)) / 100 : 1;
 }
 
-/**
- * Batch-fetch sparkline history data for multiple entities.
- * Returns full history arrays (timestamp + value pairs) for SVG rendering.
- * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
- * @param {string[]} entityIds - Entity IDs to query.
- * @param {number} [hoursToShow=24] - How far back to look in hours.
- * @returns {Promise<Record<string, {t:number, v:number}[]>>} Map of entity ID → data points.
- */
-export async function fetchSparklineData(hass, entityIds, hoursToShow = 24) {
-  /** @type {Record<string, {t:number, v:number}[]>} */
-  const results = {};
-  if (!hass?.callWS || entityIds.length === 0) return results;
-
-  const now = new Date();
-  const start = new Date(now.getTime() - hoursToShow * 60 * 60 * 1000);
-  try {
-    const history = await hass.callWS({
-      type: 'history/history_during_period',
-      start_time: start.toISOString(),
-      end_time: now.toISOString(),
-      entity_ids: entityIds,
-      minimal_response: true,
-      significant_changes_only: true,
-    });
-    for (const eid of entityIds) {
-      try {
-        const states = history?.[eid];
-        if (!states || states.length < 2) {
-          results[eid] = [];
-          continue;
-        }
-        /** @type {{t:number, v:number}[]} */
-        const points = [];
-        for (const s of states) {
-          const v = parseFloat(s.s);
-          if (!isNaN(v)) {
-            // lu is a Unix timestamp (seconds as float) in compressed format,
-            // or an ISO string in non-compressed format (last_updated fallback).
-            const rawTime = s.lu ?? s.last_updated;
-            const t = typeof rawTime === 'number' ? rawTime * 1000 : new Date(rawTime).getTime();
-            if (isFinite(t)) points.push({ t, v });
-          }
-        }
-        results[eid] = points;
-      } catch (e) {
-        // Isolate per-entity parsing errors so one bad entity doesn't block others.
-        // Log so HA history-format drift is diagnosable instead of silently empty.
-        warn('Sparkline parse failed for %s: %O', eid, e);
-        results[eid] = [];
-      }
-    }
-  } catch (e) {
-    warn('Sparkline fetch failed: %O', e);
-    for (const eid of entityIds) results[eid] = [];
-  }
-  return results;
-}
-
-/**
- * Aggregate function map for sparkline downsampling.
- * @type {Record<string, (values: number[]) => number>}
- */
-const AGGREGATE_FUNCS = {
-  avg: (v) => v.reduce((s, x) => s + x, 0) / v.length,
-  min: (v) => Math.min(...v),
-  max: (v) => Math.max(...v),
-  median: (v) => {
-    const sorted = [...v].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  },
-  first: (v) => v[0],
-  last: (v) => v[v.length - 1],
-  sum: (v) => v.reduce((s, x) => s + x, 0),
-  delta: (v) => Math.max(...v) - Math.min(...v),
-  diff: (v) => v[v.length - 1] - v[0],
-};
-
-/**
- * Downsample data into fixed time slots with configurable aggregation and carry-forward.
- * @param {{t:number, v:number}[]} data - Input data points (sorted by t).
- * @param {number} slots - Number of output slots (e.g. hours_to_show × points_per_hour).
- * @param {string} [aggregateFunc='avg'] - Aggregation function name.
- * @returns {{x:number, v:number}[]} Evenly-spaced points with x = slot index ratio [0..1].
- */
-function downsampleData(data, slots, aggregateFunc = 'avg') {
-  if (data.length === 0 || slots < 1) return [];
-  if (data.length <= slots) {
-    const minT = data[0].t;
-    const rangeT = data[data.length - 1].t - minT || 1;
-    return data.map((d) => ({ x: (d.t - minT) / rangeT, v: d.v }));
-  }
-
-  const aggFn = AGGREGATE_FUNCS[aggregateFunc] || AGGREGATE_FUNCS.avg;
-  const minT = data[0].t;
-  const maxT = data[data.length - 1].t;
-  const rangeT = maxT - minT || 1;
-  const slotSize = rangeT / slots;
-
-  /** @type {{x:number, v:number}[]} */
-  const result = [];
-  let di = 0;
-  let lastV = data[0].v;
-
-  for (let s = 0; s < slots; s++) {
-    const sEnd = minT + (s + 1) * slotSize;
-    /** @type {number[]} */
-    const bucket = [];
-    while (di < data.length && data[di].t < sEnd) {
-      bucket.push(data[di].v);
-      di++;
-    }
-    if (bucket.length > 0) {
-      lastV = aggFn(bucket);
-    }
-    result.push({ x: s / (slots - 1 || 1), v: lastV });
-  }
-  return result;
-}
-
-/**
- * Build a smooth SVG path from sparkline data.
- * Downsamples with configurable aggregation, then applies optional
- * midpoint + quadratic Bezier smoothing.
- * Auto-scales Y axis to the data range.
- * Returns empty string if fewer than 2 data points.
- * @param {{t:number, v:number}[]} data - Time-value pairs (sorted by t ascending).
- * @param {number} width - SVG viewBox width.
- * @param {number} height - SVG viewBox height.
- * @param {number} [slots=24] - Number of time slots for downsampling.
- * @param {string} [aggregateFunc='avg'] - Aggregation function name.
- * @param {boolean} [smoothing=true] - Apply quadratic Bezier smoothing.
- * @returns {string} SVG path d attribute string.
- */
-export function buildSparklinePath(data, width, height, slots = 24, aggregateFunc = 'avg', smoothing = true) {
-  if (data.length < 2) return '';
-
-  const sampled = downsampleData(data, slots, aggregateFunc);
-  if (sampled.length < 2) return '';
-
-  // Find Y range from sampled data
-  let minV = sampled[0].v;
-  let maxV = sampled[0].v;
-  for (let i = 1; i < sampled.length; i++) {
-    if (sampled[i].v < minV) minV = sampled[i].v;
-    if (sampled[i].v > maxV) maxV = sampled[i].v;
-  }
-  const rangeV = maxV - minV || 1;
-
-  // Map to SVG coordinates with Y padding to prevent stroke clipping at edges
-  const pad = 2; // px padding top/bottom inside viewBox
-  const drawH = height - pad * 2;
-  /** @type {{x:number, y:number}[]} */
-  const pts = sampled.map((d) => ({
-    x: d.x * width,
-    y: pad + drawH - ((d.v - minV) / rangeV) * drawH,
-  }));
-
-  // 2 points or smoothing disabled — straight lines
-  if (pts.length === 2 || !smoothing) {
-    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
-    for (let i = 1; i < pts.length; i++) {
-      d += `L${pts[i].x.toFixed(1)},${pts[i].y.toFixed(1)}`;
-    }
-    return d;
-  }
-
-  // Midpoint + quadratic Bezier smoothing (mini-graph-card getPath technique)
-  // For each pair of points, draw a line to the midpoint, then a Q curve
-  // through the actual point to the next midpoint.
-  let last = pts[0];
-  let d = `M${last.x.toFixed(1)},${last.y.toFixed(1)}`;
-
-  for (let i = 1; i < pts.length; i++) {
-    const next = pts[i];
-    const mx = (last.x + next.x) / 2;
-    const my = (last.y + next.y) / 2;
-    d += ` ${mx.toFixed(1)},${my.toFixed(1)}`;
-    d += ` Q${next.x.toFixed(1)},${next.y.toFixed(1)}`;
-    last = next;
-  }
-  // Final point
-  d += ` ${last.x.toFixed(1)},${last.y.toFixed(1)}`;
-  return d;
-}
+// Sparkline helpers (fetchSparklineData, buildSparklinePath) live in
+// shared/utils.js and are re-exported below for backward compatibility
+// with existing pulse-bar callers. Pulse Climate imports them directly
+// from shared.
 
 /**
  * Evaluate whether an entity bar should be visible based on visibility conditions.
@@ -926,7 +760,6 @@ export const _testExports = {
   resolveGradientColor,
   resolveMinMax,
   formatValue,
-  downsampleData,
   resolveBinaryValue,
   formatBinaryDisplay,
   formatRelativeTime,
