@@ -57,8 +57,10 @@ export const SHARED_STYLES = `
   --pulse-status-green: var(--label-badge-green, #4CAF50);
   --pulse-status-red: var(--label-badge-red, #F44336);
   --pulse-status-yellow: var(--label-badge-yellow, #FF9800);
+  --pulse-status-blue: var(--label-badge-blue, #2196F3);
 
-  /* ── Disabled ──────────────────────────────────────────────────── */
+  /* ── Info / Disabled ───────────────────────────────────────────── */
+  --pulse-info-color: var(--info-color, #5AC8FA);
   --pulse-disabled: var(--disabled-color, #bdbdbd);
 
   /* ── Glass Panel ───────────────────────────────────────────────── */
@@ -75,25 +77,69 @@ export const SHARED_STYLES = `
 
   /* ── Font Weights ──────────────────────────────────────────────── */
   --pulse-weight-hero: 100;
+  --pulse-weight-thin: 200;
   --pulse-weight-light: 300;
   --pulse-weight-regular: 400;
   --pulse-weight-medium: 500;
   --pulse-weight-semibold: 600;
 
+  /* ── Extended typography scale ─────────────────────────────────── */
+  --pulse-font-display: 64px;        /* Weather hero temp; future Climate display numbers */
+  --pulse-font-hero: 32px;           /* Climate radial centre; secondary hero */
+  --pulse-font-summary: 24px;        /* summary stat numbers (home-status, ranking) */
+  --pulse-font-large: 20px;          /* large hero-adjacent numbers (zone pulse, home-status label) */
+  --pulse-font-stat: 18px;           /* mid-emphasis stat values (flow temp, home-status zone actual) */
+  --pulse-font-section-title: 17px;  /* Weather pw-status-label equivalent */
+  --pulse-font-kicker: 12px;         /* uppercase top-of-section labels */
+
+  /* ── Letter-spacing scale ──────────────────────────────────────── */
+  --pulse-ls-display: -1.5px;
+  --pulse-ls-hero: -1px;
+  --pulse-ls-title: -0.8px;
+  --pulse-ls-kicker: 0.32em;
+  --pulse-ls-micro: 0.14em;
+
+  /* ── Tier colours (Apple system, promoted from Weather) ──────── */
+  --pulse-tier-calm: #5ac8fa;
+  --pulse-tier-moderate: #30d158;
+  --pulse-tier-strong: #ff9f0a;
+  --pulse-tier-gale: #ff453a;
+
   /* ── Border Radius ─────────────────────────────────────────────── */
   --pulse-radius-card: var(--ha-card-border-radius, 12px);
+  --pulse-radius-cartouche: 24px;            /* outer frame on Climate hearth + Weather cartouche */
   --pulse-radius-panel: 14px;
   --pulse-radius-row: 10px;
   --pulse-radius-element: 8px;
-  --pulse-radius-small: 4px;
   --pulse-radius-pill: 6px;
+  --pulse-radius-small: 4px;
+  --pulse-radius-tight: 3px;                 /* state tags, slim chips */
   --pulse-radius-bar: 2px;
+  --pulse-radius-hairline: 1px;              /* sub-pixel cells, day arc, slot bars */
+  --pulse-radius-circle: 50%;                /* dots, donut centres, circular markers */
 
   /* ── Spacing ───────────────────────────────────────────────────── */
-  --pulse-space-card: 16px;
-  --pulse-space-section: 12px;
-  --pulse-space-element: 8px;
-  --pulse-space-tight: 4px;
+  --pulse-space-card-wide: 20px;     /* weather chrome — wider inset for hero/cartouche layouts */
+  --pulse-space-card: 16px;          /* card-edge padding, section margins */
+  --pulse-space-panel: 14px;         /* glass-panel inner pad, cartouche inset */
+  --pulse-space-section: 12px;       /* between section blocks */
+  --pulse-space-row: 10px;           /* between row items */
+  --pulse-space-element: 8px;        /* between elements within a row */
+  --pulse-space-chip: 6px;           /* chip gap, dense flex gap */
+  --pulse-space-tight: 4px;          /* labels, status tags */
+  --pulse-space-hairline: 2px;       /* sub-pixel cell gaps, micro padding */
+  --pulse-space-pin: 1px;            /* one-pixel anchor offsets */
+
+  /* ── Animation timing ──────────────────────────────────────────── */
+  --pulse-anim-instant: 0.05s;     /* flash, sub-frame feedback */
+  --pulse-anim-fast: 0.15s;        /* hover backgrounds, ripple onset */
+  --pulse-anim-base: 0.2s;         /* default colour / opacity transitions */
+  --pulse-anim-medium: 0.25s;      /* transform / font-size easing */
+  --pulse-anim-mode: 0.3s;         /* mode swap, max-height reveal */
+  --pulse-anim-slow: 0.35s;        /* expand panels, large transitions */
+  --pulse-anim-color: 0.4s;        /* slow colour cross-fade */
+  --pulse-anim-reveal: 0.6s;       /* bar-width fills, sparkline grow */
+  --pulse-anim-fill: 0.8s;         /* heating bar width grow */
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -107,14 +153,15 @@ export const SHARED_STYLES = `
   color: var(--pulse-text-primary);
 }
 
-/* Section label — uppercase, small, secondary */
+/* Section label — uppercase, small, secondary tone.
+   No opacity multiplier: --pulse-text-secondary is already the dimmed token,
+   stacking 0.7 on top dropped light-theme contrast below WCAG-large threshold. */
 .pulse-section-label {
   font-size: var(--pulse-font-label);
   font-weight: var(--pulse-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--pulse-text-secondary);
-  opacity: 0.7;
 }
 
 /* Glass panel — frosted overlay */
@@ -163,7 +210,7 @@ export const SHARED_STYLES = `
   bottom: 0;
   left: 1px;
   right: 1px;
-  border-radius: 2px 2px 0 0;
-  background: var(--info-color, #5ac8fa);
+  border-radius: var(--pulse-radius-bar) var(--pulse-radius-bar) 0 0;
+  background: var(--pulse-info-color);
 }
 `;

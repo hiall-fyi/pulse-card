@@ -11,11 +11,11 @@ import { extractZoneName } from '../zone-resolver.js';
 /** Maximum deviation for bar scale (±5 units). */
 const MAX_DELTA = 5;
 
-/** Colour map using HA CSS custom properties with fallbacks. */
+/** Colour map — tier tokens for visual coherence with hero. */
 const STATUS_COLORS = {
-  green: 'var(--label-badge-green, #4CAF50)',
-  amber: 'var(--label-badge-yellow, #FF9800)',
-  red: 'var(--label-badge-red, #F44336)',
+  green: 'var(--pulse-tier-moderate)',
+  amber: 'var(--pulse-tier-strong)',
+  red: 'var(--pulse-tier-gale)',
 };
 
 /** Hero icon map. */
@@ -133,7 +133,7 @@ function renderZoneRow(zs) {
       + `<span class="pc-home-status-target">Unavailable</span>`;
     deltaHtml = `<div class="pc-home-status-delta">`
       + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
-      + `<span class="pc-home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">--</span>`
+      + `<span class="pc-home-status-delta-text" style="color:var(--pulse-text-secondary)">--</span>`
       + `</div>`;
   } else if (!isActive) {
     const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
@@ -143,7 +143,7 @@ function renderZoneRow(zs) {
       + `<span class="pc-home-status-target">Off</span>`;
     deltaHtml = `<div class="pc-home-status-delta">`
       + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
-      + `<span class="pc-home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">Off</span>`
+      + `<span class="pc-home-status-delta-text" style="color:var(--pulse-text-secondary)">Off</span>`
       + `</div>`;
   } else {
     const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
@@ -152,7 +152,6 @@ function renderZoneRow(zs) {
       + `<span class="pc-home-status-arrow">→</span>`
       + `<span class="pc-home-status-target">${escapeHtml(zs.targetTemp)}${unit}</span>`;
 
-    // Deviation bar — only meaningful with non-null currentTemp
     if (zs.currentTemp !== null && zs.currentTemp !== undefined) {
       const delta = zs.currentTemp - zs.targetTemp;
       const absDelta = Math.abs(delta);
@@ -174,7 +173,7 @@ function renderZoneRow(zs) {
     } else {
       deltaHtml = `<div class="pc-home-status-delta">`
         + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
-        + `<span class="pc-home-status-delta-text" style="color:var(--secondary-text-color, #9E9E9E)">--</span>`
+        + `<span class="pc-home-status-delta-text" style="color:var(--pulse-text-secondary)">--</span>`
         + `</div>`;
     }
   }
@@ -191,12 +190,14 @@ function renderZoneRow(zs) {
  * @param {import('../types.js').ZoneConfig[]} zones - Zone configs from card config.
  * @param {Record<string, *>} states - hass.states object.
  * @param {import('../types.js').TadoDiscovery} discovery - Discovered entities.
+ * @param {{show_hero?: boolean}} [cardConfig] - When show_hero !== false the
+ *   card-level hero already covers this role; the inner hero block is omitted
+ *   to avoid two competing focal points.
  * @returns {string} HTML string (empty if zones array is empty).
  */
-export function renderHomeStatusSection(zones, states, discovery) {
+export function renderHomeStatusSection(zones, states, discovery, cardConfig) {
   if (!zones || zones.length === 0) return '';
 
-  // Resolve zone states
   const zoneStates = zones.map((zoneConfig) => {
     const entityId = zoneConfig.entity;
     const zoneName = extractZoneName(entityId);
@@ -204,41 +205,36 @@ export function renderHomeStatusSection(zones, states, discovery) {
     return resolveZoneState(entityId, discoveredEntities, states, zoneConfig, {});
   });
 
-  // Classify zones
   const activeZones = zoneStates.filter(
     (z) => !z.isUnavailable && z.hvacAction !== 'off' && z.targetTemp,
   );
 
-  // Compute hero status
   const hero = computeHeroStatus(activeZones);
   const heroColor = STATUS_COLORS[hero.color];
   const heroIcon = HERO_ICONS[hero.color];
 
-  // Sort zones for display
   const sorted = sortZonesForDisplay(zoneStates);
-
-  // Compute summary
   const summary = computeSummary(activeZones);
 
-  // Build HTML
   let html = `<div class="pc-section pc-section-home-status">`;
   html += `<div class="pulse-section-label">Home Status</div>`;
 
-  // Hero block
-  html += `<div class="pc-home-status-hero">`;
-  html += `<ha-icon class="pc-home-status-icon" icon="${escapeHtml(heroIcon)}" style="color:${sanitizeCssValue(heroColor)}"></ha-icon>`;
-  html += `<div class="pc-home-status-label" style="color:${sanitizeCssValue(heroColor)}">${escapeHtml(hero.label)}</div>`;
-  html += `<div class="pc-home-status-detail">${escapeHtml(hero.detail)}</div>`;
-  html += `</div>`;
+  /* Defer to the card-level hero when enabled — render the inner hero only
+     when show_hero is explicitly disabled, so we don't show two focal points. */
+  if (cardConfig?.show_hero === false) {
+    html += `<div class="pc-home-status-hero">`;
+    html += `<ha-icon class="pc-home-status-icon" icon="${escapeHtml(heroIcon)}" style="color:${sanitizeCssValue(heroColor)}"></ha-icon>`;
+    html += `<div class="pc-home-status-label" style="color:${sanitizeCssValue(heroColor)}">${escapeHtml(hero.label)}</div>`;
+    html += `<div class="pc-home-status-detail">${escapeHtml(hero.detail)}</div>`;
+    html += `</div>`;
+  }
 
-  // Zone rows
   html += `<div class="pc-home-status-zones">`;
   for (const zs of sorted) {
     html += renderZoneRow(zs);
   }
   html += `</div>`;
 
-  // Summary footer
   html += `<div class="pc-home-status-summary">`;
   html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.onTarget)}</div><div class="pc-stat-label">On Target</div></div>`;
   html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.avgActual)}</div><div class="pc-stat-label">Avg Actual</div></div>`;

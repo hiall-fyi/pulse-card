@@ -18,18 +18,34 @@ export const STYLES = `${SHARED_STYLES}
   --pc-bar-height: 8px;
   --pc-bar-radius: 4px;
   --pc-chart-line-width: 1.5;
-  --pc-gap: 16px;
+  --pc-gap: var(--pulse-space-card);
   --pc-gauge-height: 6px;
   --pc-gauge-radius: 3px;
   --pc-graph-height: 80px;
+
+  /* Hearth wash — static bottom-edge ember glow over --pulse-bg-card.
+     Atmosphere module (state-driven conic gradient) animates over the top. */
+  --pc-hearth-glow-inner: rgba(255, 138, 70, 0.10);
+  --pc-hearth-glow-mid:   rgba(180, 70, 50, 0.04);
+
+  /* Section-local typography — values used by only one section, kept card-local
+     so they don't pollute the shared token surface. */
+  --pc-rank-text: 13px;     /* zone-ranking row name + value */
+  --pc-detail-name: 15px;   /* zone detail panel — clicked-zone heading */
+  --pc-detail-stat: 22px;   /* zone detail panel — primary stat value */
 }
 
 ha-card {
   overflow: hidden;
-  padding: 16px;
-  background: var(--pulse-bg-card);
+  padding: var(--pulse-space-card);
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 100%,
+      var(--pc-hearth-glow-inner) 0%,
+      var(--pc-hearth-glow-mid) 35%,
+      transparent 70%),
+    var(--pulse-bg-card);
   container-type: inline-size;
-  color: var(--primary-text-color);
+  color: var(--pulse-text-primary);
 }
 
 /* Title — adds layout margin on top of shared typography. */
@@ -44,7 +60,7 @@ ha-card {
 .pc-zone-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--pulse-space-tight);
   cursor: pointer;
   position: relative;
   overflow: hidden;
@@ -53,7 +69,7 @@ ha-card {
 .pc-zone-row:focus-visible {
   outline: 2px solid var(--pulse-accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--pulse-radius-small);
 }
 .pc-zone-row.pc-unavailable { opacity: 0.5; }
 .pc-zone-row.pc-unavailable .pc-power-bar-fill {
@@ -62,13 +78,41 @@ ha-card {
   opacity: 0.2;
 }
 
+
+.pc-zone-row.pc-row-off { opacity: 0.55; }
+.pc-zone-row.pc-row-unavail { opacity: 0.4; }
+
+.pc-state-tag {
+  display: inline-block;
+  font-size: var(--pulse-font-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  margin-left: 8px;
+  border-radius: var(--pulse-radius-tight);
+  font-weight: var(--pulse-weight-medium);
+  vertical-align: middle;
+}
+.pc-tag-heat { background: color-mix(in srgb, var(--pulse-status-yellow) 18%, transparent); color: var(--pulse-status-yellow); }
+.pc-tag-cool { background: color-mix(in srgb, var(--pulse-tier-calm) 18%, transparent); color: var(--pulse-tier-calm); }
+.pc-tag-idle { color: var(--pulse-text-secondary); opacity: 0.7; }
+.pc-tag-at-target { color: var(--pulse-status-green); opacity: 0.9; }
+.pc-tag-off { color: var(--pulse-text-secondary); opacity: 0.6; }
+.pc-tag-unavail { background: color-mix(in srgb, var(--pulse-status-red) 12%, transparent); color: color-mix(in srgb, var(--pulse-status-red) 80%, white); }
+
+/* State-tinted current temperature on rows */
+.pc-zone-row.pc-row-heat .pc-zone-temp { color: var(--pulse-status-yellow); }
+.pc-zone-row.pc-row-cool .pc-zone-temp { color: var(--pulse-tier-calm); }
+.pc-zone-row.pc-row-off .pc-zone-temp,
+.pc-zone-row.pc-row-unavail .pc-zone-temp { color: var(--pulse-text-secondary); }
+
 /* Zone header: name + current temp */
 .pc-zone-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   padding: 0 2px;
-  gap: 4px;
+  gap: var(--pulse-space-tight);
   min-width: 0;
 }
 .pc-zone-name {
@@ -81,7 +125,7 @@ ha-card {
 }
 .pc-zone-temp {
   font-size: var(--pulse-font-body);
-  font-weight: 600;
+  font-weight: var(--pulse-weight-semibold);
   color: var(--pulse-text-primary);
   white-space: nowrap;
   flex-shrink: 0;
@@ -93,12 +137,12 @@ ha-card {
 }
 .pc-zone-humidity {
   font-size: 0.8em;
-  font-weight: 400;
+  font-weight: var(--pulse-weight-regular);
   color: var(--pulse-text-secondary);
   opacity: 0.7;
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: var(--pulse-space-pin);
   margin-left: 4px;
 }
 .pc-zone-humidity ha-icon {
@@ -124,21 +168,21 @@ ha-card {
   top: -1px;
   bottom: -1px;
   width: 3px;
-  background: var(--primary-text-color);
+  background: var(--pulse-text-primary);
   border-radius: 1.5px;
   z-index: 2;
-  box-shadow: 0 0 0 1px var(--card-background-color, rgba(255,255,255,0.8));
+  box-shadow: 0 0 0 1px var(--pulse-bg-card);
 }
 .pc-temp-gauge-target {
   position: absolute;
   top: -1px;
   bottom: -1px;
   width: 2px;
-  background: var(--primary-text-color);
+  background: var(--pulse-text-primary);
   opacity: 0.5;
-  border-radius: 1px;
+  border-radius: var(--pulse-radius-hairline);
   z-index: 1;
-  box-shadow: 0 0 0 1px var(--card-background-color, rgba(255,255,255,0.8));
+  box-shadow: 0 0 0 1px var(--pulse-bg-card);
 }
 
 /* Heating/cooling power bar */
@@ -162,13 +206,13 @@ ha-card {
   left: 0;
   bottom: 0;
   border-radius: inherit;
-  transition: width 0.8s ease, background-color 0.3s ease;
+  transition: width var(--pulse-anim-fill) ease, background-color var(--pulse-anim-mode) ease;
 }
 .pc-power-bar-fill.pc-bar-active {
   box-shadow: 0 0 8px 1px var(--pc-bar-glow, rgba(255, 152, 0, 0.4));
-  animation: barPulse 2.5s ease-in-out infinite;
+  animation: pc-bar-pulse 2.5s ease-in-out infinite;
 }
-@keyframes barPulse {
+@keyframes pc-bar-pulse {
   0%, 100% { box-shadow: 0 0 6px 0 var(--pc-bar-glow, rgba(255, 152, 0, 0.3)); }
   50% { box-shadow: 0 0 10px 2px var(--pc-bar-glow, rgba(255, 152, 0, 0.5)); }
 }
@@ -177,14 +221,14 @@ ha-card {
 .pc-zone-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--pulse-space-chip);
   padding: 2px 0;
 }
 .pc-chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 11px;
+  gap: var(--pulse-space-tight);
+  font-size: var(--pulse-font-label);
   color: var(--pulse-text-secondary);
   white-space: nowrap;
   cursor: pointer;
@@ -195,7 +239,7 @@ ha-card {
 .pc-chip ha-icon { --mdc-icon-size: 14px; }
 .pc-chip.pc-severity-high { color: var(--pulse-status-red); }
 .pc-chip.pc-severity-medium { color: var(--pulse-status-yellow); }
-.pc-chip.pc-severity-critical { color: var(--label-badge-red, #B71C1C); font-weight: 600; }
+.pc-chip.pc-severity-critical { color: var(--pulse-status-red); font-weight: var(--pulse-weight-semibold); }
 
 /* Multi-column zone grid */
 .pc-section-zones.pc-columns {
@@ -208,20 +252,20 @@ ha-card {
 }
 
 /* Compact mode */
-.pc-compact .pc-zone-row { gap: 2px; }
-.pc-compact .pc-zone-name { font-size: 12px; }
-.pc-compact .pc-zone-chips { gap: 4px; }
-.pc-compact .pc-chip { font-size: 10px; }
+.pc-compact .pc-zone-row { gap: var(--pulse-space-hairline); }
+.pc-compact .pc-zone-name { font-size: var(--pulse-font-kicker); }
+.pc-compact .pc-zone-chips { gap: var(--pulse-space-tight); }
+.pc-compact .pc-chip { font-size: var(--pulse-font-caption); }
 
 /* System section rows */
 .pc-system-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--pulse-space-element);
   padding: 4px 2px;
 }
 .pc-system-label {
-  font-size: 12px;
+  font-size: var(--pulse-font-kicker);
   color: var(--pulse-text-secondary);
   min-width: 80px;
 }
@@ -233,7 +277,7 @@ ha-card {
   width: 100%;
   height: var(--pc-graph-height, 80px);
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: var(--pulse-radius-small);
 }
 .pc-chart-svg {
   width: 100%;
@@ -249,8 +293,8 @@ ha-card {
   align-items: center;
   justify-content: center;
   height: 100%;
-  font-size: 12px;
-  color: var(--secondary-text-color);
+  font-size: var(--pulse-font-kicker);
+  color: var(--pulse-text-secondary);
   opacity: 0.6;
 }
 
@@ -258,22 +302,22 @@ ha-card {
 .pc-chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--pulse-space-element);
   padding: 4px 0;
 }
 .pc-legend-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--secondary-text-color);
+  gap: var(--pulse-space-tight);
+  font-size: var(--pulse-font-label);
+  color: var(--pulse-text-secondary);
   white-space: nowrap;
 }
 .pc-legend-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--pulse-radius-circle);
   flex-shrink: 0;
 }
 
@@ -291,10 +335,38 @@ ha-card {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--secondary-text-color);
   text-align: center;
+  pointer-events: none;
+}
+.pc-donut-center-num {
+  font-size: var(--pulse-font-hero);
+  font-weight: var(--pulse-weight-thin);
+  letter-spacing: var(--pulse-ls-hero);
+  font-variant-numeric: tabular-nums;
+  color: var(--pulse-text-primary);
+  line-height: 1;
+}
+.pc-donut-center-label {
+  font-size: var(--pulse-font-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--pulse-ls-kicker);
+  color: var(--pulse-text-secondary);
+  margin-top: 4px;
+}
+
+/* Donut arcs — largest auto-blooms via inline filter attr (per-instance unique
+   id from renderDonut), idle dim 0.6. CSS does not set filter so inline attr
+   wins. Hover lifts opacity only — bloom stays anchored to active. */
+.pc-donut-arc {
+  opacity: 0.6;
+  transition: opacity var(--pulse-anim-medium);
+  cursor: pointer;
+}
+.pc-donut-arc.pc-donut-arc-active {
+  opacity: 1;
+}
+.pc-donut-arc:hover {
+  opacity: 1;
 }
 
 /* Responsive: hide legend at narrow widths */
@@ -310,7 +382,7 @@ ha-card {
   position: relative;
   width: 100%;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: var(--pulse-radius-small);
   touch-action: pan-y;
 }
 .pc-sparkline-filled svg {
@@ -324,7 +396,7 @@ ha-card {
   position: relative;
   height: 56px;
   margin-bottom: 4px;
-  border-radius: 10px;
+  border-radius: var(--pulse-radius-row);
   overflow: hidden;
   background: var(--pulse-bg-secondary);
   display: flex;
@@ -356,38 +428,38 @@ ha-card {
   align-items: center;
   width: 100%;
 }
-.pc-pulse-info-left { display: flex; flex-direction: column; gap: 2px; }
-.pc-pulse-info-right { display: flex; align-items: baseline; gap: 6px; }
+.pc-pulse-info-left { display: flex; flex-direction: column; gap: var(--pulse-space-hairline); }
+.pc-pulse-info-right { display: flex; align-items: baseline; gap: var(--pulse-space-chip); }
 .pc-pulse-current {
-  font-size: 20px;
-  font-weight: 300;
-  color: var(--primary-text-color);
+  font-size: var(--pulse-font-large);
+  font-weight: var(--pulse-weight-light);
+  color: var(--pulse-text-primary);
   font-variant-numeric: tabular-nums;
 }
 .pc-pulse-status {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  color: var(--secondary-text-color);
+  gap: var(--pulse-space-tight);
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
 }
 .pc-status-dot {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: var(--pulse-radius-circle);
   flex-shrink: 0;
 }
-@keyframes glowPulse {
+@keyframes pc-glow-pulse {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
-.pc-heating-glow { animation: glowPulse 3s ease-in-out infinite; }
+.pc-heating-glow { animation: pc-glow-pulse 3s ease-in-out infinite; }
 
 /* Heating row glow — warm border shadow */
 .pc-zone-row-pulse.pc-heating {
-  animation: rowGlow 3s ease-in-out infinite;
+  animation: pc-row-glow 3s ease-in-out infinite;
 }
-@keyframes rowGlow {
+@keyframes pc-row-glow {
   0%, 100% { box-shadow: 0 0 10px 1px rgba(255, 152, 0, 0.25), inset 0 0 10px 1px rgba(255, 152, 0, 0.06); }
   50% { box-shadow: 0 0 16px 2px rgba(255, 152, 0, 0.4), inset 0 0 14px 2px rgba(255, 152, 0, 0.1); }
 }
@@ -398,23 +470,25 @@ ha-card {
   align-items: center;
   margin-bottom: 4px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--pulse-radius-pill);
   padding: 2px 0;
   position: relative;
-  overflow: hidden;
-  transition: background 0.15s;
+  overflow: visible;
+  transition: background var(--pulse-anim-fast);
 }
 .pc-section-thermal-strip .pc-timeline-row:hover {
-  background: color-mix(in srgb, var(--primary-color, #03A9F4) 6%, transparent);
+  background: var(--pulse-bg-hover);
 }
-.pc-section-thermal-strip .pc-timeline-row.pc-selected { background: color-mix(in srgb, var(--primary-color, #03A9F4) 12%, transparent); }
+.pc-section-thermal-strip .pc-timeline-row.pc-selected {
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--pulse-tier-strong) 14%, transparent) 50%, transparent 100%);
+}
 .pc-section-thermal-strip .pc-timeline-row.pc-selected .pc-strip-container,
 .pc-section-comfort-strip .pc-heatmap-row.pc-selected .pc-strip-container { height: 18px; }
-.pc-section-thermal-strip .pc-timeline-row.pc-selected .pc-zone-label { color: var(--primary-text-color, #e5e5e7); font-weight: 500; }
+.pc-section-thermal-strip .pc-timeline-row.pc-selected .pc-zone-label { color: var(--pulse-text-primary); font-weight: var(--pulse-weight-medium); }
 .pc-section-thermal-strip .pc-zone-label {
   width: 76px;
-  font-size: 11px;
-  color: var(--secondary-text-color, #a1a1a6);
+  font-size: var(--pulse-font-label);
+  color: var(--pulse-text-secondary);
   text-align: right;
   padding-right: 10px;
   flex-shrink: 0;
@@ -427,20 +501,20 @@ ha-card {
 .pc-section-comfort-strip .pc-strip-container {
   flex: 1;
   height: 14px;
-  border-radius: 4px;
-  overflow: hidden;
+  border-radius: var(--pulse-radius-small);
+  overflow: visible;
   position: relative;
   touch-action: pan-y;
 }
 .pc-section-thermal-strip .pc-now-marker,
 .pc-section-comfort-strip .pc-now-marker {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: -3px;
+  bottom: -3px;
   width: 1.5px;
-  background: var(--primary-text-color, #333);
-  opacity: 0.4;
-  z-index: 2;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+  z-index: 3;
 }
 .pc-section-thermal-strip .pc-time-axis {
   display: flex;
@@ -448,8 +522,8 @@ ha-card {
   padding: 4px 0 8px;
 }
 .pc-section-thermal-strip .pc-time-label {
-  font-size: 9px;
-  color: var(--secondary-text-color, #636366);
+  font-size: var(--pulse-font-micro);
+  color: var(--pulse-text-secondary);
   opacity: 0.7;
 }
 
@@ -457,14 +531,14 @@ ha-card {
 .pc-strip-tooltip {
   position: absolute;
   top: -26px;
-  font-size: 10px;
-  color: var(--pulse-text-primary, #e5e5e7);
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-primary);
   background: var(--pulse-glass-bg);
   backdrop-filter: blur(var(--pulse-glass-blur));
   -webkit-backdrop-filter: blur(var(--pulse-glass-blur));
   border: 1px solid var(--pulse-glass-border);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--pulse-radius-small);
   white-space: nowrap;
   pointer-events: none;
   z-index: 10;
@@ -482,7 +556,7 @@ ha-card {
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--primary-text-color, #333);
+  background: var(--pulse-text-primary);
   opacity: 0.25;
   pointer-events: none;
   z-index: 5;
@@ -493,9 +567,9 @@ ha-card {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: var(--primary-color, #03A9F4);
+  background: var(--pulse-accent);
   opacity: 0.12;
-  border-radius: 2px;
+  border-radius: var(--pulse-radius-bar);
   pointer-events: none;
   z-index: 4;
 }
@@ -507,33 +581,35 @@ ha-card {
   align-items: center;
   margin-bottom: 3px;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--pulse-radius-pill);
   padding: 2px 0;
   position: relative;
-  overflow: hidden;
-  transition: background 0.15s;
+  overflow: visible;
+  transition: background var(--pulse-anim-fast);
 }
-.pc-section-comfort-strip .pc-heatmap-row:hover { background: color-mix(in srgb, var(--primary-color, #03A9F4) 6%, transparent); }
-.pc-section-comfort-strip .pc-heatmap-row.pc-selected { background: color-mix(in srgb, var(--primary-color, #03A9F4) 12%, transparent); }
+.pc-section-comfort-strip .pc-heatmap-row:hover { background: var(--pulse-bg-hover); }
+.pc-section-comfort-strip .pc-heatmap-row.pc-selected {
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--pulse-tier-strong) 14%, transparent) 50%, transparent 100%);
+}
 .pc-section-comfort-strip .pc-zone-label {
   width: 66px;
-  font-size: 10px;
-  color: var(--secondary-text-color, #a1a1a6);
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
   text-align: right;
   padding-right: 8px;
   flex-shrink: 0;
-  transition: color 0.2s;
+  transition: color var(--pulse-anim-base);
 }
 .pc-section-comfort-strip .pc-heatmap-row.pc-selected .pc-zone-label {
-  color: var(--primary-text-color);
-  font-weight: 500;
+  color: var(--pulse-text-primary);
+  font-weight: var(--pulse-weight-medium);
 }
 
 /* Heatmap cells — shared by comfort strip and thermal strip (heatmap mode) */
 .pc-section-comfort-strip .pc-cells,
 .pc-section-thermal-strip .pc-cells {
   display: flex;
-  gap: 1px;
+  gap: var(--pulse-space-pin);
   flex: 1;
   touch-action: pan-y;
 }
@@ -541,19 +617,23 @@ ha-card {
 .pc-section-thermal-strip .pc-cell {
   flex: 1;
   height: 16px;
-  border-radius: 2px;
-  transition: transform 0.15s, height 0.2s;
+  border-radius: var(--pulse-radius-bar);
+  transition: transform var(--pulse-anim-fast), height var(--pulse-anim-base), box-shadow var(--pulse-anim-base);
 }
 .pc-section-comfort-strip .pc-heatmap-row.pc-selected .pc-cell,
 .pc-section-thermal-strip .pc-timeline-row.pc-selected .pc-cell { height: 20px; }
 .pc-section-comfort-strip .pc-cell:hover,
-.pc-section-thermal-strip .pc-cell:hover { transform: scaleY(1.2); z-index: 1; }
+.pc-section-thermal-strip .pc-cell:hover {
+  transform: scaleY(1.4);
+  box-shadow: 0 0 8px currentColor;
+  z-index: 2;
+}
 .pc-section-comfort-strip .pc-cell-empty,
 .pc-section-thermal-strip .pc-cell-empty {
   background: repeating-linear-gradient(
     45deg,
-    var(--divider-color, rgba(255,255,255,0.06)) 0px,
-    var(--divider-color, rgba(255,255,255,0.06)) 2px,
+    var(--pulse-border-subtle) 0px,
+    var(--pulse-border-subtle) 2px,
     transparent 2px,
     transparent 4px
   );
@@ -561,34 +641,34 @@ ha-card {
 .pc-heatmap-legend {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--pulse-space-row);
   padding: 4px 0;
   justify-content: center;
 }
 .pc-heatmap-legend .pc-legend-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 9px;
-  color: var(--secondary-text-color, #8e8e93);
+  gap: var(--pulse-space-tight);
+  font-size: var(--pulse-font-micro);
+  color: var(--pulse-text-secondary);
 }
 .pc-heatmap-legend .pc-legend-swatch {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--pulse-radius-bar);
 }
 .pc-heatmap-time-axis {
   display: flex;
   justify-content: space-between;
   margin-left: 66px;
   padding: 4px 0 14px;
-  font-size: 9px;
-  color: var(--secondary-text-color, #636366);
+  font-size: var(--pulse-font-micro);
+  color: var(--pulse-text-secondary);
 }
 
 /* Energy Flow */
 .pc-ribbon-active { /* animation handled by SVG <animate> on gradient */ }
-.pc-ribbon { cursor: pointer; transition: opacity 0.2s; }
+.pc-ribbon { cursor: pointer; transition: opacity var(--pulse-anim-base); }
 .pc-ribbon:hover { opacity: 1 !important; }
 .pc-ribbon.pc-dimmed { opacity: 0.2; }
 
@@ -605,12 +685,12 @@ ha-card {
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  transition: opacity 0.25s;
+  transition: opacity var(--pulse-anim-medium);
   background: var(--pulse-glass-bg);
   backdrop-filter: blur(var(--pulse-glass-blur));
   -webkit-backdrop-filter: blur(var(--pulse-glass-blur));
   border: 1px solid var(--pulse-glass-border);
-  border-radius: 50%;
+  border-radius: var(--pulse-radius-circle);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -620,7 +700,7 @@ ha-card {
 .pc-center-sheen {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
+  border-radius: var(--pulse-radius-circle);
   pointer-events: none;
   background: radial-gradient(circle farthest-side at 0 0, rgba(255,255,255,0) 88%, rgba(255,255,255,0.5) 96%, rgba(255,255,255,0) 100%) no-repeat;
   background-size: 200% 200%;
@@ -632,26 +712,29 @@ ha-card {
   background-position: -100% 50%;
 }
 .pc-center-value {
-  font-size: 28px;
-  font-weight: 300;
-  color: var(--primary-text-color);
-  transition: font-size 0.25s;
+  font-size: var(--pulse-font-hero);
+  font-weight: var(--pulse-weight-thin);
+  letter-spacing: var(--pulse-ls-hero);
+  font-variant-numeric: tabular-nums;
+  color: var(--pulse-text-primary);
+  transition: font-size var(--pulse-anim-medium);
 }
 .pc-center-label {
-  font-size: 10px;
-  color: var(--secondary-text-color, #8e8e93);
-  letter-spacing: 0.5px;
+  font-size: var(--pulse-font-micro);
+  color: var(--pulse-text-secondary);
+  letter-spacing: var(--pulse-ls-kicker);
   text-transform: uppercase;
-  margin-top: 2px;
+  margin-top: 6px;
 }
 .pc-center-sub {
-  font-size: 10px;
-  color: var(--secondary-text-color, #636366);
-  margin-top: 2px;
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
 }
 .pc-arc-group {
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity var(--pulse-anim-base);
   opacity: 0.6;
 }
 .pc-arc-group.pc-arc-active { opacity: 1; }
@@ -674,28 +757,28 @@ ha-card {
 .pc-radial-legend .pc-legend-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: var(--secondary-text-color, #a1a1a6);
+  gap: var(--pulse-space-tight);
+  font-size: var(--pulse-font-label);
+  color: var(--pulse-text-secondary);
   cursor: pointer;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--pulse-radius-small);
   position: relative;
   overflow: hidden;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--pulse-anim-fast), color var(--pulse-anim-fast);
 }
-.pc-radial-legend .pc-legend-item:hover { background: color-mix(in srgb, var(--primary-color, #03A9F4) 8%, transparent); }
-.pc-radial-legend .pc-legend-item.pc-selected { background: color-mix(in srgb, var(--primary-color, #03A9F4) 16%, transparent); color: var(--primary-text-color); }
+.pc-radial-legend .pc-legend-item:hover { background: color-mix(in srgb, var(--pulse-accent) 8%, transparent); }
+.pc-radial-legend .pc-legend-item.pc-selected { background: color-mix(in srgb, var(--pulse-accent) 16%, transparent); color: var(--pulse-text-primary); }
 .pc-radial-legend .pc-legend-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--pulse-radius-circle);
   flex-shrink: 0;
 }
 .pc-legend-temp {
   font-variant-numeric: tabular-nums;
-  color: var(--primary-text-color);
-  font-weight: 500;
+  color: var(--pulse-text-primary);
+  font-weight: var(--pulse-weight-medium);
 }
 
 /* Zone detail panel (shared by radial, thermal strip, comfort strip, energy flow) */
@@ -703,7 +786,7 @@ ha-card {
   overflow: hidden;
   max-height: 0;
   opacity: 0;
-  transition: max-height 0.35s ease, opacity 0.25s ease, padding 0.35s ease;
+  transition: max-height var(--pulse-anim-slow) ease, opacity var(--pulse-anim-medium) ease, padding var(--pulse-anim-slow) ease;
   padding: 0;
 }
 .pc-zone-detail.pc-active {
@@ -714,7 +797,7 @@ ha-card {
   backdrop-filter: blur(var(--pulse-glass-blur));
   -webkit-backdrop-filter: blur(var(--pulse-glass-blur));
   border: 1px solid var(--pulse-glass-border);
-  border-radius: 8px;
+  border-radius: var(--pulse-radius-element);
 }
 .pc-detail-header {
   display: flex;
@@ -722,49 +805,49 @@ ha-card {
   align-items: baseline;
   margin-bottom: 10px;
 }
-.pc-detail-name { font-size: 15px; font-weight: 500; }
+.pc-detail-name { font-size: var(--pc-detail-name); font-weight: var(--pulse-weight-medium); }
 .pc-detail-close {
-  font-size: 11px;
-  color: var(--secondary-text-color, #636366);
+  font-size: var(--pulse-font-label);
+  color: var(--pulse-text-secondary);
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.15s;
+  border-radius: var(--pulse-radius-pill);
+  transition: background var(--pulse-anim-fast);
 }
-.pc-detail-close:hover { background: color-mix(in srgb, var(--primary-color, #03A9F4) 10%, transparent); }
-.pc-detail-stats { display: flex; gap: 16px; }
+.pc-detail-close:hover { background: color-mix(in srgb, var(--pulse-accent) 10%, transparent); }
+.pc-detail-stats { display: flex; gap: var(--pulse-space-card); }
 .pc-stat { flex: 1; }
 .pc-stat-value {
-  font-size: 22px;
-  font-weight: 300;
+  font-size: var(--pc-detail-stat);
+  font-weight: var(--pulse-weight-light);
   font-variant-numeric: tabular-nums;
 }
 .pc-stat-label {
-  font-size: 10px;
-  color: var(--secondary-text-color, #8e8e93);
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.4px;
   margin-top: 2px;
 }
 .pc-stat-sub {
-  font-size: 10px;
-  color: var(--secondary-text-color, #636366);
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
   margin-top: 1px;
 }
 .pc-detail-bar {
   margin-top: 10px;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--pulse-radius-tight);
   background: var(--pulse-bg-secondary);
   overflow: hidden;
 }
 .pc-detail-bar-fill {
   height: 100%;
-  border-radius: 3px;
-  transition: width 0.4s ease;
+  border-radius: var(--pulse-radius-tight);
+  transition: width var(--pulse-anim-color) ease;
 }
 .pc-detail-sparkline {
-  border-radius: 6px;
+  border-radius: var(--pulse-radius-pill);
   overflow: hidden;
 }
 
@@ -772,12 +855,12 @@ ha-card {
 .pc-api-dashboard {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--pulse-space-element);
 }
 .pc-api-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--pulse-space-element);
 }
 .pc-usage-gauge {
   position: relative;
@@ -788,9 +871,9 @@ ha-card {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--secondary-text-color);
+  font-size: var(--pulse-font-body);
+  font-weight: var(--pulse-weight-semibold);
+  color: var(--pulse-text-secondary);
   text-align: center;
   line-height: 1.2;
 }
@@ -800,26 +883,26 @@ ha-card {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--pulse-radius-circle);
   margin-right: 4px;
   vertical-align: middle;
 }
 .pc-pulse-dot.pc-connected {
   background: var(--pulse-status-green);
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: pc-pulse-dot-glow 2s ease-in-out infinite;
 }
 .pc-pulse-dot.pc-disconnected {
   background: var(--pulse-status-red);
 }
-@keyframes pulse-glow {
+@keyframes pc-pulse-dot-glow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
 
 /* Bridge flow temp */
 .pc-flow-temp-value {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--pulse-font-stat);
+  font-weight: var(--pulse-weight-semibold);
 }
 .pc-flow-sparkline {
   display: inline-block;
@@ -838,13 +921,13 @@ ha-card {
   margin: 0 auto 6px;
 }
 .pc-home-status-label {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: var(--pulse-font-large);
+  font-weight: var(--pulse-weight-medium);
   margin-bottom: 4px;
 }
 .pc-home-status-detail {
-  font-size: 12px;
-  color: var(--secondary-text-color, #9E9E9E);
+  font-size: var(--pulse-font-kicker);
+  color: var(--pulse-text-secondary);
 }
 .pc-home-status-zones {
   display: flex;
@@ -854,24 +937,24 @@ ha-card {
   display: flex;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+  border-bottom: 1px solid var(--pulse-border-subtle);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .pc-home-status-row:last-child { border-bottom: none; }
 .pc-home-status-row:hover {
-  background: color-mix(in srgb, var(--primary-color, #03A9F4) 6%, transparent);
+  background: var(--pulse-bg-hover);
 }
 .pc-home-status-row:focus-visible {
   outline: 2px solid var(--pulse-accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--pulse-radius-small);
 }
 .pc-home-status-zone-name {
   width: 70px;
   flex-shrink: 0;
-  font-size: 12px;
-  color: var(--secondary-text-color, #9E9E9E);
+  font-size: var(--pulse-font-kicker);
+  color: var(--pulse-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -880,38 +963,41 @@ ha-card {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--pulse-space-chip);
 }
 .pc-home-status-actual {
-  font-size: 16px;
+  font-size: var(--pulse-font-stat);
+  font-weight: var(--pulse-weight-thin);
+  letter-spacing: -0.3px;
   font-variant-numeric: tabular-nums;
-  color: var(--primary-text-color);
-  min-width: 52px;
+  color: var(--pulse-text-primary);
+  min-width: 56px;
 }
 .pc-home-status-actual.pc-off {
-  color: var(--secondary-text-color, #9E9E9E);
+  color: var(--pulse-text-secondary);
 }
 .pc-home-status-arrow {
-  font-size: 11px;
-  color: var(--secondary-text-color, #9E9E9E);
+  font-size: var(--pulse-font-label);
+  color: var(--pulse-text-secondary);
+  opacity: 0.7;
 }
 .pc-home-status-target {
-  font-size: 13px;
-  color: var(--secondary-text-color, #9E9E9E);
+  font-size: var(--pulse-font-kicker);
+  color: var(--pulse-text-secondary);
   font-variant-numeric: tabular-nums;
   min-width: 40px;
 }
 .pc-home-status-delta {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--pulse-space-tight);
 }
 .pc-home-status-bar-track {
   position: relative;
   width: 60px;
   height: 6px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+  border-radius: var(--pulse-radius-tight);
+  background: var(--pulse-border-medium);
   overflow: hidden;
 }
 .pc-home-status-bar-center {
@@ -926,10 +1012,10 @@ ha-card {
   position: absolute;
   top: 0;
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--pulse-radius-tight);
 }
 .pc-home-status-delta-text {
-  font-size: 11px;
+  font-size: var(--pulse-font-label);
   font-variant-numeric: tabular-nums;
   width: 40px;
   text-align: right;
@@ -937,17 +1023,22 @@ ha-card {
 .pc-home-status-summary {
   display: flex;
   justify-content: space-around;
-  border-top: 1px solid color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+  border-top: 1px solid var(--pulse-border-medium);
   padding-top: 14px;
   margin-top: 16px;
 }
 .pc-home-status-summary .pc-stat { text-align: center; }
 .pc-home-status-summary .pc-stat-value {
-  font-size: 18px;
-  font-weight: 300;
+  font-size: var(--pulse-font-summary);
+  font-weight: var(--pulse-weight-thin);
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .pc-home-status-summary .pc-stat-label {
-  font-size: 9px;
+  font-size: var(--pulse-font-micro);
+  letter-spacing: var(--pulse-ls-kicker);
+  margin-top: 6px;
 }
 
 /* Zone Ranking section */
@@ -960,37 +1051,45 @@ ha-card {
 }
 .pc-ranking-tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--pulse-space-panel);
 }
 .pc-ranking-tab {
-  font-size: 10px;
-  color: var(--secondary-text-color, #9E9E9E);
-  padding: 4px 10px;
-  border-radius: 6px;
+  font-size: var(--pulse-font-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--pulse-ls-kicker);
+  color: var(--pulse-text-secondary);
+  opacity: 0.6;
+  padding: 4px 0;
+  border: none;
+  border-bottom: 1.5px solid transparent;
+  background: none;
+  border-radius: 0;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
+  transition: color var(--pulse-anim-base), border-color var(--pulse-anim-base), opacity var(--pulse-anim-base);
 }
 .pc-ranking-tab:hover {
-  background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+  color: var(--pulse-text-primary);
+  background: none;
+  opacity: 1;
 }
 .pc-ranking-tab.pc-active {
-  background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
-  color: var(--primary-text-color);
-  border-color: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+  color: var(--pulse-text-primary);
+  background: none;
+  border-bottom-color: var(--pulse-accent);
+  opacity: 1;
 }
 .pc-ranking-list { }
 .pc-rank-row {
   display: flex;
   align-items: center;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--pulse-radius-element);
   margin-bottom: 4px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .pc-rank-row:hover {
-  background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+  background: var(--pulse-border-subtle);
 }
 .pc-rank-row:focus-visible {
   outline: 2px solid var(--pulse-accent);
@@ -998,17 +1097,17 @@ ha-card {
 }
 .pc-rank-num {
   width: 24px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--pulse-font-body);
+  font-weight: var(--pulse-weight-medium);
   font-variant-numeric: tabular-nums;
-  color: var(--secondary-text-color, #9E9E9E);
+  color: var(--pulse-text-secondary);
   flex-shrink: 0;
 }
-.pc-rank-num.pc-top { color: var(--label-badge-yellow, #FFD60A); }
+.pc-rank-num.pc-top { color: var(--pulse-tier-strong); }
 .pc-rank-name {
   flex: 1;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--pc-rank-text);
+  font-weight: var(--pulse-weight-medium);
   margin-left: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1017,19 +1116,19 @@ ha-card {
 .pc-rank-bar-track {
   flex: 2;
   height: 8px;
-  background: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
-  border-radius: 4px;
+  background: var(--pulse-border-medium);
+  border-radius: var(--pulse-radius-small);
   margin: 0 12px;
   overflow: hidden;
 }
 .pc-rank-bar-fill {
   height: 100%;
-  border-radius: 4px;
-  transition: width 0.6s ease, background 0.4s ease;
+  border-radius: var(--pulse-radius-small);
+  transition: width var(--pulse-anim-reveal) ease, background var(--pulse-anim-color) ease;
 }
 .pc-rank-value {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--pc-rank-text);
+  font-weight: var(--pulse-weight-medium);
   font-variant-numeric: tabular-nums;
   width: 50px;
   text-align: right;
@@ -1040,15 +1139,20 @@ ha-card {
   justify-content: space-around;
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+  border-top: 1px solid var(--pulse-border-medium);
 }
 .pc-ranking-summary .pc-stat { text-align: center; }
 .pc-ranking-summary .pc-stat-value {
-  font-size: 18px;
-  font-weight: 300;
+  font-size: var(--pulse-font-summary);
+  font-weight: var(--pulse-weight-thin);
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .pc-ranking-summary .pc-stat-label {
-  font-size: 9px;
+  font-size: var(--pulse-font-micro);
+  letter-spacing: var(--pulse-ls-kicker);
+  margin-top: 6px;
 }
 
 /* Responsive degradation for new sections */
@@ -1061,7 +1165,109 @@ ha-card {
 /* Temperature transition glow — brief brightness flash on temp change */
 .pc-temp-transitioning {
   filter: brightness(1.4);
-  transition: filter 0.3s ease-in, filter 0.8s ease-out 0.3s;
+  transition: filter var(--pulse-anim-mode) ease-in, filter var(--pulse-anim-fill) ease-out var(--pulse-anim-mode);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+
+.pc-hero { display: flex; align-items: flex-end; justify-content: space-between; padding: 4px 0 16px; gap: var(--pulse-space-section); flex-wrap: wrap; }
+.pc-hero-left { display: flex; flex-direction: column; gap: var(--pulse-space-tight); min-width: 0; }
+.pc-hero-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--pulse-text-secondary); }
+.pc-hero-temp { font-size: 44px; font-weight: 200; letter-spacing: -1.5px; line-height: 1; color: var(--pulse-text-primary); font-variant-numeric: tabular-nums; }
+.pc-hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: var(--pulse-space-tight); font-size: 10px; color: var(--pulse-text-secondary); text-align: right; line-height: 1.5; flex-shrink: 0; }
+.pc-hero-status { display: flex; align-items: center; gap: var(--pulse-space-tight); }
+.pc-hero-dot { display: inline-block; width: 6px; height: 6px; border-radius: var(--pulse-radius-circle); background: var(--pulse-text-secondary); flex-shrink: 0; }
+.pc-hero-dot.pc-hero-dot-active { background: var(--pulse-accent); box-shadow: 0 0 8px var(--pulse-accent); animation: pc-hero-dot-blink 1.6s ease-in-out infinite; }
+@keyframes pc-hero-dot-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.pc-hero-breakdown { opacity: 0.7; }
+.pc-hero-strip { display: flex; gap: var(--pulse-space-pin); height: 8px; margin: 0 0 14px; border-radius: var(--pulse-radius-bar); overflow: hidden; flex-basis: 100%; }
+.pc-hero-strip span { flex: 1; }
+.pc-hero-outside {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-top: 8px; flex-basis: 100%;
+  border-top: 1px solid var(--pulse-border-subtle);
+}
+.pc-hero-outside-label {
+  font-size: var(--pulse-font-micro); text-transform: uppercase;
+  letter-spacing: var(--pulse-ls-kicker);
+  color: var(--pulse-text-secondary); opacity: 0.7;
+}
+.pc-hero-outside-value {
+  font-size: var(--pulse-font-label);
+  color: var(--pulse-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.pc-hero.pc-state-off .pc-hero-temp,
+.pc-hero.pc-state-idle .pc-hero-temp { color: var(--pulse-text-secondary); }
+@container (max-width: 280px) {
+  .pc-hero { flex-direction: column; align-items: flex-start; }
+  .pc-hero-right { align-items: flex-start; text-align: left; }
+}
+
+/* ── Atmosphere backdrop ──────────────────────────────────────────── */
+
+.pc-atmosphere-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  opacity: var(--pc-atmosphere-opacity, 0.7);
+  transition: opacity var(--pulse-anim-reveal) ease;
+}
+.pc-atmosphere-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  background: var(--pc-atmosphere-gradient, transparent);
+  filter: blur(34px);
+  animation: pc-atmosphere-rotate var(--pc-atmosphere-rotate, 30s) linear infinite;
+}
+@keyframes pc-atmosphere-rotate {
+  from { transform: rotate(0deg) scale(1.25); }
+  to   { transform: rotate(360deg) scale(1.25); }
+}
+
+/* Intensity tiers */
+.pc-atmosphere-backdrop.pc-intensity-subtle  { --pc-atmosphere-opacity: 0.4; }
+.pc-atmosphere-backdrop.pc-intensity-medium  { --pc-atmosphere-opacity: 0.7; }
+.pc-atmosphere-backdrop.pc-intensity-bold    { --pc-atmosphere-opacity: 1.0; }
+
+/* State palettes — rgba kept inline for bundle size; override via --pc-atmosphere-gradient */
+.pc-atmosphere-backdrop.pc-state-heating {
+  --pc-atmosphere-gradient: conic-gradient(from 220deg at 30% 70%,
+    rgba(255,90,40,0.22) 0deg, rgba(255,140,60,0.14) 90deg,
+    rgba(80,120,200,0.08) 200deg, rgba(255,90,40,0.22) 360deg);
+}
+.pc-atmosphere-backdrop.pc-state-cooling {
+  --pc-atmosphere-gradient: conic-gradient(from 220deg at 70% 30%,
+    rgba(74,144,226,0.22) 0deg, rgba(126,192,255,0.14) 90deg,
+    rgba(120,90,200,0.08) 200deg, rgba(74,144,226,0.22) 360deg);
+}
+.pc-atmosphere-backdrop.pc-state-mixed {
+  --pc-atmosphere-gradient: conic-gradient(from 0deg at 50% 50%,
+    rgba(255,90,40,0.18) 0deg, rgba(255,140,60,0.12) 90deg,
+    rgba(74,144,226,0.18) 180deg, rgba(126,192,255,0.12) 270deg,
+    rgba(255,90,40,0.18) 360deg);
+  --pc-atmosphere-rotate: 28s;
+}
+.pc-atmosphere-backdrop.pc-state-idle {
+  --pc-atmosphere-gradient: radial-gradient(ellipse 80% 60% at 50% 30%,
+    rgba(255,255,255,0.06) 0%, transparent 70%);
+}
+.pc-atmosphere-backdrop.pc-state-idle::before { animation: none; }
+.pc-atmosphere-backdrop.pc-state-off {
+  --pc-atmosphere-gradient: radial-gradient(ellipse 80% 60% at 50% 50%,
+    rgba(255,255,255,0.04) 0%, transparent 70%);
+  --pc-atmosphere-opacity: 0.5;
+}
+.pc-atmosphere-backdrop.pc-state-off::before { animation: none; }
+
+/* Card content sits above backdrop */
+.pc-card-content {
+  position: relative;
+  z-index: 1;
 }
 
 /* Reduced motion — respect prefers-reduced-motion for users sensitive to animation */
@@ -1071,5 +1277,7 @@ ha-card {
   .pc-zone-row-pulse.pc-heating { animation: none; }
   .pc-pulse-dot.pc-connected { animation: none; }
   .pc-temp-transitioning { filter: none; transition: none; }
+  .pc-atmosphere-backdrop::before { animation: none; }
+  .pc-hero-dot.pc-hero-dot-active { animation: none; box-shadow: none; }
 }
 `;

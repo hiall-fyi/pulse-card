@@ -8,18 +8,16 @@
 
 import { html, nothing, css } from 'lit';
 
-// ── Shared editor styles ────────────────────────────────────────────
-// Every Pulse card editor uses renderReorderButtons() which emits
-// .pulse-move-icon and .pulse-remove-icon. Each editor inlines the
-// same selector — promote here so the family is the single source of
-// truth and the styles travel with the helper that emits them.
+/* Every Pulse card editor uses renderReorderButtons() which emits
+   .pulse-move-icon and .pulse-remove-icon. The matching styles travel with
+   the helper so the selectors and their styling stay together. */
 export const SHARED_EDITOR_STYLES = css`
   .pulse-move-icon {
-    color: var(--secondary-text-color);
+    color: var(--pulse-text-secondary);
     --mdc-icon-button-size: 36px;
   }
   .pulse-remove-icon {
-    color: var(--secondary-text-color);
+    color: var(--pulse-text-secondary);
     --mdc-icon-button-size: 36px;
   }
   .pulse-move-icon[disabled] {
@@ -27,8 +25,6 @@ export const SHARED_EDITOR_STYLES = css`
     pointer-events: none;
   }
 `;
-
-// ── SVG icon paths (MDI) ────────────────────────────────────────────
 
 /** MDI chevron-up path. */
 const ICON_MOVE_UP = 'M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z';
@@ -39,15 +35,10 @@ const ICON_MOVE_DOWN = 'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.5
 /** MDI close path. */
 const ICON_REMOVE = 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
 
-// ── Card helpers ────────────────────────────────────────────────────
-
 /**
- * Load HA card helpers to ensure ha-entity-picker and other HA
- * components are registered. Call once from connectedCallback.
- *
- * Pattern from Pulse Card editor — forces HA to lazy-load
- * ha-entity-picker by creating an entities card and requesting
- * its config element.
+ * Load HA card helpers to register ha-entity-picker and other HA components.
+ * Call once from connectedCallback. Forces lazy load by creating an entities
+ * card and requesting its config element — same pattern HA's own editors use.
  *
  * @param {string} logPrefix - Card name for warning messages.
  * @returns {Promise<boolean>} Whether helpers loaded successfully.
@@ -68,11 +59,8 @@ export async function loadEditorHelpers(logPrefix) {
   }
 }
 
-// ── Reorder row template ────────────────────────────────────────────
-
 /**
  * Render move-up, move-down, and remove icon buttons for a list row.
- * Matches the Pulse Card editor's entity row button pattern exactly.
  *
  * @param {number} index - Current row index.
  * @param {number} total - Total number of rows.
@@ -106,8 +94,6 @@ export function renderReorderButtons(index, total, onMove, onRemove) {
     ></ha-icon-button>
   `;
 }
-
-// ── Compute label ───────────────────────────────────────────────────
 
 /**
  * Default computeLabel for ha-form schemas.

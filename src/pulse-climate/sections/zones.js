@@ -9,7 +9,7 @@ import { escapeHtml, sanitizeCssValue, formatNumericDisplay } from '../../shared
 import { resolveZoneState, resolveHvacVisual, tempToPosition, computeGlowStdDev } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor } from '../sensor-resolver.js';
-import { temperatureToColor, buildFilledSparkline, buildSparklineDataAttr } from '../chart-primitives.js';
+import { temperatureToColor, buildFilledSparkline, buildSparklineDataAttr, buildBloomFilter } from '../chart-primitives.js';
 import { buildSparklinePath } from '../../shared/utils.js';
 
 /**
@@ -25,7 +25,33 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
   const showPowerBar = zoneConfig.show_power_bar ?? cardConfig.show_power_bar ?? true;
   const unavailableClass = zs.isUnavailable ? ' pc-unavailable' : '';
 
-  // Zone header
+  /* Per-state row class + inline state tag — drives row backdrop, target highlight, and tag pill. */
+  const atTarget = !zs.isUnavailable
+    && zs.currentTemp !== null && zs.currentTemp !== undefined
+    && zs.targetTemp !== null && zs.targetTemp !== undefined
+    && Math.abs(zs.currentTemp - zs.targetTemp) <= 0.3;
+  let stateClass;
+  let stateTag;
+  if (zs.isUnavailable) {
+    stateClass = ' pc-row-unavail';
+    stateTag = '<span class="pc-state-tag pc-tag-unavail">Unavail</span>';
+  } else if (zs.hvacAction === 'heating') {
+    stateClass = ' pc-row-heat';
+    stateTag = '<span class="pc-state-tag pc-tag-heat">Heat</span>';
+  } else if (zs.hvacAction === 'cooling') {
+    stateClass = ' pc-row-cool';
+    stateTag = '<span class="pc-state-tag pc-tag-cool">Cool</span>';
+  } else if (zs.hvacAction === 'off') {
+    stateClass = ' pc-row-off';
+    stateTag = '<span class="pc-state-tag pc-tag-off">Off</span>';
+  } else if (atTarget) {
+    stateClass = ' pc-row-at-target';
+    stateTag = '<span class="pc-state-tag pc-tag-at-target">At target</span>';
+  } else {
+    stateClass = ' pc-row-idle';
+    stateTag = '<span class="pc-state-tag pc-tag-idle">Idle</span>';
+  }
+
   const tempDisplay = zs.isUnavailable
     ? 'Unavailable'
     : zs.currentTemp !== null
@@ -44,11 +70,11 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
     ? `${escapeHtml(zs.name)}: Unavailable`
     : `${escapeHtml(zs.name)}: ${tempDisplay}${zs.targetTemp !== null ? `, target ${formatNumericDisplay(zs.targetTemp)}${zs.unit}` : ''}${zs.humidity !== null ? `, ${Math.round(zs.humidity)}% humidity` : ''}, ${zs.hvacAction}`;
 
-  let html = `<div class="pc-zone-row${unavailableClass}" tabindex="0" role="button"
+  let html = `<div class="pc-zone-row${unavailableClass}${stateClass}" tabindex="0" role="button"
     aria-label="${escapeHtml(ariaLabel)}" data-entity="${escapeHtml(zs.entityId)}">`;
   html += `<div class="pc-zone-header">`;
   html += `<span class="pc-zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}${humidityDisplay}</span>`;
-  html += `<span class="pc-zone-temp">${tempDisplay}${targetDisplay}</span>`;
+  html += `<span class="pc-zone-temp">${tempDisplay}${targetDisplay}${stateTag}</span>`;
   html += `</div>`;
 
   // Temperature gauge bar — gradient background via temperatureToColor
@@ -60,7 +86,6 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
       ? tempToPosition(zs.targetTemp, zs.minTemp, zs.maxTemp)
       : null;
 
-    // Build gradient from min to max temperature
     const coldColor = temperatureToColor(zs.minTemp);
     const warmColor = temperatureToColor((zs.minTemp + zs.maxTemp) / 2);
     const hotColor = temperatureToColor(zs.maxTemp);
@@ -75,13 +100,10 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
     html += `</div>`;
   }
 
-  // Power bar
   if (showPowerBar && !zs.isUnavailable) {
     const power = zs.heatingPower || zs.coolingPower || 0;
     const hvacVis = resolveHvacVisual(zs.hvacAction);
-    const barColor = hvacVis.cssVar
-      ? `var(${hvacVis.cssVar}, ${hvacVis.fallback})`
-      : hvacVis.fallback;
+    const barColor = hvacVis.token || hvacVis.fallback;
 
     if (power > 0 || zs.hvacAction === 'heating' || zs.hvacAction === 'cooling') {
       const fillWidth = Math.min(100, Math.max(0, power));
@@ -93,7 +115,6 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
     }
   }
 
-  // Chips
   if (zs.chips.length > 0) {
     html += `<div class="pc-zone-chips">`;
     for (const chip of zs.chips) {
@@ -108,7 +129,6 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
     html += `</div>`;
   }
 
-  // Sparkline rendering
   const sparklineMode = /** @type {*} */ (zoneConfig.sparkline)?.mode || 'overlay';
 
   // Pulse mode: completely different zone row layout — waveform as background
@@ -149,7 +169,7 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
   // Idle: subtle white line. Active: HVAC color (orange for heating, blue for cooling).
   const lineColor = isActive
     ? (zoneConfig.color || hvacVis.fallback)
-    : 'var(--secondary-text-color, #9E9E9E)';
+    : 'var(--pulse-text-secondary)';
   const safeColor = sanitizeCssValue(lineColor);
   const entitySlug = escapeHtml(zs.entityId).replace(/\./g, '-');
   const power = zs.heatingPower || zs.coolingPower || 0;
@@ -167,7 +187,6 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
   let html = `<div class="${rowClass}" tabindex="0" role="button"
     aria-label="${escapeHtml(ariaLabel)}" data-entity="${escapeHtml(zs.entityId)}"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
 
-  // Waveform SVG as background
   if (sparklineData && sparklineData.length >= 2) {
     const result = buildFilledSparkline(sparklineData, 360, 56, 60);
     if (result) {
@@ -190,8 +209,7 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
       html += `<stop offset="100%" stop-color="${safeColor}" stop-opacity="${fillBottomOpacity}"/>`;
       html += `</linearGradient>`;
       if (isActive) {
-        html += `<filter id="${filterId}"><feGaussianBlur stdDeviation="${computeGlowStdDev(360, 360).toFixed(1)}" result="b"/>`;
-        html += `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+        html += buildBloomFilter(filterId, computeGlowStdDev(360, 360).toFixed(1));
       }
       html += `</defs>`;
       html += `<path d="${result.areaPath}" fill="url(#${gradId})" />`;
@@ -202,7 +220,6 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
     }
   }
 
-  // Zone info overlay
   html += `<div class="pc-pulse-info">`;
   html += `<div class="pc-pulse-info-left">`;
   html += `<div class="pc-zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}</div>`;
@@ -225,24 +242,18 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
 
 
 /**
- * Render prominent sparkline mode: filled sparkline using shared primitive.
- * @param {string} lineColor - Line/fill color.
- * @param {{t: number, v: number}[]} data - Sparkline data.
- * @param {string} unit - Temperature unit string.
- * @returns {string} HTML string.
- */
-/**
  * Render a prominent (filled area) sparkline below the zone header.
- * @param {string} lineColor - CSS color for the sparkline.
+ * @param {string} lineColor - CSS colour for the line and fill gradient.
  * @param {{t: number, v: number}[]} data - History data points.
- * @param {string} unit - Temperature unit.
- * @param {string} [entityId] - Entity ID for unique gradient ID.
- * @returns {string} HTML string.
+ * @param {string} unit - Temperature unit (passed through to data attribute for tooltip).
+ * @param {string} [entityId] - Entity ID, hashed for the gradient id to prevent
+ *   colour bleeding between zones in the same shadow root.
+ * @returns {string} HTML string, empty when path build fails completely.
  */
 function renderProminentSparkline(lineColor, data, unit, entityId) {
   const result = buildFilledSparkline(data, 300, 40, 48);
   if (!result) {
-    // Fallback to line-only sparkline
+    /* Fallback: filled-area build failed (insufficient data) — degrade to line-only. */
     const path = buildSparklinePath(data, 300, 40, 48, 'avg', true);
     if (!path) return '';
     return `<div class="pc-sparkline-prominent"><svg viewBox="0 0 300 40" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${sanitizeCssValue(lineColor)}" stroke-width="1.5" opacity="0.7" /></svg></div>`;
@@ -292,7 +303,7 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
     const isHome = homeState.state === 'on';
     const homeIcon = isHome ? 'mdi:home' : 'mdi:home-export-outline';
     const homeLabel = isHome ? 'Home' : 'Away';
-    const homeColor = isHome ? 'var(--label-badge-green, #4CAF50)' : 'var(--secondary-text-color)';
+    const homeColor = isHome ? 'var(--pulse-status-green)' : 'var(--pulse-text-secondary)';
     html += `<div style="display:flex;justify-content:space-between;align-items:center">`;
     html += `<div class="pulse-section-label">Zones</div>`;
     html += `<span class="pc-chip" data-entity="${escapeHtml(homeEntity)}" style="color:${sanitizeCssValue(homeColor)}">`;
@@ -337,7 +348,6 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
     const zoneName = extractZoneName(entityId);
     const discoveredEntities = discovery?.zoneEntities?.[zoneName] || {};
 
-    // Check if any relevant entity changed
     const currentState = states[entityId];
     const prevState = prevStates[entityId];
     if (currentState === prevState && zoneRows[i]) continue;
@@ -346,7 +356,6 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
     const row = zoneRows[i];
     if (!row) continue;
 
-    // Update temperature display
     const tempEl = row.querySelector('.pc-zone-temp');
     if (tempEl) {
       const tempDisplay = zoneState.isUnavailable
@@ -361,21 +370,17 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
       tempEl.innerHTML = `${escapeHtml(tempDisplay)}${targetDisplay}`;
     }
 
-    // Update power bar fill
     const fillEl = /** @type {HTMLElement|null} */ (row.querySelector('.pc-power-bar-fill'));
     if (fillEl) {
       const power = zoneState.heatingPower || zoneState.coolingPower || 0;
       const hvacVis = resolveHvacVisual(zoneState.hvacAction);
-      const barColor = hvacVis.cssVar
-        ? `var(${hvacVis.cssVar}, ${hvacVis.fallback})`
-        : hvacVis.fallback;
+      const barColor = hvacVis.token || hvacVis.fallback;
       fillEl.style.width = `${Math.min(100, Math.max(0, power)).toFixed(1)}%`;
       fillEl.style.background = barColor;
       fillEl.style.setProperty('--pc-bar-glow', `${hvacVis.fallback}40`);
       fillEl.classList.toggle('pc-bar-active', power > 0);
     }
 
-    // Update gauge markers
     const currentMarker = /** @type {HTMLElement|null} */ (row.querySelector('.pc-temp-gauge-current'));
     if (currentMarker && zoneState.currentTemp !== null) {
       const pos = tempToPosition(zoneState.currentTemp, zoneState.minTemp, zoneState.maxTemp);
@@ -388,7 +393,6 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
       targetMarker.style.left = `${pos.toFixed(1)}%`;
     }
 
-    // Update gauge gradient background
     const gaugeBg = /** @type {HTMLElement|null} */ (row.querySelector('.pc-temp-gauge-bg'));
     if (gaugeBg && !zoneState.isUnavailable) {
       const coldColor = temperatureToColor(zoneState.minTemp);
@@ -397,7 +401,6 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
       gaugeBg.style.background = `linear-gradient(to right, ${coldColor}, ${warmColor}, ${hotColor})`;
     }
 
-    // Update unavailable class
     if (zoneState.isUnavailable) {
       row.classList.add('pc-unavailable');
     } else {

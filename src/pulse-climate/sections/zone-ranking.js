@@ -9,8 +9,8 @@ import { resolveZoneState } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { getAvailableMetrics, resolveMetricValue } from '../feature-availability.js';
 
-/** Uniform blue for temp and humidity bars. */
-const BLUE = 'var(--info-color, #5AC8FA)';
+/** Uniform calm blue for temp and humidity bars (Apple system, shared tier token). */
+const BLUE = 'var(--pulse-tier-calm)';
 
 /**
  * Colour a power value by severity.
@@ -18,9 +18,9 @@ const BLUE = 'var(--info-color, #5AC8FA)';
  * @returns {string}
  */
 function powerColor(v) {
-  if (v <= 40) return 'var(--label-badge-green, #4CAF50)';
-  if (v <= 70) return 'var(--label-badge-yellow, #FF9800)';
-  return 'var(--label-badge-red, #F44336)';
+  if (v <= 40) return 'var(--pulse-tier-moderate)';
+  if (v <= 70) return 'var(--pulse-tier-strong)';
+  return 'var(--pulse-tier-gale)';
 }
 
 /**
@@ -29,9 +29,9 @@ function powerColor(v) {
  * @returns {string}
  */
 function comfortColor(v) {
-  if (v >= 80) return 'var(--label-badge-green, #4CAF50)';
-  if (v >= 50) return 'var(--label-badge-yellow, #FF9800)';
-  return 'var(--label-badge-red, #F44336)';
+  if (v >= 80) return 'var(--pulse-tier-moderate)';
+  if (v >= 50) return 'var(--pulse-tier-strong)';
+  return 'var(--pulse-tier-gale)';
 }
 
 /** @typedef {{ label: string, unit: string|null, max: number|null, colorFn: (v: number) => string }} MetricDef */
@@ -104,7 +104,6 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
   const def = METRIC_DEFS[metric];
   if (!def) return '';
 
-  // Resolve zone data
   /** @type {Array<{entityId: string, name: string, value: number|null, unit: string}>} */
   const zoneData = [];
   for (const zoneConfig of zones) {
@@ -116,7 +115,7 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
     zoneData.push({ entityId, name: zs.name, value, unit: zs.unit || '°C' });
   }
 
-  // Sort descending by value, nulls to bottom
+  /* Sort descending by value, nulls to bottom. */
   zoneData.sort((a, b) => {
     if (a.value === null && b.value === null) return 0;
     if (a.value === null) return 1;
@@ -124,21 +123,17 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
     return b.value - a.value;
   });
 
-  // Compute max for bar scaling
   const validValues = zoneData.map((z) => z.value).filter((v) => v !== null);
   let scaleMax = def.max;
   if (scaleMax === null) {
-    // Temp: dynamic max
+    /* Temp metric uses a dynamic max (other metrics declare a fixed max in METRIC_DEFS). */
     scaleMax = validValues.length > 0 ? Math.max(.../** @type {number[]} */ (validValues), 30) : 30;
   }
 
-  // Resolve unit for display
   const displayUnit = def.unit !== null ? def.unit : (zoneData[0]?.unit || '°C');
 
-  // Build HTML
   let html = `<div class="pc-section pc-section-zone-ranking" data-metric="${escapeHtml(metric)}">`;
 
-  // Header: label + tabs
   html += `<div class="pc-ranking-header">`;
   html += `<div class="pulse-section-label">Zone Ranking</div>`;
   html += `<div class="pc-ranking-tabs">`;
@@ -150,7 +145,6 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
   }
   html += `</div></div>`;
 
-  // Rank rows
   html += `<div class="pc-ranking-list">`;
   for (let i = 0; i < zoneData.length; i++) {
     const z = zoneData[i];
@@ -178,7 +172,6 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
   }
   html += `</div>`;
 
-  // Summary footer
   const summaryValues = zoneData.map((z) => z.value);
   const summary = computeRankingSummary(summaryValues, displayUnit);
   html += `<div class="pc-ranking-summary">`;

@@ -5,7 +5,7 @@
  */
 
 /** Pulse Climate Card version string. */
-export const VERSION = '1.5.0';
+export const VERSION = '1.6.0';
 
 /** Custom element tag name. */
 export const CARD_NAME = 'pulse-climate-card';
@@ -22,12 +22,12 @@ export const LOG_PREFIX = 'Pulse Climate Card:';
  * Fallback hex values chosen for ≥4.5:1 contrast on both light (#fff) and dark (#1c1c1c) backgrounds.
  */
 export const HVAC_VISUALS = {
-  heating: { icon: 'mdi:fire', cssVar: '--label-badge-yellow', fallback: '#FF9800', label: 'Heating' },
-  cooling: { icon: 'mdi:snowflake', cssVar: '--label-badge-blue', fallback: '#2196F3', label: 'Cooling' },
-  drying:  { icon: 'mdi:water-off', cssVar: null, fallback: '#9C27B0', label: 'Drying' },
-  fan:     { icon: 'mdi:fan', cssVar: null, fallback: '#607D8B', label: 'Fan' },
-  idle:    { icon: 'mdi:clock-outline', cssVar: '--secondary-text-color', fallback: '#9E9E9E', label: 'Idle' },
-  off:     { icon: 'mdi:power', cssVar: '--disabled-color', fallback: '#616161', label: 'Off' },
+  heating: { icon: 'mdi:fire', token: 'var(--pulse-status-yellow)', fallback: '#FF9800', label: 'Heating' },
+  cooling: { icon: 'mdi:snowflake', token: 'var(--pulse-status-blue)', fallback: '#2196F3', label: 'Cooling' },
+  drying:  { icon: 'mdi:water-off', token: null, fallback: '#9C27B0', label: 'Drying' },
+  fan:     { icon: 'mdi:fan', token: null, fallback: '#607D8B', label: 'Fan' },
+  idle:    { icon: 'mdi:clock-outline', token: 'var(--pulse-text-secondary)', fallback: '#9E9E9E', label: 'Idle' },
+  off:     { icon: 'mdi:power', token: 'var(--pulse-disabled)', fallback: '#616161', label: 'Off' },
 };
 
 /**
@@ -36,11 +36,11 @@ export const HVAC_VISUALS = {
  * All fallback colors tested for ≥4.5:1 contrast on both light and dark backgrounds.
  */
 export const RISK_COLORS = {
-  None: { cssVar: '--label-badge-green', fallback: '#4CAF50' },
-  Low:  { cssVar: '--label-badge-green', fallback: '#8BC34A' },
-  Medium: { cssVar: '--label-badge-yellow', fallback: '#FF9800' },
-  High: { cssVar: '--label-badge-red', fallback: '#F44336' },
-  Critical: { cssVar: '--label-badge-red', fallback: '#B71C1C' },
+  None: { token: 'var(--pulse-status-green)', fallback: '#4CAF50' },
+  Low:  { token: 'var(--pulse-status-green)', fallback: '#8BC34A' },
+  Medium: { token: 'var(--pulse-status-yellow)', fallback: '#FF9800' },
+  High: { token: 'var(--pulse-status-red)', fallback: '#F44336' },
+  Critical: { token: 'var(--pulse-status-red)', fallback: '#B71C1C' },
 };
 
 /** Default section order. */
@@ -61,13 +61,13 @@ export const SECTION_TYPES = [
  * Tested for ≥3:1 contrast on both light (#fff) and dark (#1c1c1c) backgrounds.
  */
 export const CHART_PALETTE = [
-  'var(--label-badge-blue, #2196F3)',
-  'var(--label-badge-red, #F44336)',
-  'var(--label-badge-green, #4CAF50)',
-  'var(--label-badge-yellow, #FF9800)',
-  'var(--accent-color, #9C27B0)',
-  'var(--info-color, #00BCD4)',
-  'var(--warning-color, #FF5722)',
+  'var(--pulse-status-blue)',
+  'var(--pulse-status-red)',
+  'var(--pulse-status-green)',
+  'var(--pulse-status-yellow)',
+  'var(--pulse-accent)',
+  'var(--pulse-info-color)',
+  'var(--pulse-status-yellow)',
   'var(--success-color, #8BC34A)',
 ];
 

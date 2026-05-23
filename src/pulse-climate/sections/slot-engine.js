@@ -7,8 +7,6 @@
 
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 
-// ── Slot Computation ────────────────────────────────────────────────
-
 /**
  * @typedef {object} SlotData
  * @property {number|null} value - Averaged value for this slot.
@@ -68,13 +66,12 @@ export function computeSlots(data, slots, windowMs) {
   return result;
 }
 
-// ── Strip Renderers ─────────────────────────────────────────────────
 
 /**
  * @typedef {object} StripOptions
  * @property {string} [ariaLabel] - Accessible label for the strip.
  * @property {number} [nowPct] - Now marker position as percentage (0–100). Omit to hide.
- * @property {string} [emptyColor] - Color for null-value slots (default: 'var(--disabled-color, #9E9E9E)').
+ * @property {string} [emptyColor] - Color for null-value slots (default: 'var(--pulse-disabled)').
  * @property {number} [emptyOpacity] - Opacity for null-value slots (default: 0.3).
  */
 
@@ -89,7 +86,7 @@ export function renderTimelineStrip(slotData, colorFn, options = {}) {
   const slots = slotData.length;
   if (slots === 0) return '<div class="pc-strip-container"><div class="pc-chart-empty" style="height:14px;font-size:10px">No data</div></div>';
 
-  const emptyColor = options.emptyColor || 'var(--disabled-color, #9E9E9E)';
+  const emptyColor = options.emptyColor || 'var(--pulse-disabled)';
   const emptyOpacity = options.emptyOpacity ?? 0.3;
   const ariaLabel = options.ariaLabel || '';
   const slotsJson = JSON.stringify(slotData.map((s) => ({ v: s.value, l: s.label })));
@@ -131,7 +128,8 @@ export function renderHeatmapStrip(slotData, colorFn, _options = {}) {
     const label = slotData[s].label;
     if (val !== null) {
       const color = colorFn(val);
-      html += `<div class="pc-cell" style="background:${sanitizeCssValue(color)}" data-hour="${escapeHtml(label)}" data-score="${val}"></div>`;
+      const safeColor = sanitizeCssValue(color);
+      html += `<div class="pc-cell" style="background:${safeColor};color:${safeColor}" data-hour="${escapeHtml(label)}" data-score="${val}"></div>`;
     } else {
       html += `<div class="pc-cell pc-cell-empty" data-hour="${escapeHtml(label)}"></div>`;
     }
@@ -140,7 +138,6 @@ export function renderHeatmapStrip(slotData, colorFn, _options = {}) {
   return html;
 }
 
-// ── Tooltip ─────────────────────────────────────────────────────────
 
 /**
  * Create a reusable floating tooltip element for strip/cell hover.
@@ -197,7 +194,6 @@ export function createFixedTooltip() {
   };
 }
 
-// ── Time Axis ───────────────────────────────────────────────────────
 
 /**
  * Render time axis labels for a time window.
@@ -217,7 +213,6 @@ export function renderTimeLabels(windowMs, labels = 5) {
   return html;
 }
 
-// ── Drag Selection ──────────────────────────────────────────────────
 
 /**
  * Convert a pointer clientX to a slot index within a strip/cells container.

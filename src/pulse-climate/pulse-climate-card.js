@@ -3,9 +3,9 @@
  * @description Main Pulse Climate Card custom element.
  */
 
-import { CARD_NAME, EDITOR_NAME, VERSION } from './constants.js';
+import { CARD_NAME, EDITOR_NAME, LOG_PREFIX, VERSION } from './constants.js';
 import { STYLES } from './styles.js';
-import { normalizeClimateConfig, warn, resolveZoneDisplay } from './utils.js';
+import { normalizeClimateConfig, warn, resolveZoneDisplay, resolveZoneState, classifyClimateState } from './utils.js';
 import { discoverTadoEntities, extractZoneName } from './zone-resolver.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from './sensor-resolver.js';
 import { createHistoryCache, isCacheValid, updateCache, getSharedCache, updateSharedCache } from './history.js';
@@ -25,6 +25,9 @@ import { renderEnergyFlowSection, updateEnergyFlowSection } from './sections/ene
 import { renderRadialSection } from './sections/radial.js';
 import { renderHomeStatusSection } from './sections/home-status.js';
 import { renderZoneRankingSection } from './sections/zone-ranking.js';
+import { renderAtmosphere } from './sections/atmosphere.js';
+import { renderHero } from './sections/hero.js';
+import { resolveOutdoorTemp } from './outdoor-temp.js';
 import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } from '../shared/utils.js';
 import { buildFilledSparkline, temperatureToColor } from './chart-primitives.js';
 import { createStripTooltip, createFixedTooltip, pointerToSlotIndex, bindDragSelect, bindCrosshair } from './sections/slot-engine.js';
@@ -35,29 +38,20 @@ import { fetchSparklineData } from '../shared/utils.js';
 /** Module-level flag — log discovery results once per page load across all card instances. */
 let _discoveryLogged = false;
 
-// ── Shared CSS StyleSheet ───────────────────────────────────────────
-// Created once at module evaluation time and shared across all card instances
-// via adoptedStyleSheets. Falls back to <style> injection for Safari < 16.4.
-
-/** @type {boolean} */
+/** Falls back to <style> injection on Safari < 16.4. */
 const _supportsAdoptedStyleSheets = typeof CSSStyleSheet !== 'undefined'
   && typeof CSSStyleSheet.prototype.replaceSync === 'function'
   && typeof document !== 'undefined'
   && 'adoptedStyleSheets' in (document.createElement('div').attachShadow({ mode: 'open' }));
 
-/** @type {CSSStyleSheet|null} */
+/** @type {CSSStyleSheet|null} Shared across all card instances; null on Safari < 16.4. */
 const _sharedSheet = _supportsAdoptedStyleSheets ? (() => {
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(STYLES);
   return sheet;
 })() : null;
 
-
-// ── History Section Classification ──────────────────────────────────
-// Sections that depend on history cache data — only these are re-rendered
-// during the 5-minute history refresh cycle.
-
-/** @type {Set<string>} Section types that depend on history cache data. */
+/** Sections re-rendered on the 5-minute history refresh cycle. */
 const HISTORY_SECTIONS = new Set([
   'zones', 'api', 'graph', 'bridge', 'thermal_strip',
   'comfort_strip', 'homekit', 'weather', 'radial', 'donut',
@@ -144,11 +138,9 @@ class PulseClimateCard extends HTMLElement {
    * @param {Record<string, *>} config
    */
   setConfig(config) {
-    // Stop any radial animation timer chains from the previous config before
-    // the DOM is rebuilt — otherwise they'd fire against detached arcs.
+    /* Stop radial animation chains before DOM rebuild — otherwise they fire against detached arcs. */
     this._stopRadialAnimations();
-    // Bump history generation — any in-flight fetch will see its captured
-    // gen differs from _historyGen on resume and skip its cache write.
+    /* Bump history gen — in-flight fetches captured the old gen and will skip their cache write on resume. */
     this._historyGen++;
     this._config = normalizeClimateConfig(config);
     this._discovery = null;
@@ -171,17 +163,16 @@ class PulseClimateCard extends HTMLElement {
     this._hass = hass;
     if (!this._config) return;
 
-    // Lazy discovery on first hass (needs states to scan)
     if (!this._discovery) {
       this._runDiscovery();
-      this._fullRender(); // _fullRender caches _prevStates internally
+      this._fullRender();
       this._refreshHistoryIfNeeded();
       return;
     }
 
-    // Throttle differential updates — coalesce rapid state changes into
-    // a single RAF-aligned update pass. Prevents 15+ card instances from
-    // each doing full DOM diffing on every individual entity state change.
+    /* Throttle differential updates — coalesce rapid state changes into a single
+       RAF-aligned update pass. Prevents 15+ card instances from each doing full
+       DOM diffing on every individual entity state change. */
     if (this._rafId) return;
     this._rafId = requestAnimationFrame(() => {
       this._rafId = null;
@@ -189,13 +180,13 @@ class PulseClimateCard extends HTMLElement {
       const now = Date.now();
       if (now - this._lastUpdateTime < 200) return;
       this._lastUpdateTime = now;
-      // Zone change guard — skip _updateZones() if no zone entity changed (O(1) per zone)
       const states = this._hass.states;
       const zonesChanged = (this._config._zones || []).some((z) =>
         states[z.entity] !== this._prevStates[z.entity]
       );
       if (zonesChanged) this._updateZones();
       this._updateSections();
+      if (zonesChanged) this._updateHero();
       this._refreshHistoryIfNeeded();
       this._cacheWatchedStates();
     });
@@ -204,19 +195,19 @@ class PulseClimateCard extends HTMLElement {
   /** Run Tado CE entity discovery. */
   _runDiscovery() {
     if (!this._hass || !this._config) return;
-    // Discovery may redefine zone set — bump gen so in-flight fetches are stale.
+    /* Discovery may redefine zone set — bump gen so in-flight fetches are stale. */
     this._historyGen++;
     const zones = this._config._zones || [];
     const zoneNames = zones.map((/** @type {import('./types.js').ZoneConfig} */ z) => extractZoneName(z.entity));
     this._discovery = discoverTadoEntities(this._hass.states, zoneNames, this._hass.entities);
 
-    // Log discovery results once per page load (module-level flag survives instance recreation)
+    /* _discoveryLogged flag survives instance recreation — logs only on first card init per page load. */
     if (!_discoveryLogged && this._discovery.isTadoCE) {
       _discoveryLogged = true;
       const found = Object.entries(this._discovery.hubEntities).map(([k, v]) => `${k}=${v}`);
-      console.info('Pulse Climate: hub discovery — found:', found.join(', '));
+      console.info(`${LOG_PREFIX} Tado CE hub discovery — found: ${found.join(', ')}`);
       if (this._discovery.missingHubKeys.length > 0) {
-        console.warn('Pulse Climate: hub discovery — missing:', this._discovery.missingHubKeys.join(', '));
+        console.warn(`${LOG_PREFIX} Tado CE hub discovery — missing: ${this._discovery.missingHubKeys.join(', ')}. Affected sections may render with degraded data.`);
       }
     }
     this._buildRerenderTargets();
@@ -374,7 +365,7 @@ class PulseClimateCard extends HTMLElement {
         watchIds: zones.map((z) => z.entity),
         render: () => {
           const states = this._hass?.states || {};
-          return renderHomeStatusSection(zones, states, discovery);
+          return renderHomeStatusSection(zones, states, discovery, this._config || {});
         },
       },
       {
@@ -403,28 +394,46 @@ class PulseClimateCard extends HTMLElement {
 
     let html = '';
 
-    // Style — use shared CSSStyleSheet when supported, fallback to <style> injection
     if (_sharedSheet) {
       this._shadow.adoptedStyleSheets = [_sharedSheet];
     } else {
       html += `<style>${STYLES}</style>`;
     }
 
-    // Card wrapper
+    /* Resolve zone states once for atmosphere + hero. Sections still resolve their own
+       below — separate caching scope to keep section module boundaries intact. */
+    const heroZoneStates = zones.map((/** @type {*} */ z) => {
+      const zoneName = extractZoneName(z.entity);
+      const discovered = discovery.zoneEntities?.[zoneName] || {};
+      return resolveZoneState(z.entity, discovered, states, z, config);
+    });
+    const climateState = classifyClimateState(heroZoneStates);
+
     if (!isEntityRow) {
       html += `<ha-card${isCompact ? ' class="pc-compact"' : ''}>`;
     }
 
-    // Title
+    if (config.show_atmosphere !== false) {
+      html += renderAtmosphere(climateState, config.atmosphere_intensity);
+    }
+
+    html += `<div class="pc-card-content">`;
+
     if (config.title) {
       html += `<div class="pulse-title">${escapeHtml(config.title)}</div>`;
     }
 
-    // Render sections in config order
+    if (config.show_hero !== false) {
+      const outdoor = resolveOutdoorTemp(config, discovery, states);
+      html += renderHero(heroZoneStates, config, this._getHomeAvgHistory(heroZoneStates), outdoor);
+    }
+
     const sections = config.sections || [{ type: 'zones' }];
     for (const section of sections) {
       html += this._renderSection(section, zones, states, discovery);
     }
+
+    html += `</div>`;
 
     if (!isEntityRow) {
       html += `</ha-card>`;
@@ -433,20 +442,14 @@ class PulseClimateCard extends HTMLElement {
     // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
     this._shadow.innerHTML = html;
 
-    // Cache DOM refs
     this._elements.zonesSection = this._shadow.querySelector('.pc-section-zones');
     this._elements.apiSection = this._shadow.querySelector('.pc-section-api');
     this._cacheWatchedStates();
 
-    // Bind action listeners on zone rows
     this._bindZoneActions();
-    // Bind chip tap-to-entity actions
     this._bindChipActions();
-    // Bind interaction listeners on visual identity sections
     this._bindSectionInteractions();
-    // Bind section chip tap-to-entity actions
     this._bindSectionChipActions();
-    // Start countdown timer for Next Sync chip
     this._startCountdownTimer();
   }
 
@@ -461,7 +464,6 @@ class PulseClimateCard extends HTMLElement {
       const zoneConfig = zones[i];
       const entityId = zoneConfig.entity;
 
-      // Clean up previous listeners
       const prevCleanup = /** @type {*} */ (row).__pulseCleanup;
       if (typeof prevCleanup === 'function') prevCleanup();
 
@@ -481,7 +483,6 @@ class PulseClimateCard extends HTMLElement {
         delete /** @type {*} */ (row).__pulseCleanup;
       };
 
-      // Keyboard accessibility
       row.addEventListener('keydown', (ev) => {
         const kev = /** @type {KeyboardEvent} */ (ev);
         if (kev.key === 'Enter' || kev.key === ' ') {
@@ -490,7 +491,6 @@ class PulseClimateCard extends HTMLElement {
         }
       }, { signal });
 
-      // Tap / double-tap via click
       row.addEventListener('click', (ev) => {
         ev.preventDefault();
         if (held) { held = false; return; }
@@ -507,7 +507,6 @@ class PulseClimateCard extends HTMLElement {
         }
       }, { signal });
 
-      // Hold via pointerdown
       row.addEventListener('pointerdown', () => {
         held = false;
         holdTimer = setTimeout(() => {
@@ -567,14 +566,12 @@ class PulseClimateCard extends HTMLElement {
         chipEl.style.cursor = 'pointer';
         attachRipple(chipEl);
 
-        // Tap
         chipEl.addEventListener('click', (ev) => {
           ev.stopPropagation();
           if (!this._hass) return;
           sharedExecuteAction(this, this._hass, tapAction, chipEntityId, warn);
         }, { signal: chipSignal });
 
-        // Hold
         /** @type {ReturnType<typeof setTimeout>|null} */
         let holdTimer = null;
         chipEl.addEventListener('pointerdown', (ev) => {
@@ -654,7 +651,7 @@ class PulseClimateCard extends HTMLElement {
     const svgEl = this._shadow.querySelector('.pc-section-radial svg');
     if (arcs.length === 0 || !centerEl) return;
 
-    // Get SVG center for proper scale transform origin
+    /* Scale transforms below anchor on the SVG centre, not the bbox of the rotated arc. */
     const svgSize = svgEl ? Number(svgEl.getAttribute('width')) || 280 : 280;
     const svgCenter = svgSize / 2;
 
@@ -722,7 +719,6 @@ class PulseClimateCard extends HTMLElement {
         ? `${action === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(power)}%`
         : 'Idle';
 
-      // Update center
       const valueEl = centerEl.querySelector('.pc-center-value');
       const labelEl = centerEl.querySelector('.pc-center-label');
       const subEl = centerEl.querySelector('.pc-center-sub');
@@ -731,7 +727,7 @@ class PulseClimateCard extends HTMLElement {
       const humText = humidity !== undefined ? ` · ${humidity}%` : '';
       if (subEl) subEl.textContent = `${actionLabel}${humText}`;
 
-      // Dim/select arcs — scale from SVG center for consistent outward push
+      /* Scale from SVG centre — consistent outward push regardless of arc rotation. */
       arcs.forEach((/** @type {Element} */ a, /** @type {number} */ i) => {
         a.classList.toggle('pc-dimmed', i !== idx);
         a.classList.toggle('pc-selected', i === idx);
@@ -745,7 +741,6 @@ class PulseClimateCard extends HTMLElement {
         l.classList.toggle('pc-selected', i === idx);
       });
 
-      // Detail panel
       if (detailEl) {
         // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
         detailEl.innerHTML = `<div class="pc-detail-stats">
@@ -794,7 +789,7 @@ class PulseClimateCard extends HTMLElement {
       const shimmerCycle = () => {
         if (!this._radialAnimState.shimmer) return;
         if (selectedIdx !== null) {
-          // Paused while zone selected — check again later
+          /* Pause cycle while a zone is selected — manual focus wins over shimmer. */
           setTimeout(shimmerCycle, 500);
           return;
         }
@@ -802,44 +797,37 @@ class PulseClimateCard extends HTMLElement {
         const arc = /** @type {HTMLElement} */ (arcs[currentIdx]);
         if (!arc) { setTimeout(shimmerCycle, 300); return; }
 
-        // Brighten this zone
         arc.style.filter = 'brightness(1.8)';
         arc.style.transition = 'filter 0.3s ease-in';
 
-        // Fade back after a short hold
         setTimeout(() => {
-          arc.style.filter = '';
+              arc.style.filter = '';
           arc.style.transition = 'filter 0.5s ease-out';
         }, 250);
 
-        // Move to next zone
         currentIdx += direction;
 
-        // At the end of a sweep, pause, then pick new direction and speed
         if (currentIdx >= arcs.length || currentIdx < 0) {
           currentIdx = direction > 0 ? 0 : arcs.length - 1;
-          // Random pause between sweeps (1-3s)
+          /* Random pause 1-3s between sweeps; 40% chance reverse direction. */
           const pause = 1000 + Math.random() * 2000;
-          // 40% chance to reverse direction
           if (Math.random() < 0.4) direction *= -1;
           setTimeout(shimmerCycle, pause);
         } else {
-          // Variable delay between zones (80-250ms) — faster = more energetic
+          /* 80-250ms inter-zone delay — faster = more energetic feel. */
           const delay = 80 + Math.random() * 170;
           setTimeout(shimmerCycle, delay);
         }
       };
 
-      // Start after a short delay
       setTimeout(shimmerCycle, 1500);
     }
 
-    // ── Glass sheen sweep ──────────────────────────────────────────
-    // A thin light band sweeps across the center glass pane at random intervals.
+    /* Glass sheen sweep — thin light band crosses the centre glass pane at random intervals. */
     if (!isReducedMotion()) {
       const sheenEl = /** @type {HTMLElement|null} */ (this._shadow.querySelector('#radial-sheen'));
       if (sheenEl) {
-        // Detect light theme for sheen color
+        /* Luminance threshold drives sheen colour swap (dark on cream vs light on charcoal). */
         const bgColor = getComputedStyle(this).getPropertyValue('--primary-background-color').trim();
         const rgbMatch = bgColor.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
         const isLight = rgbMatch ? (0.299 * Number(rgbMatch[1]) + 0.587 * Number(rgbMatch[2]) + 0.114 * Number(rgbMatch[3])) / 255 >= 0.5 : false;
@@ -908,36 +896,32 @@ class PulseClimateCard extends HTMLElement {
       comparisonIdx = null;
       const overlay = detail.querySelector('.pc-comparison-path');
       if (overlay) overlay.remove();
-      const legend = detail.querySelector('.comparison-legend');
+      const legend = detail.querySelector('.pc-comparison-legend');
       if (legend) legend.remove();
     };
 
     rows.forEach((/** @type {Element} */ row, /** @type {number} */ i) => {
       attachRipple(/** @type {HTMLElement} */ (row));
       row.addEventListener('click', () => {
-        // Late-binding: read current state at event time, not bind time
+        /* Late-binding — read current state at event time, not at bind time. */
         const states = this._hass?.states || {};
         const discovery = this._discovery;
         const historyCache = this._historyCache;
 
-        // Clear any drag-select highlights
         detailEl.querySelectorAll('.pc-strip-drag-highlight').forEach((/** @type {Element} */ h) => { /** @type {HTMLElement} */ (h).style.display = 'none'; });
 
-        // If detail panel is open and tapping a different zone → comparison overlay
+        /* Tapping a different row while detail panel is open — overlay comparison sparkline. */
         if (selectedIdx !== null && selectedIdx !== i) {
           const detail = detailEl.querySelector('.pc-zone-detail');
           const sparkSvg = detail?.querySelector('.pc-detail-sparkline svg');
           if (detail && sparkSvg) {
-            // Toggle off if same comparison zone tapped again
             if (comparisonIdx === i) {
               removeComparison(detail);
               return;
             }
-            // Remove previous comparison
             removeComparison(detail);
             comparisonIdx = i;
 
-            // Build comparison sparkline path
             const cmpConfig = zones[i];
             if (!cmpConfig) return;
             const cmpEntityId = cmpConfig.entity;
@@ -951,7 +935,7 @@ class PulseClimateCard extends HTMLElement {
                 const cmpPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 cmpPath.setAttribute('d', cmpResult.linePath);
                 cmpPath.setAttribute('fill', 'none');
-                cmpPath.setAttribute('stroke', 'var(--info-color, #4FC3F7)');
+                cmpPath.setAttribute('stroke', 'var(--pulse-info-color)');
                 cmpPath.setAttribute('stroke-width', '1.5');
                 cmpPath.setAttribute('opacity', '0.5');
                 cmpPath.classList.add('pc-comparison-path');
@@ -959,16 +943,15 @@ class PulseClimateCard extends HTMLElement {
               }
             }
 
-            // Add legend
             const primaryConfig = zones[selectedIdx];
             const primaryName = resolveZoneDisplay(primaryConfig?.entity || '', states, primaryConfig).name;
             const cmpName = resolveZoneDisplay(cmpEntityId, states, cmpConfig).name;
             const legendEl = document.createElement('div');
             legendEl.className = 'pc-comparison-legend';
-            legendEl.style.cssText = 'display:flex;gap:12px;font-size:10px;margin-top:4px;color:var(--secondary-text-color,#8e8e93)';
+            legendEl.style.cssText = 'display:flex;gap:12px;font-size:10px;margin-top:4px;color:var(--pulse-text-secondary)';
             // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
-            legendEl.innerHTML = `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:4px"></span>${escapeHtml(primaryName)}</span>` +
-              `<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--info-color, #4FC3F7);margin-right:4px"></span>${escapeHtml(cmpName)}</span>`;
+            legendEl.innerHTML = `<span><span style="display:inline-block;width:8px;height:8px;border-radius:var(--pulse-radius-circle);background:currentColor;margin-right:4px"></span>${escapeHtml(primaryName)}</span>` +
+              `<span><span style="display:inline-block;width:8px;height:8px;border-radius:var(--pulse-radius-circle);background:var(--pulse-info-color);margin-right:4px"></span>${escapeHtml(cmpName)}</span>`;
             detail.appendChild(legendEl);
             return;
           }
@@ -994,7 +977,6 @@ class PulseClimateCard extends HTMLElement {
         const { name, temp, target, humidity, hvacAction } = zd;
         if (subtitleEl) subtitleEl.textContent = name;
 
-        // Resolve zone history data for sparkline
         const zoneName = extractZoneName(entityId);
         const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
         const sensorId = zoneConfig.temperature_entity || zoneEntities.temperature || entityId;
@@ -1027,7 +1009,6 @@ class PulseClimateCard extends HTMLElement {
           ? `${hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(power)}%`
           : 'Idle';
 
-        // Compute temperature min/max range from history data
         let rangeLabel = '';
         if (historyData.length >= 2) {
           let minV = Infinity;
@@ -1043,12 +1024,11 @@ class PulseClimateCard extends HTMLElement {
           }
         }
 
-        // Build sparkline from zone history
         let sparklineHtml = '';
         if (historyData.length >= 2) {
           const sparkColor = hvacAction === 'heating'
-            ? 'var(--label-badge-yellow, #FF9800)'
-            : (temp !== undefined && isFinite(Number(temp)) ? temperatureToColor(Number(temp)) : 'var(--primary-text-color)');
+            ? 'var(--pulse-status-yellow)'
+            : (temp !== undefined && isFinite(Number(temp)) ? temperatureToColor(Number(temp)) : 'var(--pulse-text-primary)');
           const safeColor = sanitizeCssValue(sparkColor);
           const result = this._sparklinePathCache.get(sensorId) || buildFilledSparkline(historyData, 340, 36, 48);
           if (result) {
@@ -1194,7 +1174,6 @@ class PulseClimateCard extends HTMLElement {
     rows.forEach((/** @type {Element} */ row, /** @type {number} */ i) => {
       attachRipple(/** @type {HTMLElement} */ (row));
       row.addEventListener('click', () => {
-        // Clear any drag-select highlights
         const sectionRoot = this._shadow.querySelector('.pc-section-comfort-strip');
         if (sectionRoot) sectionRoot.querySelectorAll('.pc-strip-drag-highlight').forEach((/** @type {Element} */ h) => { /** @type {HTMLElement} */ (h).style.display = 'none'; });
         if (selectedIdx === i) {
@@ -1241,7 +1220,7 @@ class PulseClimateCard extends HTMLElement {
         }
         const bestHour = labels[bestIdx] || '--';
         const worstHour = labels[worstIdx] || '--';
-        const barColor = avg >= 80 ? 'var(--label-badge-green, #34c759)' : avg >= 50 ? 'var(--label-badge-yellow, #ff9f0a)' : 'var(--label-badge-red, #ff453a)';
+        const barColor = avg >= 80 ? 'var(--pulse-status-green)' : avg >= 50 ? 'var(--pulse-status-yellow)' : 'var(--pulse-status-red)';
         const zoneName = row.querySelector('.pc-zone-label')?.textContent || '';
 
         // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
@@ -1272,7 +1251,6 @@ class PulseClimateCard extends HTMLElement {
       /** @type {HTMLElement} */ (heatmapBody).style.position = 'relative';
       heatmapBody.appendChild(heatmapTooltip.element);
     }
-    // Reference element for crosshair positioning — first .cells or .strip-container
     const firstRef = heatmapBody?.querySelector('.pc-cells') || heatmapBody?.querySelector('.pc-strip-container');
 
     // Heatmap mode: per-cell tooltip
@@ -1372,7 +1350,6 @@ class PulseClimateCard extends HTMLElement {
     ribbons.forEach((/** @type {Element} */ ribbon) => {
       ribbon.classList.add('pc-ribbon');
       ribbon.addEventListener('click', () => {
-        // Energy flow detail is simpler — just dim/undim ribbons
         const zone = ribbon.getAttribute('data-zone');
         if (!zone) return;
         if (selectedZone === zone) {
@@ -1543,7 +1520,7 @@ class PulseClimateCard extends HTMLElement {
       case 'comfort_strip': return renderComfortStripSection(zones, /** @type {*} */ (section), states, discovery, hc);
       case 'energy_flow': return renderEnergyFlowSection(zones, states, discovery);
       case 'radial': return renderRadialSection(zones, /** @type {*} */ (section), states, discovery, hc);
-      case 'home_status': return renderHomeStatusSection(zones, states, discovery);
+      case 'home_status': return renderHomeStatusSection(zones, states, discovery, this._config || {});
       case 'zone_ranking': return renderZoneRankingSection(zones, states, discovery);
       default: return '';
     }
@@ -1574,17 +1551,14 @@ class PulseClimateCard extends HTMLElement {
       setTimeout(() => el.classList.remove('pc-temp-transitioning'), 1100);
     };
 
-    // Power bar fill in default/compact layout
     const rows = this._shadow.querySelectorAll('.pc-zone-row');
     if (rows[zoneIndex]) {
       flash(rows[zoneIndex].querySelector('.pc-power-bar-fill'));
     }
 
-    // Pulse mode row
     const pulseRows = this._shadow.querySelectorAll('.pc-zone-row-pulse');
     flash(pulseRows[zoneIndex] || null);
 
-    // Radial arc path
     const arcGroups = this._shadow.querySelectorAll('.pc-arc-group');
     if (arcGroups[zoneIndex]) {
       flash(arcGroups[zoneIndex].querySelector('.pc-arc-path'));
@@ -1595,7 +1569,8 @@ class PulseClimateCard extends HTMLElement {
   _updateZones() {
     if (!this._elements.zonesSection || !this._config || !this._hass || !this._discovery) return;
 
-    // Detect temperature changes for transition glow (before updating DOM)
+    /* Compare against _prevStates BEFORE updateZonesSection mutates the DOM —
+       transition glow needs the pre/post temp delta. */
     if (!isReducedMotion()) {
       const zones = this._config._zones || [];
       const states = this._hass.states;
@@ -1640,7 +1615,6 @@ class PulseClimateCard extends HTMLElement {
       const oldEl = this._shadow.querySelector(target.selector);
       if (!oldEl || target.watchIds.length === 0) continue;
 
-      // Skip re-render if none of the watched entities changed
       const changed = target.watchIds.some((eid) => {
         const cur = states[eid];
         const prev = this._prevStates[eid];
@@ -1692,7 +1666,6 @@ class PulseClimateCard extends HTMLElement {
     // Falls back to full re-render if zone count changed or section not found.
     const energyFlowEl = /** @type {HTMLElement|null} */ (this._shadow.querySelector('.section-energy-flow'));
     if (energyFlowEl) {
-      // Check if any zone's heating power or hvac_action changed
       const efChanged = zones.some((z) => {
         const zn = extractZoneName(z.entity);
         const ze = discovery.zoneEntities?.[zn] || {};
@@ -1725,6 +1698,35 @@ class PulseClimateCard extends HTMLElement {
   }
 
   /**
+   * Re-render the card-level hero block. Called when zone state OR history
+   * cache updates — hero shows live state (zone tags / classification) AND
+   * derived data (24h thermal strip needs history; outside line is live).
+   */
+  _updateHero() {
+    if (!this._config || !this._hass || !this._discovery) return;
+    if (this._config.show_hero === false) return;
+    const heroEl = this._shadow.querySelector('.pc-hero');
+    if (!heroEl) return;
+    const config = this._config;
+    const states = this._hass.states;
+    const discovery = this._discovery;
+    const zones = config._zones || [];
+    const heroZoneStates = zones.map((/** @type {*} */ z) => {
+      const zoneName = extractZoneName(z.entity);
+      const discovered = discovery.zoneEntities?.[zoneName] || {};
+      return resolveZoneState(z.entity, discovered, states, z, config);
+    });
+    const outdoor = resolveOutdoorTemp(config, discovery, states);
+    const heroHtml = renderHero(heroZoneStates, config, this._getHomeAvgHistory(heroZoneStates), outdoor);
+    if (!heroHtml) return;
+    const tpl = document.createElement('template');
+    // eslint-disable-next-line no-unsanitized/property -- renderHero output is pre-escaped (same pattern as section renderers)
+    tpl.innerHTML = heroHtml;
+    const newEl = tpl.content.firstElementChild;
+    if (newEl) heroEl.replaceWith(newEl);
+  }
+
+  /**
    * Re-render only history-dependent sections after cache update.
    * Skips non-history sections (environment, thermal, schedule) to preserve
    * their DOM elements, interactive state, and event listeners.
@@ -1743,7 +1745,7 @@ class PulseClimateCard extends HTMLElement {
 
     for (const section of sections) {
       const type = typeof section === 'string' ? section : section.type;
-      if (!HISTORY_SECTIONS.has(type)) continue; // Skip non-history sections
+      if (!HISTORY_SECTIONS.has(type)) continue;
 
       const selector = SECTION_SELECTORS[type];
       if (!selector) continue;
@@ -1754,7 +1756,6 @@ class PulseClimateCard extends HTMLElement {
       const html = this._renderSection(section, zones, states, discovery);
       if (!html) continue;
 
-      // Swap the section element
       const tpl = document.createElement('template');
       // eslint-disable-next-line no-unsanitized/property -- inputs pre-escaped by section renderers
       tpl.innerHTML = html;
@@ -1767,7 +1768,6 @@ class PulseClimateCard extends HTMLElement {
 
     if (replacedTypes.length === 0) return;
 
-    // Re-cache DOM refs for sections that were replaced
     if (replacedTypes.includes('zones')) {
       this._elements.zonesSection = this._shadow.querySelector('.pc-section-zones');
       this._bindZoneActions();
@@ -1791,7 +1791,6 @@ class PulseClimateCard extends HTMLElement {
       this._bindEnergyFlowInteractions();
     }
 
-    // Re-bind section chip actions if any chip-bearing section was replaced
     const hasChipSection = replacedTypes.some((t) =>
       ['zones', 'api', 'bridge', 'homekit', 'weather'].includes(t));
     if (hasChipSection) {
@@ -1810,7 +1809,10 @@ class PulseClimateCard extends HTMLElement {
       this._historyCache = shared;
       this._rebuildSparklinePathCache();
       const withData = Object.values(shared.data).filter((/** @type {*} */ d) => d.length >= 2).length;
-      if (withData > 0) this._updateHistorySections();
+      if (withData > 0) {
+        this._updateHistorySections();
+        this._updateHero();
+      }
       return;
     }
 
@@ -1823,64 +1825,55 @@ class PulseClimateCard extends HTMLElement {
     /** @type {string[]} */
     const entityIds = [];
 
-    // Collect sensor entities for history using shared resolver
-    // (ensures same resolution chain as section renderers — Req 5, 6)
+    /* Collect sensor entities through the shared resolver so history cache keys
+       match the resolution chain section renderers use. */
     const states = this._hass.states;
     for (const zone of zones) {
       const zoneName = extractZoneName(zone.entity);
       const zoneEntities = this._discovery?.zoneEntities?.[zoneName] || {};
-      // Temperature sensor via 4-level resolution chain
       const tempResolved = resolveHistoryTempSensor(zone.entity, states, zoneEntities, zone);
       entityIds.push(tempResolved.entityId);
-      // Humidity sensor via 4-level resolution chain
       const humResolved = resolveHistoryHumSensor(zone.entity, states, zoneEntities, zone);
       if (humResolved) entityIds.push(humResolved.entityId);
     }
 
-    // Hub entities for API history
     if (this._discovery?.hubEntities?.call_history) {
       entityIds.push(this._discovery.hubEntities.call_history);
     }
     if (this._discovery?.hubEntities?.api_usage) {
       entityIds.push(this._discovery.hubEntities.api_usage);
     }
-    // Bridge boiler flow temperature for sparkline
     if (this._discovery?.hubEntities?.boiler_flow_temp) {
       entityIds.push(this._discovery.hubEntities.boiler_flow_temp);
     }
-    // HomeKit saved calls for sparkline
     if (this._discovery?.hubEntities?.homekit_reads_saved) {
       entityIds.push(this._discovery.hubEntities.homekit_reads_saved);
     }
     if (this._discovery?.hubEntities?.homekit_writes_saved) {
       entityIds.push(this._discovery.hubEntities.homekit_writes_saved);
     }
-    // Weather outdoor temperature for sparkline
     if (this._discovery?.hubEntities?.outside_temp) {
       entityIds.push(this._discovery.hubEntities.outside_temp);
     }
 
     if (entityIds.length === 0) { this._historyFetchInProgress = false; return; }
-    // Filter out undefined/empty entries and deduplicate (Req 6.3)
     const validIds = [...new Set(entityIds.filter((/** @type {string} */ id) => id && typeof id === 'string' && id.includes('.')))];
     if (validIds.length === 0) { this._historyFetchInProgress = false; return; }
     try {
       const data = await fetchSparklineData(this._hass, validIds, 24);
-      // Stale check: if config/discovery changed during the await, bail out.
-      // Without this guard, old zone data would overwrite the new cache and
-      // leak into the shared module cache, affecting other card instances.
+      /* Stale guard: without it, old zone data overwrites the new cache and leaks
+         into the shared module cache, affecting other card instances. */
       if (fetchGen !== this._historyGen) {
         warn('History fetch result discarded — config changed during fetch');
         return;
       }
       this._historyCache = updateCache(this._historyCache, data);
       this._rebuildSparklinePathCache();
-      // Update shared cache so other card instances can reuse this data
       updateSharedCache(data);
-      // Count how many entities got data
       const withData = Object.values(data).filter((/** @type {*} */ d) => d.length >= 2).length;
       if (withData > 0) {
         this._updateHistorySections();
+        this._updateHero();
       }
     } catch (e) {
       warn('History fetch failed, using cached data: %O', e);
@@ -1890,10 +1883,44 @@ class PulseClimateCard extends HTMLElement {
   }
 
   /**
-   * Cache only the entity states that this card watches for differential updates.
-   * Avoids shallow-copying the entire hass.states object (hundreds of keys)
-   * on every update cycle.
+   * Compute home-average history series for the hero strip.
+   * Averages temperature samples across all live zones using each zone's
+   * existing per-zone history cache. Returns an empty array when no zone
+   * has cached history yet — hero strip auto-hides in that case.
+   *
+   * @param {Array<{entityId: string, isUnavailable: boolean}>} zoneStates
+   * @returns {Array<{t: number, v: number}>}
    */
+  _getHomeAvgHistory(zoneStates) {
+    const data = this._historyCache?.data;
+    const states = this._hass?.states;
+    const discovery = this._discovery;
+    if (!data || !states || !discovery || zoneStates.length === 0) return [];
+    /** @type {Array<Array<{t:number, v:number}>>} */
+    const series = [];
+    const zoneConfigs = this._config?._zones || [];
+    for (const z of zoneStates) {
+      if (z.isUnavailable) continue;
+      const zoneName = extractZoneName(z.entityId);
+      const zoneEntities = discovery.zoneEntities?.[zoneName] || {};
+      const zoneConfig = zoneConfigs.find((/** @type {*} */ c) => c.entity === z.entityId) || { entity: z.entityId };
+      const resolved = resolveHistoryTempSensor(z.entityId, states, zoneEntities, zoneConfig);
+      const arr = data[resolved.entityId];
+      if (Array.isArray(arr) && arr.length >= 2) series.push(arr);
+    }
+    if (series.length === 0) return [];
+    const anchor = series[0];
+    return anchor.map((pt, i) => {
+      const vals = [];
+      for (const s of series) {
+        const sample = s[Math.min(i, s.length - 1)];
+        if (sample && typeof sample.v === 'number' && Number.isFinite(sample.v)) vals.push(sample.v);
+      }
+      const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : pt.v;
+      return { t: pt.t, v: avg };
+    });
+  }
+
   _cacheWatchedStates() {
     if (!this._hass || !this._config || !this._discovery) return;
     const states = this._hass.states;
@@ -1913,7 +1940,6 @@ class PulseClimateCard extends HTMLElement {
       }
     }
 
-    // Hub entities (api, bridge, homekit, weather, etc.)
     for (const eid of Object.values(hub)) {
       if (eid && states[eid]) watched[eid] = states[eid];
     }
@@ -1922,11 +1948,10 @@ class PulseClimateCard extends HTMLElement {
   }
 
   disconnectedCallback() {
-    // Preserve history cache across disconnect/reconnect — avoids blank
-    // sections on dashboard refresh while history re-fetches in background.
+    /* Preserve history cache across disconnect/reconnect — avoids blank sections
+       on dashboard refresh while history re-fetches in background. */
     if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
     if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
-    // Abort all bind method controllers
     this._chipAbort?.abort();
     this._sectionChipAbort?.abort();
     this._radialAbort?.abort();
@@ -1934,9 +1959,7 @@ class PulseClimateCard extends HTMLElement {
     this._heatmapAbort?.abort();
     this._energyFlowAbort?.abort();
     this._sparklineAbort?.abort();
-    // Stop radial shimmer / sheen animation chains.
     this._stopRadialAnimations();
-    // Clean up action listeners to prevent leaks
     const rows = this._shadow?.querySelectorAll('.pc-zone-row') || [];
     for (const row of rows) {
       const cleanup = /** @type {*} */ (row).__pulseCleanup;
@@ -1950,8 +1973,8 @@ class PulseClimateCard extends HTMLElement {
       this._fullRender();
       this._refreshHistoryIfNeeded();
     } else if (this._config && this._hass && this._shadow.querySelector('ha-card')) {
-      // Reconnected after dashboard edit — DOM preserved but timers/listeners stopped.
-      // Re-bind interactions to restart shimmer, glass sheen, and event listeners.
+      /* Reconnect after dashboard edit — DOM preserved but timers/listeners were stopped
+         in disconnectedCallback. Re-bind to restart shimmer, glass sheen, and listeners. */
       this._bindSectionInteractions();
       this._bindZoneActions();
       this._bindChipActions();
@@ -2003,12 +2026,10 @@ class PulseClimateCard extends HTMLElement {
   }
 }
 
-// Register custom element
 if (!customElements.get(CARD_NAME)) {
   customElements.define(CARD_NAME, PulseClimateCard);
 }
 
-// Register with HA card picker
 /** @type {*} */ (window).customCards = /** @type {*} */ (window).customCards || [];
 /** @type {*} */ (window).customCards.push({
   type: CARD_NAME,
@@ -2016,5 +2037,4 @@ if (!customElements.get(CARD_NAME)) {
   description: 'Modular climate dashboard card with Tado CE enrichment',
 });
 
-// Version log
 console.info(`%c PULSE-CLIMATE-CARD %c v${VERSION} `, 'background:#4CAF50;color:white;font-weight:bold', 'background:#333;color:#fff');

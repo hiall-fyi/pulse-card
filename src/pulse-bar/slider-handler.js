@@ -50,7 +50,6 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
   /** @type {ReturnType<typeof setTimeout>|null} */
   let flagTimer = null;
 
-  // Store cleanup
   /** @type {*} */ (rowEl).__pulseSliderCleanup = () => {
     controller.abort();
     if (flagTimer) clearTimeout(flagTimer);
@@ -58,13 +57,12 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     delete /** @type {*} */ (rowEl).__pulseSliderCleanup;
   };
 
-  // Resolve interactive config (boolean or object)
   const interactiveCfg = typeof ec.interactive === 'object' ? ec.interactive
     : typeof cfg.interactive === 'object' ? cfg.interactive
       : undefined;
 
-  // State saved on pointerdown for revert
-  /** @type {{fillWidth: string, displayValue: string, pointerId: number, startX: number} | null} */
+  /** @type {{fillWidth: string, displayValue: string, pointerId: number, startX: number} | null}
+   *    Saved on pointerdown so a cancelled drag can revert the optimistic UI. */
   let dragState = null;
 
   /**
@@ -145,8 +143,6 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
       });
   }
 
-  // --- Pointer events on .pb-container ---
-
   container.addEventListener('pointerdown', (ev) => {
     if (!cardEl._hass) return;
     ev.preventDefault();
@@ -161,19 +157,14 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
       startX: ev.clientX,
     };
 
-    // Set sliding flag
     /** @type {*} */ (rowEl).__pulseSliding = true;
 
-    // Capture pointer for tracking outside element
     container.setPointerCapture(ev.pointerId);
-
-    // Add visual feedback
     rowEl.classList.add('sliding');
 
-    // Disable CSS transition for instant tracking
+    /* Disable CSS transition during drag — instant tracking matches pointer. */
     if (fillEl) fillEl.style.transition = 'none';
 
-    // Immediate UI update at pointer position
     const value = clientXToValue(ev.clientX);
     updateUI(value);
   }, { signal });
@@ -191,24 +182,18 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
 
     const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.pb-fill'));
 
-    // Re-enable CSS transition
     if (fillEl) fillEl.style.transition = '';
-
-    // Remove visual feedback
     rowEl.classList.remove('sliding');
-
-    // Release capture
     container.releasePointerCapture(ev.pointerId);
 
-    // Final value
     const value = clientXToValue(ev.clientX);
     updateUI(value);
     commitValue(value);
 
-    // Clear drag state
     dragState = null;
 
-    // Clear sliding flag after delay (prevents click handler from firing tap_action)
+    /* Defer clearing the sliding flag — without delay, the synthetic click
+       fires immediately after pointerup and triggers tap_action. */
     flagTimer = setTimeout(() => {
       /** @type {*} */ (rowEl).__pulseSliding = false;
     }, SLIDING_FLAG_DELAY);
@@ -227,8 +212,6 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     dragState = null;
     /** @type {*} */ (rowEl).__pulseSliding = false;
   }, { signal });
-
-  // --- Step buttons (+/-) ---
 
   /** @type {ReturnType<typeof setInterval>|null} */
   let repeatTimer = null;
@@ -261,7 +244,6 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
       adjustByStep(dir);
     }, { signal });
 
-    // Long press repeat
     btn.addEventListener('pointerdown', (ev) => {
       ev.stopPropagation();
       if (repeatTimer) clearInterval(repeatTimer);
@@ -276,7 +258,6 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     btn.addEventListener('pointerleave', stopRepeat, { signal });
   }
 
-  // --- Keyboard support ---
 
   rowEl.addEventListener('keydown', (ev) => {
     const hass = cardEl._hass;

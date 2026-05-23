@@ -42,13 +42,11 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
   let html = `<div class="pc-section pc-section-thermal-strip">`;
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
   html += `<div class="pulse-section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(typeLabel)} ${escapeHtml(modeLabel)}</div>`;
-  html += `<span class="pc-card-subtitle pc-section-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
+  html += `<span class="pc-card-subtitle pc-section-subtitle" style="font-size:11px;color:var(--pulse-text-secondary)">Tap a zone for details</span>`;
   html += `</div>`;
 
-  // Detail panel placeholder
+  /* Detail panel + crosshair are populated by _bindTimelineInteractions on tap. */
   html += `<div class="pc-zone-detail" id="timeline-detail"></div>`;
-
-  // Crosshair element
   html += `<div class="pc-strip-rows" style="position:relative">`;
   html += `<div class="pc-strip-crosshair" style="display:none"></div>`;
 
@@ -56,7 +54,6 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
     const entityId = zoneConfig.entity;
     const zoneName = extractZoneName(entityId);
     const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
-    // Pick sensor based on attribute mode using shared resolver
     const resolved = isHumidity
       ? resolveHistoryHumSensor(entityId, states, zoneEntities, zoneConfig)
       : resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig);
@@ -91,7 +88,6 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
 
   html += `</div>`;
 
-  // Time axis
   html += `<div class="pc-time-axis" style="margin-left:76px">`;
   html += renderTimeLabels(windowMs);
   html += `</div>`;

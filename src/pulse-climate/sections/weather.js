@@ -64,7 +64,7 @@ export function renderWeatherSection(hubEntities, states, historyCache) {
   if (tempEntityId && historyCache) {
     const data = historyCache.data?.[tempEntityId] || [];
     const currentTemp = parseFloat(temp || '0');
-    const sparkColor = !isNaN(currentTemp) ? temperatureToColor(currentTemp) : 'var(--primary-text-color)';
+    const sparkColor = !isNaN(currentTemp) ? temperatureToColor(currentTemp) : 'var(--pulse-text-primary)';
     html += renderSparklineHtml(data, 200, 30, sparkColor, 'weather-spark-grad', 'Outdoor temperature history');
   }
 

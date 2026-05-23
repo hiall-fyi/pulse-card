@@ -7,7 +7,7 @@
 
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { CHART_PALETTE } from '../constants.js';
-import { buildFilledSparkline, buildMultiLinePaths, buildLegendChips } from '../chart-primitives.js';
+import { buildFilledSparkline, buildMultiLinePaths, buildLegendChips, buildBloomFilter, uniqueBloomId } from '../chart-primitives.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 
@@ -44,7 +44,6 @@ export function resolveChartColor(index, palette) {
 function renderFilledGraph(series, height, ariaLabel) {
   const width = 300;
 
-  // Try filled sparkline for each series
   /** @type {{linePath: string, areaPath: string, color: string, entityId: string}[]} */
   const filled = [];
   for (const s of series) {
@@ -74,6 +73,10 @@ function renderFilledGraph(series, height, ariaLabel) {
   // stacked mode renders temperature + humidity back-to-back).
   const gradIds = filled.map(() => uniqueGraphGradId());
 
+  // Per-instance unique glow filter id — prevents collision when multiple
+  // graph SVGs share the same shadow DOM (stacked temp + humidity).
+  const glowId = uniqueBloomId('graph-glow');
+
   let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="pc-chart-svg" preserveAspectRatio="none">`;
   svg += '<defs>';
   for (let i = 0; i < filled.length; i++) {
@@ -82,12 +85,13 @@ function renderFilledGraph(series, height, ariaLabel) {
     svg += `<stop offset="100%" stop-color="${sanitizeCssValue(filled[i].color)}" stop-opacity="0"/>`;
     svg += `</linearGradient>`;
   }
+  svg += buildBloomFilter(glowId, 0.6);
   svg += '</defs>';
 
   for (let i = 0; i < filled.length; i++) {
     const f = filled[i];
     svg += `<path d="${f.areaPath}" fill="url(#${gradIds[i]})" />`;
-    svg += `<path d="${f.linePath}" fill="none" stroke="${sanitizeCssValue(f.color)}" stroke-width="var(--pc-chart-line-width, 1.5)" data-entity="${escapeHtml(f.entityId)}" />`;
+    svg += `<path d="${f.linePath}" fill="none" stroke="${sanitizeCssValue(f.color)}" stroke-width="var(--pc-chart-line-width, 1.5)" filter="url(#${glowId})" data-entity="${escapeHtml(f.entityId)}" />`;
   }
   svg += '</svg>';
   return svg;

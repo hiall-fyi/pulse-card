@@ -96,7 +96,6 @@ class PulseBarCard extends HTMLElement {
       clearTimeout(this._sparklineTimer);
       this._sparklineTimer = null;
     }
-    // Clean up action listener timers on all bar rows
     const rows = this._shadow.querySelectorAll('.pb-row');
     for (const row of rows) {
       cleanupActionListeners(/** @type {HTMLElement} */ (row));
@@ -107,7 +106,8 @@ class PulseBarCard extends HTMLElement {
   /** Re-bind listeners when reconnected after dashboard edit. */
   connectedCallback() {
     if (this._config && this._hass && this._elements.container) {
-      // DOM preserved but listeners cleaned up — re-bind action and slider listeners
+      /* DOM preserved across reconnect, but disconnectedCallback cleaned up
+         the listeners — re-bind action + slider listeners. */
       this._cacheBarElements();
     }
   }
@@ -119,7 +119,7 @@ class PulseBarCard extends HTMLElement {
   setConfig(config) {
     this._config = normalizeConfig(config);
     this._elements = {};
-    // Reset async data caches so stale entries from old entities don't linger
+    /* Reset async data caches so stale entries from old entities don't linger. */
     this._sparklineData = {};
     this._sparklineLastFetch = 0;
     this._indicators = {};
@@ -146,7 +146,6 @@ class PulseBarCard extends HTMLElement {
         needsRender = true;
         break;
       }
-      // Check if target entity state changed
       const targetCfg = ec.target ?? this._cfg.target;
       if (typeof targetCfg === 'string') {
         const tState = hass.states[targetCfg];
@@ -207,7 +206,6 @@ class PulseBarCard extends HTMLElement {
     this._elements.container = this._shadow.querySelector('.pb-card');
     this._cacheBarElements();
 
-    // Apply initial visibility
     for (const ec of cfg.entities) {
       const row = /** @type {HTMLElement|undefined} */ (this._elements.rows?.[ec.entity]);
       if (row) row.style.display = evaluateVisibility(ec, this._hass) ? '' : 'none';
@@ -223,7 +221,6 @@ class PulseBarCard extends HTMLElement {
     const cfg = this._cfg;
     const bs = resolveBarState(ec, cfg, this._hass);
 
-    // Positions
     const posName = ec.positions?.name ?? cfg.positions?.name ?? DEFAULTS.positions.name;
     const posValue = ec.positions?.value ?? cfg.positions?.value ?? DEFAULTS.positions.value;
     const posIcon = ec.positions?.icon ?? cfg.positions?.icon ?? DEFAULTS.positions.icon;
@@ -234,25 +231,17 @@ class PulseBarCard extends HTMLElement {
     // runtime agree on what the user sees.
     const posIndicator = ec.positions?.indicator ?? cfg.positions?.indicator ?? DEFAULTS.positions.indicator;
 
-    // Animation — cfg.animation is guaranteed populated by normalizeConfig
+    /* cfg.animation is guaranteed populated by normalizeConfig. */
     const ecAnim = ec.animation ?? {};
     const animSpeed = ecAnim.speed ?? /** @type {NonNullable<typeof cfg.animation>} */ (cfg.animation).speed;
     const animEffect = ecAnim.effect ?? /** @type {NonNullable<typeof cfg.animation>} */ (cfg.animation).effect;
     const animState = ecAnim.state ?? /** @type {NonNullable<typeof cfg.animation>} */ (cfg.animation).state;
 
-    // Indicator
     const indicatorHtml = this._buildIndicatorHtml(ec, cfg, posIndicator);
-
-    // Secondary info
     const secondaryText = resolveSecondaryInfo(ec, this._hass);
-
-    // Labels (outside)
     const labelsHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'outside', secondaryText);
-
-    // Content (inside/classic mode)
     const contentHtml = this._buildPositionHtml(bs, posName, posValue, posIcon, posIndicator, indicatorHtml, 'inside', secondaryText);
 
-    // Bar fill
     const height = sanitizeCssValue(cssValue(ec.height ?? cfg.height));
     const borderRadius = sanitizeCssValue(cssValue(ec.border_radius ?? cfg.border_radius));
     const fillStyle = bs.color ? `background-color:${sanitizeCssValue(bs.color)};` : '';
@@ -262,10 +251,7 @@ class PulseBarCard extends HTMLElement {
     const scaledFill = bs.fill * barWidthScale;
     const fillDim = `width:${scaledFill}%;${transitionStyle}${fillStyle}`;
 
-    // Target marker
     const targetHtml = this._buildTargetHtml(ec, cfg, bs.min, bs.max);
-
-    // Sparkline
     const sparklineHtml = this._buildSparklineHtml(ec, cfg);
 
     const barContainerHtml = `
@@ -277,10 +263,8 @@ class PulseBarCard extends HTMLElement {
         ${contentHtml}
       </div>`;
 
-    // ARIA — use role="slider" for interactive bars
     const isInteractive = !!(ec.interactive ?? cfg.interactive);
 
-    // Wrap pb-container with step buttons for interactive bars
     const barHtml = isInteractive
       ? `<div class="pb-interactive-row"><div class="pb-step-btn" data-step="-1" role="button" aria-label="Decrease">−</div>${barContainerHtml}<div class="pb-step-btn" data-step="1" role="button" aria-label="Increase">+</div></div>`
       : barContainerHtml;
@@ -389,18 +373,15 @@ class PulseBarCard extends HTMLElement {
       const row = this._elements.rows?.[ec.entity];
       if (!row) continue;
 
-      // Skip update during active slider drag — optimistic UI takes priority
+      /* During active slider drag, optimistic UI takes priority over server echo. */
       if (/** @type {*} */ (row).__pulseSliding) continue;
 
-      // Visibility toggle
       const visible = evaluateVisibility(ec, this._hass);
       /** @type {HTMLElement} */ (row).style.display = visible ? '' : 'none';
       if (!visible) continue;
 
-      // Update unavailable class
       row.classList.toggle('unavailable', bs.isUnavailable);
 
-      // Update fill
       /** @type {HTMLElement|null} */
       const fillEl = /** @type {HTMLElement|null} */ (row.querySelector('.pb-fill'));
       if (fillEl) {
@@ -408,30 +389,27 @@ class PulseBarCard extends HTMLElement {
         fillEl.style.width = scaledWidth;
         fillEl.style.backgroundColor = bs.color || '';
 
-        // Sync sparkline width to bar_width limit [Issue #21]
+        /* Sparkline width must mirror the bar_width clamp so the line never
+           runs past the bar end. */
         /** @type {HTMLElement|null} */
         const sparkSvg = /** @type {HTMLElement|null} */ (row.querySelector('.pb-sparkline'));
         if (sparkSvg) sparkSvg.style.width = `${barWidthScale * 100}%`;
 
-        // Update icon if severity has icon override
         const iconEl = row.querySelector('.pb-icon');
         if (iconEl && bs.resolvedIcon) iconEl.setAttribute('icon', bs.resolvedIcon);
       }
 
-      // Update name + value text
       const nameEls = row.querySelectorAll('.pb-name');
       for (const el of nameEls) el.textContent = bs.name;
       const valueEls = row.querySelectorAll('.pb-value');
       for (const el of valueEls) el.textContent = bs.displayValue;
 
-      // Update secondary info text
       const secondaryEls = row.querySelectorAll('.pb-secondary');
       if (secondaryEls.length > 0) {
         const secondaryText = resolveSecondaryInfo(ec, this._hass);
         for (const el of secondaryEls) el.textContent = secondaryText;
       }
 
-      // Update ARIA + data-state
       row.setAttribute('aria-valuenow', bs.isUnavailable ? '0' : String(bs.numValue));
       row.setAttribute('aria-valuemin', String(bs.min));
       row.setAttribute('aria-valuemax', String(bs.max));
@@ -443,7 +421,6 @@ class PulseBarCard extends HTMLElement {
         row.removeAttribute('data-severity-color');
       }
 
-      // Update target marker position
       /** @type {HTMLElement|null} */
       const targetEl = /** @type {HTMLElement|null} */ (row.querySelector('.pb-target'));
       const targetCfg = ec.target ?? cfg.target;
@@ -488,12 +465,10 @@ class PulseBarCard extends HTMLElement {
     if (!cfg) return;
 
     try {
-      // Build entity ID → EntityConfig map for O(1) lookup
       /** @type {Map<string, EntityConfig>} */
       const entityMap = new Map();
       for (const ec of cfg.entities) entityMap.set(ec.entity, ec);
 
-      // Collect entities that need indicator data, grouped by period
       /** @type {Map<number, {entity: string, icfg: import('./types.js').IndicatorConfig}[]>} */
       const byPeriod = new Map();
       for (const ec of cfg.entities) {
@@ -506,7 +481,6 @@ class PulseBarCard extends HTMLElement {
         group.push({ entity: ec.entity, icfg });
       }
 
-      // Batch fetch per period group
       for (const [period, entries] of byPeriod) {
         const entityIds = entries.map((e) => e.entity);
         const prevValues = await fetchPreviousValues(this._hass, entityIds, period);
@@ -520,7 +494,6 @@ class PulseBarCard extends HTMLElement {
           const result = computeIndicator(rawValue, prevValues[entity]);
           this._indicators[entity] = result;
 
-          // Update DOM
           const row = this._elements.rows?.[entity];
           if (!row) continue;
           const indEl = row.querySelector('.pb-indicator');
@@ -615,7 +588,6 @@ class PulseBarCard extends HTMLElement {
     );
     if (!hasSparkline) return;
 
-    // Find the minimum update_interval across all sparkline configs
     let minInterval = 300;
     for (const ec of cfg.entities) {
       const scfg = this._resolveSparklineConfig(ec, cfg);
@@ -759,7 +731,6 @@ class PulseBarCard extends HTMLElement {
           }
         }
         attachRipple(row);
-        // Attach ripple to step buttons
         for (const btn of row.querySelectorAll('.pb-step-btn')) {
           attachRipple(/** @type {HTMLElement} */ (btn));
         }

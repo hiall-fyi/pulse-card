@@ -9,9 +9,9 @@ import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { renderSparklineHtml } from '../chart-primitives.js';
 
 /** HomeKit identity color — green to match connection status. */
-const HK_COLOR = 'var(--label-badge-green, #4CAF50)';
+const HK_COLOR = 'var(--pulse-status-green)';
 /** Secondary color for writes (distinct from reads). */
-const HK_WRITE_COLOR = 'var(--accent-color, #9C27B0)';
+const HK_WRITE_COLOR = 'var(--pulse-accent)';
 
 /**
  * Render HomeKit section HTML.
@@ -28,7 +28,7 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
   const connected = connState.state === 'on';
   const connColor = connected
     ? HK_COLOR
-    : 'var(--label-badge-red, #F44336)';
+    : 'var(--pulse-status-red)';
   const connLabel = connected ? 'Connected' : 'Disconnected';
   const dotClass = connected ? 'pc-pulse-dot pc-connected' : 'pc-pulse-dot pc-disconnected';
 
@@ -37,19 +37,18 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
   const mappedZones = attrs.mapped_zones;
   const reconnectCount = attrs.reconnect_count;
 
-  // Reads/writes saved — prefer standalone entities, fall back to attributes
+  /* Reads/writes saved: prefer standalone entities; fall back to attributes
+     so older Tado CE versions without the dedicated counter sensors still display. */
   const readsEntity = hubEntities.homekit_reads_saved ? states[hubEntities.homekit_reads_saved] : null;
   const writesEntity = hubEntities.homekit_writes_saved ? states[hubEntities.homekit_writes_saved] : null;
   const readsSaved = readsEntity ? (Number(readsEntity.state) || 0) : (Number(attrs.reads_saved_today) || 0);
   const writesSaved = writesEntity ? (Number(writesEntity.state) || 0) : (Number(attrs.writes_saved_today) || 0);
   const totalSaved = readsSaved + writesSaved;
 
-  // Section header — include total saved when available
   let html = `<div class="pc-section pc-section-homekit">`;
   const totalLabel = totalSaved > 0 ? ` · ${totalSaved} saved` : '';
   html += `<div class="pulse-section-label">HomeKit${escapeHtml(totalLabel)}</div>`;
 
-  // Connection status with pulse dot + uptime
   html += `<div class="pc-zone-chips">`;
   html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.homekit_connected)}" style="color:${sanitizeCssValue(connColor)}">`;
   html += `<span class="${dotClass}"></span>`;
@@ -60,15 +59,14 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
     html += `<span class="pc-chip">${escapeHtml(mappedZones)} zones</span>`;
   }
   if (reconnectCount !== undefined && reconnectCount > 0) {
-    html += `<span class="pc-chip" style="color:var(--label-badge-yellow, #FF9800)">Reconnects: ${escapeHtml(reconnectCount)}</span>`;
+    html += `<span class="pc-chip" style="color:var(--pulse-status-yellow)">Reconnects: ${escapeHtml(reconnectCount)}</span>`;
   }
   html += `</div>`;
 
-  // Saved calls section
   if (readsSaved > 0 || writesSaved > 0) {
     const readsPct = totalSaved > 0 ? (readsSaved / totalSaved) * 100 : 100;
 
-    // Reads/writes bar — green for reads, purple for writes
+    /* Stacked bar — purple writes underlay + green reads overlay (read-heavy is the common case). */
     html += `<div style="margin-top:4px">`;
     html += `<div class="pc-power-bar-container">`;
     html += `<div class="pc-power-bar-track"></div>`;
@@ -77,14 +75,12 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
     html += `</div>`;
     html += `</div>`;
 
-    // Sparkline — green to match HomeKit identity
     const sparkEntityId = hubEntities.homekit_reads_saved;
     if (sparkEntityId && historyCache) {
       const data = historyCache.data?.[sparkEntityId] || [];
       html += renderSparklineHtml(data, 200, 30, HK_COLOR, 'hk-spark-grad', 'HomeKit saved calls history');
     }
 
-    // Reads/writes chips
     html += `<div class="pc-zone-chips">`;
     const readsDataEntity = hubEntities.homekit_reads_saved || '';
     const writesDataEntity = hubEntities.homekit_writes_saved || '';
@@ -104,7 +100,7 @@ export function renderHomekitSection(hubEntities, states, historyCache) {
     html += `<div class="pc-zone-chips">`;
     if (writeAttempts > 0) html += `<span class="pc-chip">Attempts: ${escapeHtml(writeAttempts)}</span>`;
     if (writeSuccesses > 0) html += `<span class="pc-chip">Successes: ${escapeHtml(writeSuccesses)}</span>`;
-    if (writeFallbacks > 0) html += `<span class="pc-chip" style="color:var(--label-badge-yellow, #FF9800)">Fallbacks: ${escapeHtml(writeFallbacks)}</span>`;
+    if (writeFallbacks > 0) html += `<span class="pc-chip" style="color:var(--pulse-status-yellow)">Fallbacks: ${escapeHtml(writeFallbacks)}</span>`;
     if (writeLatency > 0) html += `<span class="pc-chip">Latency: ${escapeHtml(writeLatency)}ms</span>`;
     html += `</div>`;
   }

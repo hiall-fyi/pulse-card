@@ -822,6 +822,8 @@ Family-shared tokens (used by every Pulse card) live on the `--pulse-*` prefix â
 | `--pulse-text-secondary` | Icon, secondary info colour | HA theme secondary text |
 | `--pulse-font-body` | Base font size for name, value, icon | `14px` (auto-scales inside bars) |
 
+The family surface also exposes named tokens for typography (`--pulse-font-display` / `-hero` / `-summary` / `-large` / `-stat` / `-kicker`), border radii (`--pulse-radius-panel` / `-row` / `-element` / `-pill` / `-small` / `-tight` / `-hairline` / `-circle`), animation durations (`--pulse-anim-instant` / `-fast` / `-base` / `-medium` / `-mode` / `-slow` / `-color` / `-reveal` / `-fill`), spacing (`--pulse-space-card` / `-panel` / `-section` / `-row` / `-element` / `-chip` / `-tight` / `-hairline` / `-pin`), and Apple-system tier colours (`--pulse-tier-calm` / `-moderate` / `-strong` / `-gale`). Defaults match what shipped before â€” overriding any one cascades cleanly to every card in your dashboard. Source of truth lives in `src/shared/styles.js`.
+
 **Bar-Card-only tokens:**
 
 | Variable | Controls | Default |
