@@ -5,7 +5,6 @@
  */
 
 import { DEFAULTS, LOG_PREFIX } from './constants.js';
-// Re-export shared utilities for backward compatibility
 export { escapeHtml, sanitizeCssValue, clamp, cssValue, fetchSparklineData, buildSparklinePath } from '../shared/utils.js';
 import { clamp } from '../shared/utils.js';
 
@@ -43,7 +42,6 @@ function formatBinaryDisplay(value, unit) {
   return unit ? `${capitalised}${unit}` : capitalised;
 }
 
-// clamp() is imported from shared/utils.js and re-exported above
 
 /**
  * Compute bar fill percentage.
@@ -279,7 +277,6 @@ export function formatIndicator(direction, delta, showDelta, decimal, unit) {
   return { arrow, text: `${arrow} ${sign}${rounded}${unitStr}` };
 }
 
-// sanitizeCssValue() is imported from shared/utils.js and re-exported above
 
 /**
  * Log a warning with the Pulse Card prefix.
@@ -329,9 +326,7 @@ export async function fetchPreviousValues(hass, entityIds, minutesAgo = 60) {
   return results;
 }
 
-// cssValue() is imported from shared/utils.js and re-exported above
 
-// escapeHtml() is imported from shared/utils.js and re-exported above
 
 /**
  * Pre-sort a severity array by `from` value for gradient interpolation.
@@ -375,11 +370,9 @@ export function normalizeConfig(config) {
     merged.severity = preSortSeverity(merged.severity);
   }
 
-  // Legacy promote: pre-v1.5.0 configs used `indicator: { show: true }`
-  // without a `positions.indicator` setting and relied on a runtime
-  // auto-promote to render the arrow. v1.5.0 makes `positions.indicator`
-  // the single source of truth — promote here so editor and runtime
-  // agree without a runtime fallback rule the user can't see.
+  /* Legacy YAML may set `indicator: { show: true }` without `positions.indicator`.
+     Promote it here so `positions.indicator` is the single source of truth that
+     both editor and runtime agree on. */
   if (merged.indicator?.show === true && merged.positions.indicator === 'off') {
     merged.positions = { ...merged.positions, indicator: 'outside' };
   }
@@ -387,9 +380,8 @@ export function normalizeConfig(config) {
   merged.entities = config.entities
     ? config.entities.map(/** @param {*} e */ (e) => {
         const ec = typeof e === 'string' ? { entity: e } : { ...e };
-        // Pre-sort per-entity severity
         if (ec.severity) ec.severity = preSortSeverity(ec.severity);
-        // Attach card-level secondary_info as fallback
+        /* Card-level secondary_info applies as fallback when the entity has none. */
         if (!ec.secondary_info && merged.secondary_info) {
           ec._cardSecondaryInfo = merged.secondary_info;
         }
@@ -546,10 +538,6 @@ export function computeBarWidthScale(ec, cfg) {
   return raw !== undefined && raw !== null ? Math.max(1, Math.min(100, raw)) / 100 : 1;
 }
 
-// Sparkline helpers (fetchSparklineData, buildSparklinePath) live in
-// shared/utils.js and are re-exported below for backward compatibility
-// with existing pulse-bar callers. Pulse Climate imports them directly
-// from shared.
 
 /**
  * Evaluate whether an entity bar should be visible based on visibility conditions.
@@ -581,9 +569,6 @@ export function evaluateVisibility(ec, hass) {
   return true;
 }
 
-// =====================================================================
-// Slider Mode — utility functions
-// =====================================================================
 
 /**
  * Slider service mapping per entity domain.

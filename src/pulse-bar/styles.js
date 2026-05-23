@@ -14,13 +14,13 @@ export const STYLES = `${SHARED_STYLES}
        Family-shared concerns live on --pulse-* via SHARED_STYLES. */
     --pb-columns: 1;
     --pb-track-opacity: 0.12;
-    --pb-animation-speed: 0.8s;
+    --pb-animation-speed: var(--pulse-anim-fill);
   }
 
   ha-card {
     overflow: hidden;
-    padding: 16px;
-    background: var(--pulse-bg-card, var(--ha-card-background, var(--card-background-color)));
+    padding: var(--pulse-space-card);
+    background: var(--pulse-bg-card);
     container-type: inline-size;
   }
 
@@ -47,7 +47,7 @@ export const STYLES = `${SHARED_STYLES}
   .pb-row {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--pulse-space-chip);
     cursor: pointer;
     position: relative;
     overflow: hidden;
@@ -65,7 +65,7 @@ export const STYLES = `${SHARED_STYLES}
   .pb-label-left, .pb-label-right {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--pulse-space-chip);
   }
 
   .pb-label-left {
@@ -84,7 +84,7 @@ export const STYLES = `${SHARED_STYLES}
 
   .pb-value {
     font-size: var(--pulse-font-body);
-    font-weight: 500;
+    font-weight: var(--pulse-weight-medium);
     color: var(--pulse-text-primary);
     white-space: nowrap;
   }
@@ -101,7 +101,7 @@ export const STYLES = `${SHARED_STYLES}
   .pb-track {
     position: absolute;
     inset: 0;
-    background: var(--primary-color, #03A9F4);
+    background: var(--pulse-accent);
     opacity: var(--pb-track-opacity);
     border-radius: inherit;
   }
@@ -112,10 +112,10 @@ export const STYLES = `${SHARED_STYLES}
     top: 0;
     left: 0;
     bottom: 0;
-    background: var(--primary-color, #03A9F4);
+    background: var(--pulse-accent);
     border-radius: inherit;
     transition: width var(--pb-animation-speed) ease,
-                background-color 0.3s ease;
+                background-color var(--pulse-anim-mode) ease;
   }
 
   /* Content overlay (classic/inside mode) */
@@ -137,12 +137,12 @@ export const STYLES = `${SHARED_STYLES}
     top: -1px;
     bottom: -1px;
     width: 2px;
-    background: var(--primary-text-color, #333);
+    background: var(--pulse-text-primary);
     opacity: 0.6;
-    border-radius: 1px;
+    border-radius: var(--pulse-radius-hairline);
     z-index: 2;
     pointer-events: none;
-    box-shadow: 0 0 0 1px var(--card-background-color, rgba(255,255,255,0.8));
+    box-shadow: 0 0 0 1px var(--pulse-bg-card);
   }
 
   /* Target label */
@@ -151,9 +151,9 @@ export const STYLES = `${SHARED_STYLES}
     top: -18px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
-    font-weight: 500;
-    color: var(--primary-text-color, #333);
+    font-size: var(--pulse-font-caption);
+    font-weight: var(--pulse-weight-medium);
+    color: var(--pulse-text-primary);
     white-space: nowrap;
     pointer-events: none;
     opacity: 0.7;
@@ -161,8 +161,8 @@ export const STYLES = `${SHARED_STYLES}
 
   /* Indicator */
   .pb-indicator {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--pulse-font-kicker);
+    font-weight: var(--pulse-weight-medium);
     color: var(--pb-indicator-color);
   }
   .pb-indicator.up { color: var(--pb-indicator-color, var(--pulse-status-green)); }
@@ -199,12 +199,12 @@ export const STYLES = `${SHARED_STYLES}
   }
 
   /* Charge animation */
-  @keyframes pulse-charge {
+  @keyframes pb-charge {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.75; }
   }
   .pb-fill.charge {
-    animation: pulse-charge 2s ease-in-out infinite;
+    animation: pb-charge 2s ease-in-out infinite;
   }
 
   /* Entity row mode */
@@ -229,7 +229,7 @@ export const STYLES = `${SHARED_STYLES}
   .pb-row:focus-visible {
     outline: 2px solid var(--pulse-accent);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: var(--pulse-radius-small);
   }
 
   /* Secondary info group — wraps name + secondary line */
@@ -237,7 +237,7 @@ export const STYLES = `${SHARED_STYLES}
     display: flex;
     flex-direction: column;
     min-width: 0;
-    gap: 1px;
+    gap: var(--pulse-space-pin);
   }
 
   /* Secondary info text */
@@ -266,7 +266,7 @@ export const STYLES = `${SHARED_STYLES}
     z-index: 1;
     pointer-events: none;
     opacity: 0.45;
-    color: var(--pb-sparkline-color, var(--primary-text-color));
+    color: var(--pb-sparkline-color, var(--pulse-text-primary));
   }
   .pb-sparkline path {
     vector-effect: non-scaling-stroke;
@@ -296,15 +296,15 @@ export const STYLES = `${SHARED_STYLES}
     height: 100%;
     cursor: pointer;
     opacity: 0.6;
-    color: var(--primary-text-color);
-    font-size: 18px;
-    font-weight: 500;
+    color: var(--pulse-text-primary);
+    font-size: var(--pulse-font-stat);
+    font-weight: var(--pulse-weight-medium);
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
     position: relative;
     overflow: hidden;
-    transition: opacity 0.15s;
+    transition: opacity var(--pulse-anim-fast);
   }
   .pb-step-btn:hover {
     opacity: 1;
@@ -317,7 +317,7 @@ export const STYLES = `${SHARED_STYLES}
   .pb-row[data-interactive] .pb-interactive-row {
     display: flex;
     align-items: stretch;
-    gap: 2px;
+    gap: var(--pulse-space-hairline);
   }
   .pb-row[data-interactive] .pb-interactive-row .pb-container {
     flex: 1;
@@ -326,13 +326,13 @@ export const STYLES = `${SHARED_STYLES}
 
   /* Compact mode */
   ha-card:has(.compact) {
-    padding: 10px;
+    padding: var(--pulse-space-row);
   }
   .pb-card.compact {
     gap: var(--pulse-space-element, 6px);
   }
   .compact .pb-row {
-    gap: 3px;
+    gap: var(--pulse-space-tight);
   }
   .compact .pb-labels {
     padding: 0;
@@ -344,7 +344,7 @@ export const STYLES = `${SHARED_STYLES}
     font-size: var(--pulse-font-body, 12px);
   }
   .compact .pb-indicator {
-    font-size: 10px;
+    font-size: var(--pulse-font-caption);
   }
 
   /* Reduced motion — respect prefers-reduced-motion */

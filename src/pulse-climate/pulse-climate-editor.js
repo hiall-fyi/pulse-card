@@ -507,21 +507,21 @@ class PulseClimateCardEditor extends LitElement {
         font-size: 14px;
         font-weight: 500;
         margin: 12px 0 8px;
-        color: var(--primary-text-color);
+        color: var(--pulse-text-primary);
       }
       h3:first-child { margin-top: 0; }
       .pc-editor-entities {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--pulse-space-element);
       }
       .pc-editor-entity-row {
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        padding: 8px;
-        border: 1px solid var(--divider-color, #e0e0e0);
-        border-radius: 8px;
+        gap: var(--pulse-space-tight);
+        padding: var(--pulse-space-element);
+        border: 1px solid var(--pulse-border-divider);
+        border-radius: var(--pulse-radius-element);
       }
       .pc-editor-entity-row-main {
         display: flex;
@@ -542,31 +542,31 @@ class PulseClimateCardEditor extends LitElement {
       .pc-editor-section-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        gap: var(--pulse-space-element);
         padding: 8px 0;
       }
       .pc-editor-section-chip {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--pulse-space-chip);
         font-size: 13px;
-        color: var(--primary-text-color);
+        color: var(--pulse-text-primary);
         cursor: pointer;
       }
       .pc-editor-section-chip ha-switch {
-        --switch-unchecked-button-color: var(--disabled-color, #bdbdbd);
+        --switch-unchecked-button-color: var(--pulse-disabled);
       }
       .pc-editor-section-chip.pc-editor-active {
         /* Reserved for future active styling. */
       }
       .pc-editor-section-settings {
         padding: 4px 0 8px;
-        border-top: 1px solid var(--divider-color, rgba(255,255,255,0.08));
+        border-top: 1px solid var(--pulse-border-divider);
         margin-top: 4px;
       }
       .pc-editor-section-hint {
         font-size: 12px;
-        color: var(--warning-color, #FF9800);
+        color: var(--pulse-status-yellow);
         padding: 4px 0 8px;
       }
     `;

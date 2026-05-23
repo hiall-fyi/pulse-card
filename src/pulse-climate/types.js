@@ -55,6 +55,12 @@ export {};
  * @property {boolean} [entity_row] - Remove ha-card wrapper.
  * @property {boolean} [show_temp_bar] - Card-level default.
  * @property {boolean} [show_power_bar] - Card-level default.
+ * @property {boolean} [show_atmosphere] - Show animated atmosphere backdrop. Default true.
+ * @property {'subtle'|'medium'|'bold'} [atmosphere_intensity] - Backdrop opacity tier. Default medium.
+ * @property {boolean} [show_hero] - Show card-level hero block. Default false (opt-in).
+ * @property {boolean} [hero_show_thermal_strip] - Render 24h home-avg mini-strip below hero. Default true.
+ * @property {boolean} [hero_show_outside] - Show outdoor temp line under hero. Default true.
+ * @property {string} [outdoor_temp_entity] - Card-level outdoor temp source. Auto-discovers when omitted.
  * @property {boolean} [interactive] - Card-level default.
  * @property {string[]} [chips] - Card-level default chip list.
  * @property {(string|SectionConfig)[]} [sections] - Section list.

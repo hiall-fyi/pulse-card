@@ -7,7 +7,7 @@
  */
 
 import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } from '../../shared/utils.js';
-import { temperatureToColor, humidityToColor } from '../chart-primitives.js';
+import { temperatureToColor, humidityToColor, buildBloomFilter } from '../chart-primitives.js';
 import { resolveZoneState, computeGlowStdDev, computeShimmerScale } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
 
@@ -63,7 +63,6 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   const available = 360 - totalGap;
   const arcAngle = available / zones.length;
 
-  // Resolve zone data
   /** @type {{name: string, temp: number|null, target: number|null, power: number, humidity: number|null, hvacAction: string, entityId: string, unit: string}[]} */
   const zoneData = [];
   for (const zoneConfig of zones) {
@@ -78,7 +77,6 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     });
   }
 
-  // Outside temperature
   const outsideTempEntityConfig = sectionConfig?.outdoor_temp_entity;
   const outsideTempEntity = outsideTempEntityConfig || discovery?.hubEntities?.outside_temp;
   let outsideTemp = null;
@@ -91,7 +89,6 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   }
   const outsideUnit = outsideTempEntity ? (states[outsideTempEntity]?.attributes?.unit_of_measurement || '°C') : '°C';
 
-  // Outside humidity
   const outsideHumEntityConfig = sectionConfig?.outdoor_humidity_entity;
   let outsideHumidity = null;
   if (outsideHumEntityConfig && states[outsideHumEntityConfig]) {
@@ -111,7 +108,6 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     centerSub = `${escapeHtml(outsideHumidity)}%`;
   }
 
-  // Section label
   /** @type {Record<string, string>} */
   const labelMap = { temperature: 'Home Thermal View', humidity: 'Home Humidity View', both: 'Home Climate View' };
   const sectionLabel = labelMap[attribute] || 'Home Thermal View';
@@ -130,7 +126,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
 
   html += `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${escapeHtml(sectionLabel)}" style="display:block;margin:0 auto">`;
   html += `<defs>`;
-  html += `<filter id="${glowId}"><feGaussianBlur stdDeviation="${computeGlowStdDev(size, 280).toFixed(1)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  html += buildBloomFilter(glowId, computeGlowStdDev(size, 280).toFixed(1));
 
   // Heat shimmer filters — per-zone <filter> with <feTurbulence> + <feDisplacementMap>
   if (!reducedMotion) {
@@ -162,7 +158,6 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     const isActive = z.power > 0 || z.hvacAction === 'heating' || z.hvacAction === 'cooling';
     const activeClass = isActive ? ' pc-arc-active' : '';
 
-    // Build title text
     const titleParts = [escapeHtml(z.name)];
     if (showTemp) titleParts.push(z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--');
     if (showHumidity && z.humidity !== null) titleParts.push(`${Math.round(z.humidity)}%`);
@@ -179,9 +174,8 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     const hitD = arcPath(cx, cy, hitOuterR, hitInnerR, startAngle - gapDeg / 2, endAngle + gapDeg / 2);
     html += `<path d="${hitD}" fill="transparent" class="pc-arc-hit"/>`;
 
-    // Temperature arc
     if (showTemp) {
-      const tempColor = z.temp !== null ? temperatureToColor(z.temp) : 'var(--disabled-color, #9E9E9E)';
+      const tempColor = z.temp !== null ? temperatureToColor(z.temp) : 'var(--pulse-disabled)';
       const tempThickness = 8 + (z.power / 100) * 20;
       const tempInnerR = baseOuterR - tempThickness;
       const tempD = arcPath(cx, cy, baseOuterR, tempInnerR, startAngle, endAngle);
@@ -202,7 +196,6 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       html += `</path>`;
     }
 
-    // Humidity arc
     if (showHumidity && z.humidity !== null) {
       const humColor = humidityToColor(z.humidity);
       let humOuterR, humInnerR;
@@ -227,9 +220,18 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
 
   html += `</svg>`;
 
-  // Center info — fixed circular size based on inner arc radius
-  // Smallest inner radius = baseOuterR - 28 (at max power). No gap — glass border provides separation.
-  const centerDiameter = Math.round((baseOuterR - 28) * 2);
+  // Center info — sized so glass touches the inner edge of the deepest arc.
+  // Per-zone arc thickness = 8 + (power/100) × 20 (range 8-28px). Compute the
+  // actual max across zones at render time so glass extends to the inner edge
+  // of the thickest arc, not the worst-case 28px. Min 8px applies for showHumidity-only modes.
+  let maxThickness = 8;
+  if (showTemp) {
+    for (const z of zoneData) {
+      const t = 8 + (z.power / 100) * 20;
+      if (t > maxThickness) maxThickness = t;
+    }
+  }
+  const centerDiameter = Math.round((baseOuterR - maxThickness) * 2);
   html += `<div class="pc-center-info" id="radial-center" style="width:${centerDiameter}px;height:${centerDiameter}px">`;
   html += `<div class="pc-center-sheen" id="radial-sheen"></div>`;
   html += `<div class="pc-center-value">${centerValue}</div>`;
@@ -238,16 +240,14 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   html += `</div>`;
   html += `</div>`;
 
-  // Detail panel placeholder
   html += `<div class="pc-zone-detail" id="radial-detail"></div>`;
 
-  // Legend
   html += `<div class="pc-radial-legend">`;
   for (let i = 0; i < zoneData.length; i++) {
     const z = zoneData[i];
     const dotColor = attribute === 'humidity'
-      ? (z.humidity !== null ? humidityToColor(z.humidity) : 'var(--disabled-color, #9E9E9E)')
-      : (z.temp !== null ? temperatureToColor(z.temp) : 'var(--disabled-color, #9E9E9E)');
+      ? (z.humidity !== null ? humidityToColor(z.humidity) : 'var(--pulse-disabled)')
+      : (z.temp !== null ? temperatureToColor(z.temp) : 'var(--pulse-disabled)');
     let valueText = '';
     if (showTemp) valueText += z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--';
     if (showTemp && showHumidity) valueText += ' · ';

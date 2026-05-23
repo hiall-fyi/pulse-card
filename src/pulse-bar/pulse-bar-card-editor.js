@@ -425,7 +425,7 @@ class PulseBarCardEditor extends LitElement {
     const formData = ev.detail.value;
     const newConfig = { ...this._config };
 
-    // --- Simple flat keys: empty → delete, else → set ---
+    /* Simple flat keys: empty → delete, else → set. */
     const simpleKeys = ['title', 'height', 'border_radius', 'color', 'columns', 'gap', 'min', 'max', 'decimal', 'bar_width', 'font_size'];
     for (const key of simpleKeys) {
       const val = formData[key];
@@ -436,9 +436,9 @@ class PulseBarCardEditor extends LitElement {
       }
     }
 
-    // --- Boolean toggles: true → set, false → delete, absent → skip ---
-    // Note: complementary, limit_value, entity_row are YAML-only (not in editor schema)
-    // but if they somehow appear in formData, handle them gracefully
+    /* Boolean toggles: true → set, false → delete, absent → skip.
+       complementary / limit_value / entity_row are YAML-only (no editor schema)
+       but handle gracefully if they slip into formData. */
     const boolKeys = ['complementary', 'limit_value', 'entity_row'];
     for (const key of boolKeys) {
       if (formData[key] === true) {
@@ -769,7 +769,7 @@ class PulseBarCardEditor extends LitElement {
         font-size: 14px;
         font-weight: 500;
         margin: 12px 0 8px;
-        color: var(--primary-text-color);
+        color: var(--pulse-text-primary);
       }
       h3:first-child {
         margin-top: 0;
@@ -777,15 +777,15 @@ class PulseBarCardEditor extends LitElement {
       .pb-editor-entities {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--pulse-space-element);
       }
       .pb-editor-entity-row {
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        padding: 8px;
-        border: 1px solid var(--divider-color, #e0e0e0);
-        border-radius: 8px;
+        gap: var(--pulse-space-tight);
+        padding: var(--pulse-space-element);
+        border: 1px solid var(--pulse-border-divider);
+        border-radius: var(--pulse-radius-element);
       }
       .pb-editor-entity-row-main {
         display: flex;
@@ -798,7 +798,7 @@ class PulseBarCardEditor extends LitElement {
       .pb-editor-entity-row-fields {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        gap: var(--pulse-space-element);
       }
       ${SHARED_EDITOR_STYLES}
       .pb-editor-add-entity {
@@ -808,7 +808,7 @@ class PulseBarCardEditor extends LitElement {
       .pb-editor-color-field {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--pulse-space-element);
       }
       .pb-editor-color-field ha-textfield {
         flex: 1;
@@ -820,19 +820,19 @@ class PulseBarCardEditor extends LitElement {
         width: 40px;
         height: 40px;
         padding: 0;
-        border: 2px solid var(--divider-color, #e0e0e0);
-        border-radius: 6px;
+        border: 2px solid var(--pulse-border-divider);
+        border-radius: var(--pulse-radius-pill);
         cursor: pointer;
         background: none;
         flex-shrink: 0;
         overflow: hidden;
       }
       .pb-editor-color-field input[type="color"]::-webkit-color-swatch-wrapper {
-        padding: 2px;
+        padding: var(--pulse-space-hairline);
       }
       .pb-editor-color-field input[type="color"]::-webkit-color-swatch {
         border: none;
-        border-radius: 3px;
+        border-radius: var(--pulse-radius-tight);
       }
       .pb-editor-sparkline-color {
         margin: 4px 0 16px;
@@ -840,9 +840,9 @@ class PulseBarCardEditor extends LitElement {
       .pb-editor-interactive-toggle {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--pulse-space-element);
         font-size: 14px;
-        color: var(--primary-text-color);
+        color: var(--pulse-text-primary);
         cursor: pointer;
         padding: 4px 0;
       }

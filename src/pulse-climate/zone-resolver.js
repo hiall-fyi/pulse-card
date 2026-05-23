@@ -5,6 +5,8 @@
  * with fallback to entity_id suffix matching for non-registry environments.
  */
 
+import { LOG_PREFIX } from './constants.js';
+
 // ── Translation Key Maps ────────────────────────────────────────────
 // Primary discovery mechanism: match by translation_key + platform === "tado_ce".
 // These are stable English strings that never change across HA languages.
@@ -215,8 +217,8 @@ function discoverHubViaRegistry(entities, index) {
  * For each configured zone, find the climate entity's device_id, then scan all
  * Tado CE entities with that device_id and match by translation_key.
  *
- * Note: hass.entities does NOT include unique_id (removed in HA 2023.3).
- * device_id + translation_key is the only reliable discovery method.
+ * Note: hass.entities does NOT expose unique_id, so device_id + translation_key
+ * is the only reliable discovery path here.
  *
  * @param {Record<string, import('./types.js').HassEntityRegistryEntry>} entities - hass.entities.
  * @param {string[]} zoneNames - Zone name prefixes from climate entity IDs.
@@ -348,7 +350,7 @@ export function discoverTadoEntities(states, zoneNames, entities) {
     return _discoveryCache.result;
   }
 
-  // 1. Check if Tado CE is present — try registry first, fall back to entity_id scan
+  /* Detect Tado CE: registry scan first (i18n-safe), fall back to entity_id sniff. */
   let isTadoCE = false;
   let useRegistry = false;
 
@@ -360,7 +362,6 @@ export function discoverTadoEntities(states, zoneNames, entities) {
     isTadoCE = Object.keys(states).some((eid) => eid.startsWith('sensor.tado_ce_'));
   }
 
-  // 2. Discover hub entities
   /** @type {Record<string, string>} */
   let hubEntities = {};
   if (isTadoCE) {
@@ -379,13 +380,13 @@ export function discoverTadoEntities(states, zoneNames, entities) {
     }
   }
 
-  // 3. Discover per-zone entities
   /** @type {Record<string, Record<string, string>>} */
   let zoneEntities;
   if (useRegistry) {
     zoneEntities = discoverZonesViaRegistry(/** @type {Record<string, import('./types.js').HassEntityRegistryEntry>} */ (entities), zoneNames, states);
 
-    // Merge any zone entities found by suffix that registry missed
+    /* Merge any zone entities found by suffix that registry missed
+       (covers edge cases where translation_key is absent). */
     const suffixZones = discoverZonesViaSuffix(states, zoneNames);
     for (const zoneName of zoneNames) {
       if (!zoneEntities[zoneName]) zoneEntities[zoneName] = {};
@@ -398,22 +399,20 @@ export function discoverTadoEntities(states, zoneNames, entities) {
     zoneEntities = discoverZonesViaSuffix(states, zoneNames);
   }
 
-  // 4. Compute missing hub keys for caller to log
   const missingHubKeys = Object.keys(HUB_TRANSLATION_KEYS).filter((k) => !hubEntities[k]);
 
   const result = { isTadoCE, hubEntities, zoneEntities, missingHubKeys };
 
-  // Debug logging for discovery diagnostics
   if (isTadoCE) {
     for (const [zoneName, ze] of Object.entries(zoneEntities)) {
       const keys = Object.keys(ze);
       if (keys.length === 0) {
-        console.debug('Pulse Climate: zone "%s" — no Tado CE entities discovered', zoneName);
+        console.debug(`${LOG_PREFIX} zone "${zoneName}" — no Tado CE entities discovered. Check entity_id matches sensor.<zone>_temperature pattern, or use temperature_entity / set_point_entity overrides.`);
       }
     }
   }
 
-  // Update cache — store a copy of zoneNames to prevent external mutation
+  /* Store a copy of zoneNames in the cache — caller may mutate the array. */
   _discoveryCache = { states, zoneNames: [...zoneNames], result };
 
   return result;

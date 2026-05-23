@@ -493,6 +493,12 @@ These options apply to the entire card. Zone-level settings override card-level 
 | `show_temp_bar` | boolean | `true` | Show temperature gauge bars on all zones |
 | `show_power_bar` | boolean | `true` | Show heating/cooling power bars on all zones |
 | `interactive` | boolean | `false` | Enable temperature sliders on all zones |
+| `show_hero` | boolean | `false` | Show the home overview at the top (home-average temperature, status pill, thermal strip, outdoor temp) — opt-in |
+| `hero_show_thermal_strip` | boolean | `true` | Render the 24h home-average thermal strip below the home overview |
+| `hero_show_outside` | boolean | `true` | Show outdoor temperature line below the home overview |
+| `outdoor_temp_entity` | string | auto | Card-level outdoor temperature source. Auto-detects from Tado CE outside sensor or any `weather.*` entity |
+| `show_atmosphere` | boolean | `true` | Show the animated atmosphere backdrop tinted by overall heating state |
+| `atmosphere_intensity` | `subtle` / `medium` / `bold` | `medium` | Backdrop opacity tier when `show_atmosphere` is on |
 | `chips` | list | auto | Default chip list for all zones |
 | `sections` | list | `[zones]` | Which sections to show and in what order |
 | `tap_action` | object | `more-info` | Default tap action for all zones |
@@ -593,6 +599,18 @@ Tado CE-specific sections (api, bridge, homekit, weather, environment, thermal, 
 
 Pulse Climate Card has several visual features that make your climate dashboard distinctive. All effects respect your `prefers-reduced-motion` OS setting — if you're sensitive to animation, the card disables all repetitive motion automatically.
 
+### Home Overview
+
+A single-glance summary at the top of the card, anchored by the home-average temperature in big numbers. Sits above the zone list and shows the average alongside a status pill that summarises heating state across all zones (`All Good` / `Warming Up` / `Cold Start` / `Cooling`), how many zones are heating right now, a 24-hour thermal strip of the home's average, and an outdoor temperature line.
+
+**Off by default — opt in with `show_hero: true`.** Once enabled, hide individual rows with `hero_show_thermal_strip: false` / `hero_show_outside: false`. The outdoor temperature auto-detects from a Tado CE outside sensor or any `weather.*` entity in your dashboard; override with the card-level `outdoor_temp_entity`.
+
+### Atmosphere Backdrop
+
+A slow animated tint behind the card chrome that reflects overall heating state — warmer when zones are heating up, calmer when steady. Defaults to `medium` intensity and respects `prefers-reduced-motion`.
+
+`atmosphere_intensity` accepts `subtle` / `medium` / `bold`. Set `show_atmosphere: false` to disable entirely.
+
 ### Heating Glow
 
 When a zone is actively heating, its power bar glows with a warm orange pulse. The glow intensity and animation speed scale with heating power — a zone at 100% pulses faster and brighter than one at 20%. Cooling zones glow blue. Idle zones show no glow.
@@ -642,6 +660,8 @@ Family-shared tokens (used by every Pulse card) live on the `--pulse-*` prefix �
 | `--pulse-font-body` | Base font size for zone names and temperatures | `14px` |
 | `--pulse-glass-bg` | Frosted glass panel background colour | HA card background |
 | `--pulse-glass-blur` | Frosted glass blur radius | `8px` |
+
+The family surface also exposes named tokens for typography (`--pulse-font-display` / `-hero` / `-summary` / `-large` / `-stat` / `-kicker`), border radii (`--pulse-radius-panel` / `-row` / `-element` / `-pill` / `-small` / `-tight` / `-hairline` / `-circle`), animation durations (`--pulse-anim-instant` / `-fast` / `-base` / `-medium` / `-mode` / `-slow` / `-color` / `-reveal` / `-fill`), spacing (`--pulse-space-card` / `-panel` / `-section` / `-row` / `-element` / `-chip` / `-tight` / `-hairline` / `-pin`), and Apple-system tier colours (`--pulse-tier-calm` / `-moderate` / `-strong` / `-gale`). Defaults match what shipped before — overriding any one cascades cleanly to every card in your dashboard. Source of truth lives in `src/shared/styles.js`.
 
 **Climate-Card-only tokens:**
 

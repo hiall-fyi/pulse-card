@@ -5,7 +5,7 @@
 
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { CHART_PALETTE } from '../constants.js';
-import { buildDonutArcs, buildLegendChips, resolveBreakdownSegments } from '../chart-primitives.js';
+import { buildLegendChips, renderDonut, resolveBreakdownSegments } from '../chart-primitives.js';
 import { warn } from '../utils.js';
 
 /**
@@ -32,33 +32,19 @@ export function renderDonutSection(sectionConfig, hubEntities, states) {
 
   if (segments.length === 0) return '';
 
-  const total = segments.reduce((sum, s) => sum + s.value, 0);
-  const arcs = buildDonutArcs(segments, size);
-
   let html = `<div class="pc-section pc-section-donut">`;
   /** @type {Record<string, string>} */
   const titleMap = { api_breakdown: 'API Breakdown', homekit_saved: 'HomeKit Saved' };
+  /** @type {Record<string, string>} */
+  const centerLabelMap = { api_breakdown: 'Calls', homekit_saved: 'Saved' };
   const title = (source && titleMap[source]) || 'Breakdown';
+  const centerLabel = (source && centerLabelMap[source]) || 'Total';
   html += `<div class="pulse-section-label">${escapeHtml(title)}</div>`;
 
-  // SVG donut
-  const ariaLabel = segments.map((s) => `${s.label} ${s.value}`).join(', ');
   html += `<div class="pc-donut-container" style="width:${sanitizeCssValue(size)}px;height:${sanitizeCssValue(size)}px">`;
-  html += `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="${escapeHtml(ariaLabel)}">`;
-
-  // Background ring (grey) for empty state or as base
-  const oR = size / 2 - 2;
-  const iR = oR * 0.6;
-  html += `<circle cx="${size / 2}" cy="${size / 2}" r="${((oR + iR) / 2).toFixed(1)}" fill="none" stroke="var(--divider-color, rgba(0,0,0,0.12))" stroke-width="${(oR - iR).toFixed(1)}" />`;
-
-  for (const arc of arcs) {
-    html += `<path d="${arc.d}" fill="${sanitizeCssValue(arc.color)}" data-segment="${escapeHtml(arc.label)}"><title>${escapeHtml(arc.label)}: ${Math.round(arc.angle / 360 * total)}</title></path>`;
-  }
-  html += '</svg>';
-
-  // Center label
-  html += `<div class="pc-donut-center">${escapeHtml(Math.round(total))}</div>`;
-  html += '</div>';
+  const { html: donutHtml } = renderDonut(segments, { size, centerLabel });
+  html += donutHtml;
+  html += `</div>`;
 
   // Legend
   const legendItems = segments.map((s) => ({

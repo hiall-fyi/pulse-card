@@ -6,8 +6,6 @@
 
 import { escapeHtml, sanitizeCssValue } from '../shared/utils.js';
 
-// ── Multi-Line Paths ────────────────────────────────────────────────
-
 /**
  * Downsample data into fixed time slots with averaging.
  * @param {{t: number, v: number}[]} data - Sorted by t.
@@ -103,7 +101,6 @@ export function buildMultiLinePaths(series, width, height, slots = 48) {
   if (!isFinite(globalMax)) globalMax = 100;
 
   return series.map((s) => {
-    // Filter non-finite data points
     const clean = s.data.filter((pt) => isFinite(pt.v));
     if (clean.length < 2) {
       return { entityId: s.entityId, color: s.color, d: '' };
@@ -113,8 +110,6 @@ export function buildMultiLinePaths(series, width, height, slots = 48) {
     return { entityId: s.entityId, color: s.color, d };
   });
 }
-
-// ── Donut Arcs ──────────────────────────────────────────────────────
 
 /**
  * Build SVG arc path `d` strings for a donut/ring chart.
@@ -158,7 +153,110 @@ export function buildDonutArcs(segments, size, outerRadius, innerRadius) {
   return arcs;
 }
 
-// ── Legend Chips ─────────────────────────────────────────────────────
+/**
+ * Counter for unique bloom filter ids — every consumer gets its own id,
+ * preventing CSS / SVG defs collision across multiple SVGs in a shadow DOM.
+ */
+let _bloomFilterCounter = 0;
+
+/**
+ * Generate a unique bloom filter id. Use as both the `<filter id>` and the
+ * referencing `filter="url(#id)"` attribute.
+ *
+ * @param {string} [prefix] - Filter id prefix (default 'pc-bloom').
+ * @returns {string} Unique id like 'pc-bloom-7'.
+ */
+export function uniqueBloomId(prefix = 'pc-bloom') {
+  _bloomFilterCounter = (_bloomFilterCounter + 1) >>> 0;
+  return `${prefix}-${_bloomFilterCounter.toString(36)}`;
+}
+
+/**
+ * Build the markup for a Gaussian-blur bloom filter — the family-wide visual
+ * primitive used by radial heating arcs, donut active segments, graph lines,
+ * energy-flow ribbons, zones sparklines, and api gauges.
+ *
+ * @param {string} id - Filter id (use uniqueBloomId() for safety).
+ * @param {number|string} [stdDeviation] - Blur amount. Pass a string ('3.0') to
+ *   preserve trailing zeros for tests. Default 1.5 (small SVG); use 3 for
+ *   medium, 0.6-0.8 for very small lines.
+ * @param {string} [padding] - Filter region padding. Default '-30% / 160%'
+ *   handles most cases; use '-5% / 110%' for tight bounds.
+ * @returns {string} `<filter>...</filter>` markup ready to embed in `<defs>`.
+ */
+export function buildBloomFilter(id, stdDeviation = 1.5, padding) {
+  const pad = padding || '-30%';
+  const ext = padding === '-5%' ? '110%' : '160%';
+  // Avoid serialising padding/ext when they default — keep markup compact for
+  // tight-bounds consumers (zones sparkline) that rely on default region.
+  const region = padding === undefined
+    ? ''
+    : ` x="${pad}" y="${pad}" width="${ext}" height="${ext}"`;
+  return `<filter id="${id}"${region}><feGaussianBlur stdDeviation="${stdDeviation}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+}
+
+/**
+ * Render a donut SVG with auto-bloom on largest segment + idle dim 0.6.
+ * Family DNA: feGaussianBlur bloom mirrors radial heating arcs.
+ *
+ * @param {import('./types.js').DonutSegmentInput[]} segments
+ * @param {object} [opts]
+ * @param {number} [opts.size] - SVG dimension (default 120).
+ * @param {string} [opts.ariaLabel] - Accessibility label.
+ * @param {string} [opts.centerNumStyle] - Inline style for center number (e.g. font-size override).
+ * @param {string|null} [opts.centerLabel] - Optional uppercase kicker label below number. null = no label.
+ * @returns {{html: string, total: number}} HTML string + total value (caller can use total for legends).
+ */
+export function renderDonut(segments, opts = {}) {
+  const size = opts.size || 120;
+  const ariaLabel = opts.ariaLabel || segments.map((s) => `${s.label} ${s.value}`).join(', ');
+  const centerNumStyle = opts.centerNumStyle || '';
+  const centerLabel = opts.centerLabel; // undefined → no label, '' or string → render
+  const arcs = buildDonutArcs(segments, size);
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+
+  if (segments.length === 0) return { html: '', total: 0 };
+
+  // Per-instance unique filter id — avoids collision with other donut SVGs.
+  const filterId = uniqueBloomId('donut-bloom');
+
+  // Largest segment auto-bloom — mirrors radial active arc.
+  let maxValue = 0;
+  let maxIdx = -1;
+  for (let i = 0; i < arcs.length; i++) {
+    const v = segments[i]?.value || 0;
+    if (v > maxValue) { maxValue = v; maxIdx = i; }
+  }
+
+  // Bloom intensity scales with size — small donut (api) needs less spread.
+  const bloomDeviation = size <= 80 ? 1.5 : 3;
+
+  let svg = `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="${escapeHtml(ariaLabel)}">`;
+  svg += `<defs>${buildBloomFilter(filterId, bloomDeviation, '-30%')}</defs>`;
+
+  const oR = size / 2 - 2;
+  const iR = oR * 0.6;
+  svg += `<circle cx="${size / 2}" cy="${size / 2}" r="${((oR + iR) / 2).toFixed(1)}" fill="none" stroke="var(--pulse-border-divider)" stroke-width="${(oR - iR).toFixed(1)}" />`;
+
+  for (let i = 0; i < arcs.length; i++) {
+    const arc = arcs[i];
+    const isActive = i === maxIdx;
+    const arcClass = isActive ? 'pc-donut-arc pc-donut-arc-active' : 'pc-donut-arc';
+    const filterAttr = isActive ? ` filter="url(#${filterId})"` : '';
+    svg += `<path d="${arc.d}" fill="${sanitizeCssValue(arc.color)}" class="${arcClass}"${filterAttr} data-segment="${escapeHtml(arc.label)}"><title>${escapeHtml(arc.label)}: ${Math.round(arc.angle / 360 * total)}</title></path>`;
+  }
+  svg += `</svg>`;
+
+  let center = `<div class="pc-donut-center">`;
+  const numStyleAttr = centerNumStyle ? ` style="${centerNumStyle}"` : '';
+  center += `<div class="pc-donut-center-num"${numStyleAttr}>${escapeHtml(Math.round(total))}</div>`;
+  if (centerLabel !== undefined && centerLabel !== null) {
+    center += `<div class="pc-donut-center-label">${escapeHtml(centerLabel)}</div>`;
+  }
+  center += `</div>`;
+
+  return { html: svg + center, total };
+}
 
 /**
  * Build HTML string of legend chip elements.
@@ -177,8 +275,6 @@ export function buildLegendChips(items) {
   html += '</div>';
   return html;
 }
-
-// ── Color Mapping ───────────────────────────────────────────────────
 
 /**
  * Map a temperature value to a CSS color string.
@@ -222,8 +318,6 @@ export function humidityToColor(humidity) {
   return '#1565C0';
 }
 
-// ── Arc Path ────────────────────────────────────────────────────────
-
 /**
  * Build a single SVG arc path between two angles with variable inner/outer radii.
  * Pure function — no side effects, no DOM access.
@@ -262,8 +356,6 @@ export function buildArcPath(cx, cy, innerR, outerR, startAngle, endAngle) {
   ].join(' ');
 }
 
-// ── Filled Sparkline ────────────────────────────────────────────────
-
 /**
  * Build a filled-area sparkline (line path + closed area path).
  * Returns both paths for rendering line stroke + gradient fill.
@@ -277,7 +369,6 @@ export function buildArcPath(cx, cy, innerR, outerR, startAngle, endAngle) {
 export function buildFilledSparkline(data, width, height, slots = 48) {
   if (!data || data.length < 2) return null;
 
-  // Filter non-finite values
   const clean = data.filter((pt) => isFinite(pt.v));
   if (clean.length < 2) return null;
 
@@ -291,7 +382,6 @@ export function buildFilledSparkline(data, width, height, slots = 48) {
   const sampled = downsample(clean, slots);
   if (sampled.length < 2) return null;
 
-  // Find Y range
   let minV = Infinity;
   let maxV = -Infinity;
   for (const pt of sampled) {
@@ -366,8 +456,6 @@ export function renderSparklineHtml(data, width, height, color, gradientId, aria
   html += `</svg></div>`;
   return html;
 }
-
-// ── Breakdown Segment Resolution ────────────────────────────────────
 
 /** Attribute keys to skip when resolving flat breakdown attributes. */
 const SKIP_ATTRS = new Set(['friendly_name', 'icon', 'unit_of_measurement', 'device_class']);

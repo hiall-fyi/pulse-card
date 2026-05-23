@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.6.0] - 2026-05-23
+
+**Climate Card gains an opt-in home overview (home-average temperature in big numbers, status pill, 24h thermal strip, outdoor temp), plus an animated atmosphere backdrop tinted by overall heating state. Plus a sweep through the design tokens — typography, radii, durations, spacing, and tier colours all live on the family `--pulse-*` surface now, so card-mod tweaks ripple cleanly across every card.**
+
+### ⚠️ Upgrade Notes
+
+- **Climate Card adds two new card-level visuals.** A home overview at the top showing your home-average temperature in big numbers, a status pill (All Good / Warming Up / Cold Start), how many zones are heating right now, a 24-hour thermal strip of the home's average, and an outdoor temperature line — opt in with `show_hero: true`; off by default so existing dashboards keep their layout. An animated atmosphere backdrop that subtly tints the card based on overall heating state is on by default; turn it off with `show_atmosphere: false`. Per-component opt-outs (`hero_show_thermal_strip`, `hero_show_outside`, `atmosphere_intensity`) are documented in [CLIMATE_CARD_GUIDE.md](CLIMATE_CARD_GUIDE.md).
+
+- **Reminder: `type: custom:pulse-card` still goes away in v2.0.0.** The alias keeps working in v1.6.0 — your existing dashboards keep loading without YAML changes — but the canonical name is `type: custom:pulse-bar-card`. When you next edit a dashboard, swap the type in the YAML. No rush; this release won't break anything.
+
+### Features
+
+- **Climate Card home overview at the top** — single-glance summary of your whole home, anchored by the home-average temperature in big numbers. Sits above the zone list and shows the average alongside a status pill (All Good / Warming Up / Cold Start), how many zones are heating right now, a 24-hour thermal strip of the home's average, and an outdoor temperature line. Outdoor temp is auto-detected from a Tado CE outside sensor or any `weather.*` entity; override with the new card-level `outdoor_temp_entity` option. Off by default — opt in with `show_hero: true`. Hide individual rows with `hero_show_thermal_strip` / `hero_show_outside`.
+- **Climate Card atmosphere backdrop** — animated tint behind the card chrome that reflects overall heating state. Subtle by default and breathes slowly so it doesn't distract; pick `subtle` / `medium` / `bold` via `atmosphere_intensity`, or turn off entirely with `show_atmosphere: false`.
+- **Donut largest-segment bloom** — the dominant zone in the donut now glows softly to anchor the eye. Centre value uses the same hero typography as the rest of the card.
+- **Heatmap now-marker** — when you set the comfort or thermal strip to heatmap mode, a vertical line marks the current hour. Previously the marker only appeared in timeline mode.
+- **Strip cell hover glow + warm spotlight on selected row** — hovering a thermal strip cell now highlights it with a soft glow, and the currently selected row gets a warm spotlight wash so you can track it across scrolling.
+- **Radial centre + zone ranking typography** — radial section's centre temperature, zone-ranking summary stats, and the home-status block all now use the same hero font family (32px, thin weight, tabular numerals). Numbers stay aligned column-to-column, big numbers read as a family.
+
+### Bug Fixes
+
+- **Climate Card history cache no longer keys against the wrong sensor** — when a zone configured `temperature_entity` to override which sensor feeds its history (e.g. a Sonoff external sensor instead of Tado's built-in reading), the home-average history strip read from `data[climate.foo]` while the writer keyed against the resolved sensor, leaving the strip permanently empty. Both sides now resolve the same way.
+- **Climate Card donut bloom no longer silently disappears** — the active arc had a global `filter: url(#donut-bloom)` rule that overrode the inline per-instance filter id, so the browser looked up an id that didn't exist and dropped the bloom entirely. The CSS rule is gone; the inline attribute now wins.
+- **Thermal strip cell glow + scaleY no longer get clipped** — the hover glow and selected-row scale effects were being silently clipped by `overflow: hidden` on the row container and strip wrapper. Both containers now use `overflow: visible`; cells keep their corner rounding via their own `border-radius`.
+- **Climate Card "X active" zone count now counts only heating + cooling** — the hero status pill was including idle / off zones in the count. Off zones now show their own subtle backdrop instead of being counted as active.
+- **Section labels no longer fade out** — the family-shared `.pulse-section-label` had a 0.7 opacity multiplier baked in, which made labels read as washed-out grey on light themes. Removed; labels now use full token colour.
+- **Climate Card comparison legend now styles** — the comparison overlay between primary and comparison entities was emitting `class="comparison-legend"` while the stylesheet rule expected `.pc-comparison-legend`. Selector typo fixed; legend now picks up its colour and dot styling.
+
+### Improvements
+
+- **Family `--pulse-*` token surface expanded** — typography (display / hero / summary / large / stat / kicker font sizes, plus letter-spacing scale), border radii (panel / row / element / pill / small / tight / hairline / circle), animation durations (instant / fast / base / medium / mode / slow / colour / reveal / fill), spacing scale (panel / row / chip / hairline / pin), and Apple-system tier colours (calm / moderate / strong / gale) all now live as named tokens on the `--pulse-*` family surface. Defaults match what shipped before, so the cards look identical without `card-mod` overrides — but if you do override, a single token change cascades cleanly. Full reference is in each card's guide.
+- **Hearth wash** — Climate Card backdrop picks up a subtle bottom-edge ember glow that pairs with the new atmosphere layer. Static; no animation. Disable indirectly by setting `--pulse-bg-card` via card-mod.
+- **Atmosphere subsystem hardening** — the atmosphere column's storm narrative no longer mis-renders severe storms as "Atmosphere settled" when CAPE plus lifted-index push the score into the High band on installs without an Atmos CE composite sensor. Atmos CE sensor changes (CAPE bumps, freeze level shifts, wind shear updates) now invalidate the render gate immediately instead of waiting up to 60 seconds for the periodic timer.
+- **Climate Card atmosphere section honours `pro: false`** — Bar / Climate / Switch all let you set `pro: false` per section to demote the brand-mark corner button to a static decorator. The atmosphere section silently ignored it; it now follows the same opt-out as every other section.
+- **Aggressive comment + dead-code sweep** — internal jargon stripped from source comments, family-wide log prefix alignment, unused exports purged. No user-visible behaviour change; the maintenance cost on every future fix drops.
+
+### Notes
+
+- **No YAML config changes required.** Every option that worked in v1.5.0 keeps working without edits. The 6 new Climate Card options are additive and default to sensible values, so dashboards untouched still render.
+- **HACS upgrade is unchanged.** The filename `pulse-card.js` and HACS folder `/hacsfiles/pulse-card/` stay where they are. Existing dashboard resource URLs (`/local/pulse-card.js`) keep working without changes.
+
+
 ## [1.5.0] - 2026-05-20
 
 **Bar Card and Climate Card naming sweep — shared design tokens are now under one `--pulse-*` family prefix and card-specific knobs use `--pb-*` or `--pc-*`. CSS class selectors are slug-prefixed to match. If you customise either card with `card-mod` or a custom HA theme, you'll need to update a handful of variable names. Plus a Climate Card editor fix that lets you tick on the Home Status and Zone Ranking sections without hand-editing YAML.**

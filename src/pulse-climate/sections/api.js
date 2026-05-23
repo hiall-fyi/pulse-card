@@ -7,7 +7,7 @@
  */
 
 import { escapeHtml, sanitizeCssValue, isReducedMotion } from '../../shared/utils.js';
-import { buildArcPath, buildDonutArcs, buildLegendChips, renderSparklineHtml, resolveBreakdownSegments } from '../chart-primitives.js';
+import { buildArcPath, buildBloomFilter, buildLegendChips, renderDonut, renderSparklineHtml, resolveBreakdownSegments } from '../chart-primitives.js';
 import { CHART_PALETTE } from '../constants.js';
 
 /**
@@ -16,9 +16,9 @@ import { CHART_PALETTE } from '../constants.js';
  * @returns {string} CSS color.
  */
 function resolveApiColor(pct) {
-  if (pct > 95) return 'var(--label-badge-red, #F44336)';
-  if (pct > 80) return 'var(--label-badge-yellow, #FF9800)';
-  return 'var(--label-badge-green, #4CAF50)';
+  if (pct > 95) return 'var(--pulse-status-red)';
+  if (pct > 80) return 'var(--pulse-status-yellow)';
+  return 'var(--pulse-status-green)';
 }
 
 /**
@@ -28,9 +28,9 @@ function resolveApiColor(pct) {
  */
 function resolveStatusColor(status) {
   const s = (status || '').toLowerCase();
-  if (s === 'ok' || s === 'healthy') return 'var(--label-badge-green, #4CAF50)';
-  if (s === 'warning') return 'var(--label-badge-yellow, #FF9800)';
-  return 'var(--label-badge-red, #F44336)';
+  if (s === 'ok' || s === 'healthy') return 'var(--pulse-status-green)';
+  if (s === 'warning') return 'var(--pulse-status-yellow)';
+  return 'var(--pulse-status-red)';
 }
 
 /**
@@ -48,13 +48,11 @@ function renderUsageGauge(usage, limit) {
   const outerR = size / 2 - 4;
   const innerR = outerR * 0.7;
 
-  // Background arc (full circle, grey)
   const bgArc = buildArcPath(cx, cy, innerR, outerR, -90, 269.9);
-  // Fill arc (proportional to usage)
   const fillAngle = -90 + (pct / 100) * 360;
   const fillArc = pct > 0 ? buildArcPath(cx, cy, innerR, outerR, -90, Math.min(fillAngle, 269.9)) : '';
 
-  // Dynamic pulse: >95% = urgent (1s), >80% = warning (2.5s), else static
+  /* Dynamic pulse: >95% = urgent (1s period), >80% = warning (2.5s), else static. */
   const isUrgent = pct > 95;
   const isWarning = pct > 80;
   const needsGlow = isUrgent || isWarning;
@@ -62,9 +60,9 @@ function renderUsageGauge(usage, limit) {
   let html = `<div class="pc-usage-gauge">`;
   html += `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="API usage: ${Math.round(usage)} of ${Math.round(limit)}" style="width:${size}px;height:${size}px">`;
   if (needsGlow) {
-    html += `<defs><filter id="gauge-glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+    html += `<defs>${buildBloomFilter('gauge-glow', 2)}</defs>`;
   }
-  html += `<path d="${bgArc}" fill="var(--divider-color, rgba(0,0,0,0.12))" />`;
+  html += `<path d="${bgArc}" fill="var(--pulse-border-divider)" />`;
   if (fillArc) {
     html += `<path d="${fillArc}" fill="${sanitizeCssValue(color)}"${needsGlow ? ' filter="url(#gauge-glow)"' : ''}>`;
     html += `<title>API usage: ${Math.round(pct)}%</title>`;
@@ -104,23 +102,16 @@ function renderBreakdownDonut(attrs) {
   if (segments.length === 0) return '';
 
   const size = 60;
-  const arcs = buildDonutArcs(segments, size);
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
 
-  // Wrap donut + legend in flex row
   let html = `<div style="display:flex;align-items:center;gap:12px">`;
   html += `<div class="pc-donut-container" style="width:${size}px;height:${size}px;flex-shrink:0;margin:0">`;
-  html += `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="API call breakdown">`;
-  const oR = size / 2 - 2;
-  const iR = oR * 0.6;
-  html += `<circle cx="${size / 2}" cy="${size / 2}" r="${((oR + iR) / 2).toFixed(1)}" fill="none" stroke="var(--divider-color, rgba(0,0,0,0.12))" stroke-width="${(oR - iR).toFixed(1)}" />`;
-  for (const arc of arcs) {
-    html += `<path d="${arc.d}" fill="${sanitizeCssValue(arc.color)}"><title>${escapeHtml(arc.label)}: ${Math.round(arc.angle / 360 * total)}</title></path>`;
-  }
-  html += `</svg>`;
-  html += `<div class="pc-donut-center" style="font-size:12px">${escapeHtml(Math.round(total))}</div>`;
+  const { html: donutHtml } = renderDonut(segments, {
+    size,
+    ariaLabel: 'API call breakdown',
+    centerNumStyle: 'font-size:14px',
+  });
+  html += donutHtml;
   html += `</div>`;
-  // Legend inline next to donut
   html += buildLegendChips(segments.map((s) => ({ label: s.label, color: s.color, value: String(Math.round(s.value)) })));
   html += `</div>`;
   return html;
@@ -148,7 +139,8 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
   html += `<div class="pulse-section-label">API Usage</div>`;
   html += `<div class="pc-api-dashboard">`;
 
-  // Row 1: Gauge + History sparkline (use api_usage for reset-aware history)
+  /* Row 1: Gauge + history sparkline. We key history off api_usage rather than
+     api_limit so the sparkline resets with the rolling window. */
   html += `<div class="pc-api-row">`;
   html += renderUsageGauge(usage, limit);
   const historyEntity = hubEntities.api_usage;
@@ -157,14 +149,13 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
   }
   html += `</div>`;
 
-  // Row 2: Breakdown donut
   if (hubEntities.api_breakdown && states[hubEntities.api_breakdown]) {
     html += `<div class="pc-api-row">`;
     html += renderBreakdownDonut(states[hubEntities.api_breakdown].attributes || {});
     html += `</div>`;
   }
 
-  // Row 3: Status chips — Rate | Poll | Next Sync (countdown) | Reset | Token | Status
+  /* Status chips, in render order: Rate | Poll | Next Sync (countdown) | Reset | Token | Status. */
   html += `<div class="pc-zone-chips">`;
   if (hubEntities.call_history && states[hubEntities.call_history]) {
     const callsPerHour = states[hubEntities.call_history].attributes?.calls_per_hour;
@@ -194,7 +185,7 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
         } else {
           nextDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
         }
-      } catch (e) { /* keep raw */ console.debug('Pulse Climate: api date parse fallback', e); }
+      } catch { /* keep raw display */ }
     }
     html += `<span class="pc-chip chip-next-sync" data-entity="${escapeHtml(hubEntities.next_sync)}" data-target="${targetMs}">Next: ${escapeHtml(nextDisplay)}</span>`;
   }
@@ -205,7 +196,7 @@ export function renderApiSection(hubEntities, states, sectionConfig, historyCach
       try {
         const d = new Date(resetRaw);
         resetDisplay = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-      } catch (e) { /* keep raw */ console.debug('Pulse Climate: api date parse fallback', e); }
+      } catch { /* keep raw display */ }
     }
     html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.api_reset)}">Reset: ${escapeHtml(resetDisplay)}</span>`;
   }

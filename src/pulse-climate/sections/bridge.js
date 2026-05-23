@@ -22,8 +22,8 @@ export function renderBridgeSection(hubEntities, states, historyCache) {
   if (!connState) return '';
   const connected = connState.state === 'on';
   const connColor = connected
-    ? 'var(--label-badge-green, #4CAF50)'
-    : 'var(--label-badge-red, #F44336)';
+    ? 'var(--pulse-status-green)'
+    : 'var(--pulse-status-red)';
   const connLabel = connected ? 'Connected' : 'Disconnected';
   const dotClass = connected ? 'pc-pulse-dot pc-connected' : 'pc-pulse-dot pc-disconnected';
 
@@ -36,7 +36,6 @@ export function renderBridgeSection(hubEntities, states, historyCache) {
   let html = `<div class="pc-section pc-section-bridge">`;
   html += `<div class="pulse-section-label">Bridge</div>`;
 
-  // Connection badge with pulse dot
   html += `<div class="pc-zone-chips">`;
   html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.bridge_connected)}" style="color:${sanitizeCssValue(connColor)}">`;
   html += `<span class="${dotClass}"></span>`;
@@ -45,15 +44,14 @@ export function renderBridgeSection(hubEntities, states, historyCache) {
     html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.bridge_connected)}">${escapeHtml(Math.round(responseTime))}ms</span>`;
   }
   if (failures !== undefined && failures > 0) {
-    html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.bridge_connected)}" style="color:var(--label-badge-red, #F44336)">Failures: ${escapeHtml(failures)}</span>`;
+    html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.bridge_connected)}" style="color:var(--pulse-status-red)">Failures: ${escapeHtml(failures)}</span>`;
   }
   html += `</div>`;
 
-  // Boiler flow temperature with inline sparkline
   if (hubEntities.boiler_flow_temp && states[hubEntities.boiler_flow_temp]) {
     const temp = parseFloat(states[hubEntities.boiler_flow_temp].state);
     const tempStr = states[hubEntities.boiler_flow_temp].state;
-    const tempColor = !isNaN(temp) ? temperatureToColor(temp) : 'var(--primary-text-color)';
+    const tempColor = !isNaN(temp) ? temperatureToColor(temp) : 'var(--pulse-text-primary)';
 
     html += `<div style="display:flex;align-items:center;gap:8px;margin-top:4px">`;
     html += `<span class="pc-flow-temp-value" style="color:${sanitizeCssValue(tempColor)}">${escapeHtml(tempStr)}${escapeHtml(tempUnit)}</span>`;
@@ -68,7 +66,6 @@ export function renderBridgeSection(hubEntities, states, historyCache) {
     html += `</div>`;
   }
 
-  // WC status chips
   const hasWc = hubEntities.wc_status && states[hubEntities.wc_status];
   const hasWcTarget = hubEntities.wc_target_flow && states[hubEntities.wc_target_flow];
   if (hasWc || hasWcTarget) {
@@ -82,7 +79,7 @@ export function renderBridgeSection(hubEntities, states, historyCache) {
     html += `</div>`;
   }
 
-  // Boiler max output temperature (number entity — tap to adjust)
+  /* boiler_max_output is a number entity — chip is tappable to open the more-info dialog. */
   if (hubEntities.boiler_max_output && states[hubEntities.boiler_max_output]) {
     const maxTemp = states[hubEntities.boiler_max_output].state;
     if (maxTemp !== 'unavailable' && maxTemp !== 'unknown') {
@@ -93,10 +90,9 @@ export function renderBridgeSection(hubEntities, states, historyCache) {
     }
   }
 
-  // Last error
   if (lastError && lastError !== 'None' && lastError !== 'null') {
     html += `<div class="pc-zone-chips">`;
-    html += `<span class="pc-chip" style="color:var(--label-badge-red, #F44336)">Error: ${escapeHtml(lastError)}</span>`;
+    html += `<span class="pc-chip" style="color:var(--pulse-status-red)">Error: ${escapeHtml(lastError)}</span>`;
     html += `</div>`;
   }
 

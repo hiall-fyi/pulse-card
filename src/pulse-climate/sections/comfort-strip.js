@@ -74,7 +74,7 @@ function scoreToColor(score) {
 function closestValue(data, targetTime, maxGap = 7200000) {
   if (data.length === 0) return null;
 
-  // Binary search for insertion point
+  /* Binary search for insertion point, then check lo and lo-1 for the closest finite value. */
   let lo = 0;
   let hi = data.length - 1;
   while (lo < hi) {
@@ -83,7 +83,6 @@ function closestValue(data, targetTime, maxGap = 7200000) {
     else hi = mid;
   }
 
-  // Check lo and lo-1 for closest finite value
   let best = null;
   let bestDist = Infinity;
   for (let i = Math.max(0, lo - 1); i <= Math.min(data.length - 1, lo); i++) {
@@ -121,13 +120,12 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
   let html = `<div class="pc-section pc-section-comfort-strip">`;
   html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
   html += `<div class="pulse-section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(modeLabel)}</div>`;
-  html += `<span class="pc-card-subtitle" style="font-size:11px;color:var(--secondary-text-color,#636366)">Tap a zone for details</span>`;
+  html += `<span class="pc-card-subtitle" style="font-size:11px;color:var(--pulse-text-secondary)">Tap a zone for details</span>`;
   html += `</div>`;
 
-  // Detail panel placeholder (populated by JS on select)
+  /* Detail panel placeholder, populated by _bindHeatmapInteractions on row select. */
   html += `<div class="pc-zone-detail" id="heatmap-detail"></div>`;
 
-  // Heatmap rows
   html += `<div class="pc-heatmap-body" style="position:relative">`;
   html += `<div class="pc-strip-crosshair" style="display:none"></div>`;
   for (let z = 0; z < zones.length; z++) {
@@ -146,13 +144,13 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     const comfortEntity = zoneEntities.comfort_level;
     const comfortLevel = comfortEntity ? (states[comfortEntity]?.state || null) : null;
 
-    // Compute scores for each slot as SlotData[]
     /** @type {import('./slot-engine.js').SlotData[]} */
     const slotData = [];
     const slotSize = windowMs / slots;
 
-    // Seed lastScore from the most recent data before the window starts,
-    // so early slots don't show as empty when data exists just before the boundary.
+    /* Seed lastScore from the most recent data point before the window starts —
+       prevents early slots from rendering empty when valid data exists just
+       before the window boundary. */
     /** @type {number|null} */
     let lastScore = null;
     if (tempData.length > 0) {
@@ -181,18 +179,16 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     if (mode === 'timeline') {
       html += renderTimelineStrip(slotData, scoreToColor, { ariaLabel, nowPct });
     } else {
-      html += renderHeatmapStrip(slotData, scoreToColor);
+      html += renderHeatmapStrip(slotData, scoreToColor, { ariaLabel });
     }
     html += `</div>`;
   }
   html += `</div>`;
 
-  // Time axis
   html += `<div class="pc-heatmap-time-axis">`;
   html += renderTimeLabels(windowMs);
   html += `</div>`;
 
-  // Legend
   html += `<div class="pc-heatmap-legend">`;
   html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(52,199,89,0.7)"></div>≥80</div>`;
   html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(255,159,10,0.65)"></div>50–79</div>`;

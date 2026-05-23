@@ -10,6 +10,7 @@ import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } f
 import { HVAC_VISUALS } from '../constants.js';
 import { resolveZoneState, computeGlowStdDev, computeParticleCount, computeParticleDuration, computeParticleRadius } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
+import { buildBloomFilter } from '../chart-primitives.js';
 
 /**
  * Build a cubic Bézier ribbon path.
@@ -81,7 +82,6 @@ export function renderEnergyFlowSection(zones, states, discovery) {
     zoneData.push({ name: zs.name, power: zs.heatingPower, temp: zs.currentTemp, target: zs.targetTemp, unit: zs.unit, hvacAction: zs.hvacAction });
   }
 
-  // Total power for header
   const totalPower = zoneData.length > 0
     ? Math.round(zoneData.reduce((s, z) => s + z.power, 0) / zoneData.length)
     : 0;
@@ -120,15 +120,14 @@ export function renderEnergyFlowSection(zones, states, discovery) {
   const fanSpacing = boilerH / Math.max(zoneData.length, 1) * 0.7;
 
   const heatingColor = HVAC_VISUALS.heating.fallback;
-  const idleColor = 'var(--disabled-color, #9E9E9E)';
+  const idleColor = 'var(--pulse-disabled)';
   const hasAnyHeating = zoneData.some((z) => z.power > 0 || z.hvacAction === 'heating' || z.hvacAction === 'cooling');
   const activeZoneCount = zoneData.filter((z) => z.power > 0).length;
 
   html += `<svg viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="Energy flow from boiler to zones" style="width:100%;height:${sanitizeCssValue(svgH)}px;display:block">`;
 
-  // Gradient + glow filter defs
   html += `<defs>`;
-  html += `<filter id="flow-glow"><feGaussianBlur stdDeviation="${computeGlowStdDev(svgW, 360).toFixed(1)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  html += buildBloomFilter('flow-glow', computeGlowStdDev(svgW, 360).toFixed(1));
   for (let i = 0; i < zoneData.length; i++) {
     const active = zoneData[i].power > 0 || zoneData[i].hvacAction === 'heating' || zoneData[i].hvacAction === 'cooling';
     const color = active ? heatingColor : idleColor;
@@ -159,12 +158,11 @@ export function renderEnergyFlowSection(zones, states, discovery) {
   html += `</defs>`;
 
   // Source node (boiler) — warm tint when any zone is heating
-  const boilerFill = hasAnyHeating ? 'rgba(255, 152, 0, 0.15)' : 'color-mix(in srgb, var(--primary-text-color, #e5e5e7) 8%, transparent)';
-  const boilerStroke = hasAnyHeating ? 'rgba(255, 152, 0, 0.25)' : 'color-mix(in srgb, var(--primary-text-color, #e5e5e7) 15%, transparent)';
+  const boilerFill = hasAnyHeating ? 'rgba(255, 152, 0, 0.15)' : 'color-mix(in srgb, var(--pulse-text-primary) 8%, transparent)';
+  const boilerStroke = hasAnyHeating ? 'rgba(255, 152, 0, 0.25)' : 'color-mix(in srgb, var(--pulse-text-primary) 15%, transparent)';
   html += `<rect x="${sourceX - boilerW / 2}" y="${sourceY - boilerH / 2}" width="${boilerW}" height="${boilerH}" rx="8" fill="${sanitizeCssValue(boilerFill)}" stroke="${sanitizeCssValue(boilerStroke)}" stroke-width="1"/>`;
-  html += `<text x="${sourceX}" y="${sourceY - boilerH / 2 - 6}" text-anchor="middle" font-size="10" fill="var(--secondary-text-color, #8e8e93)">Boiler</text>`;
+  html += `<text x="${sourceX}" y="${sourceY - boilerH / 2 - 6}" text-anchor="middle" font-size="10" fill="var(--pulse-text-secondary)">Boiler</text>`;
 
-  // Ribbons + destination labels
   for (let i = 0; i < zoneData.length; i++) {
     const zone = zoneData[i];
     const destY = startY + i * zoneSpacing + 20;
@@ -201,12 +199,10 @@ export function renderEnergyFlowSection(zones, states, discovery) {
       html += `</g>`;
     }
 
-    // Zone name — bold for active zones
-    const nameFill = active ? 'var(--primary-text-color, #e5e5e7)' : 'var(--secondary-text-color, #a1a1a6)';
+    const nameFill = active ? 'var(--pulse-text-primary)' : 'var(--pulse-text-secondary)';
     const nameWeight = active ? ' font-weight="600"' : '';
     html += `<text x="${destX}" y="${(destY - 1).toFixed(1)}" font-size="11" fill="${sanitizeCssValue(nameFill)}"${nameWeight}>${escapeHtml(zone.name)}</text>`;
-    // Sub-text — heating color for active zones
-    const subFill = active ? sanitizeCssValue(heatingColor) : 'var(--secondary-text-color, #8e8e93)';
+    const subFill = active ? sanitizeCssValue(heatingColor) : 'var(--pulse-text-secondary)';
     const subText = active
       ? `${zone.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(zone.power)}%${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`
       : `Idle${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`;
@@ -234,7 +230,6 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
   const svg = sectionEl.querySelector('svg');
   if (!svg) return false;
 
-  // Resolve current zone data
   /** @type {{name: string, power: number, temp: number|null, unit: string, hvacAction: string}[]} */
   const zoneData = [];
   for (const zoneConfig of zones) {
@@ -249,7 +244,7 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
   if (ribbons.length !== zoneData.length) return false; // Zone count changed — need full re-render
 
   const heatingColor = HVAC_VISUALS.heating.fallback;
-  const idleColor = 'var(--disabled-color, #9E9E9E)';
+  const idleColor = 'var(--pulse-disabled)';
   const hasAnyHeating = zoneData.some((z) => z.power > 0 || z.hvacAction === 'heating' || z.hvacAction === 'cooling');
 
   // Layout constants (must match renderEnergyFlowSection)
@@ -267,20 +262,17 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
   const minRibbonW = 2;
   const fanSpacing = boilerH / Math.max(zoneData.length, 1) * 0.7;
 
-  // Update header avg power
   const totalPower = Math.round(zoneData.reduce((s, z) => s + z.power, 0) / zoneData.length);
   const headerSpan = sectionEl.querySelector('.energy-flow-header-value');
   if (headerSpan) headerSpan.textContent = `${totalPower}% avg`;
 
-  // Update boiler node tint
   const boilerRect = svg.querySelector('rect');
   if (boilerRect) {
-    boilerRect.setAttribute('fill', hasAnyHeating ? 'rgba(255, 152, 0, 0.15)' : 'color-mix(in srgb, var(--primary-text-color, #e5e5e7) 8%, transparent)');
-    boilerRect.setAttribute('stroke', hasAnyHeating ? 'rgba(255, 152, 0, 0.25)' : 'color-mix(in srgb, var(--primary-text-color, #e5e5e7) 15%, transparent)');
+    boilerRect.setAttribute('fill', hasAnyHeating ? 'rgba(255, 152, 0, 0.15)' : 'color-mix(in srgb, var(--pulse-text-primary) 8%, transparent)');
+    boilerRect.setAttribute('stroke', hasAnyHeating ? 'rgba(255, 152, 0, 0.25)' : 'color-mix(in srgb, var(--pulse-text-primary) 15%, transparent)');
     boilerRect.setAttribute('stroke-width', hasAnyHeating ? '0.5' : '1');
   }
 
-  // Update each ribbon + labels
   const textEls = svg.querySelectorAll('text');
   // Text elements: [0]=Boiler, then per zone: [1+i*2]=name, [2+i*2]=sub-text
   for (let i = 0; i < zoneData.length; i++) {
@@ -288,7 +280,6 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
     const ribbon = ribbons[i];
     const active = zone.power > 0 || zone.hvacAction === 'heating' || zone.hvacAction === 'cooling';
 
-    // Update ribbon path (width changes with power)
     const destY = startY + i * zoneSpacing + 20;
     const ribbonW = zone.power > 0
       ? minRibbonW + (zone.power / 100) * (maxRibbonW - minRibbonW)
@@ -297,7 +288,6 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
     const newPath = buildRibbonPath(fanSourceY, destY, ribbonW / 2, ribbonW / 2, svgW, sourceX + boilerW / 2, destX - 12);
     ribbon.setAttribute('d', newPath);
 
-    // Update ribbon class + filter
     if (active) {
       ribbon.classList.add('pc-ribbon-active');
       ribbon.setAttribute('filter', 'url(#flow-glow)');
@@ -306,7 +296,6 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
       ribbon.removeAttribute('filter');
     }
 
-    // Update title
     const titleEl = ribbon.querySelector('title');
     if (titleEl) titleEl.textContent = `${zone.name}: ${Math.round(zone.power)}% heating power`;
 
@@ -317,7 +306,6 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
       /** @type {HTMLElement} */ (particleGroup).style.display = zone.power > 0 ? '' : 'none';
     }
 
-    // Update gradient — swap between animated and static
     const gradEl = svg.querySelector(`#flow-g${i}`);
     if (gradEl) {
       const color = active ? heatingColor : idleColor;
@@ -326,7 +314,6 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
 
       if (active) {
         const dur = zone.power > 0 ? (4.5 - (zone.power / 100) * 3.3).toFixed(1) : '5.0';
-        // Update stop colors and opacities for active gradient
         if (stops.length >= 3) {
           stops[0].setAttribute('stop-color', color);
           stops[0].setAttribute('stop-opacity', '0.3');
@@ -335,12 +322,11 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
           stops[2].setAttribute('stop-color', color);
           stops[2].setAttribute('stop-opacity', '0.3');
         }
-        // Update animation duration (speed changes with power)
         for (const anim of animates) {
           anim.setAttribute('dur', `${dur}s`);
         }
-        // If no animates exist (was idle), we can't add them without re-render
-        // — the gradient will still show the correct color, just without animation
+        /* If animates were absent (zone was idle previously), we can't add them
+           without re-render — gradient shows the correct colour, just static. */
         gradEl.setAttribute('gradientUnits', 'objectBoundingBox');
       } else {
         // Static idle gradient
@@ -352,7 +338,6 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
           stops[2].setAttribute('stop-color', color);
           stops[2].setAttribute('stop-opacity', '0.1');
         }
-        // Remove animations for idle state
         for (const anim of animates) {
           anim.remove();
         }
@@ -367,7 +352,7 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
 
     if (nameEl) {
       nameEl.textContent = zone.name;
-      nameEl.setAttribute('fill', active ? 'var(--primary-text-color, #e5e5e7)' : 'var(--secondary-text-color, #a1a1a6)');
+      nameEl.setAttribute('fill', active ? 'var(--pulse-text-primary)' : 'var(--pulse-text-secondary)');
       if (active) {
         nameEl.setAttribute('font-weight', '600');
       } else {
@@ -380,7 +365,7 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
         ? `${zone.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(zone.power)}%${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`
         : `Idle${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`;
       subEl.textContent = subText;
-      subEl.setAttribute('fill', active ? heatingColor : 'var(--secondary-text-color, #8e8e93)');
+      subEl.setAttribute('fill', active ? heatingColor : 'var(--pulse-text-secondary)');
     }
   }
 

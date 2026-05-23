@@ -38,10 +38,35 @@ export function warnUnresolvedOverride(zoneName, key, entityId, states) {
 /**
  * Resolve HVAC action visual (icon, color, label).
  * @param {string} action - hvac_action value.
- * @returns {{icon: string, cssVar: string|null, fallback: string, label: string}}
+ * @returns {{icon: string, token: string|null, fallback: string, label: string}}
  */
 export function resolveHvacVisual(action) {
   return /** @type {Record<string, *>} */ (HVAC_VISUALS)[action] || HVAC_VISUALS.idle;
+}
+
+/**
+ * Classify the home's overall climate state from per-zone hvac actions.
+ * Drives atmosphere backdrop tint and hero status pill. Pure function.
+ *
+ * @param {Array<{hvacAction: string, isUnavailable: boolean}>} zoneStates
+ * @returns {'heating'|'cooling'|'mixed'|'idle'|'off'}
+ */
+export function classifyClimateState(zoneStates) {
+  const live = zoneStates.filter((z) => !z.isUnavailable);
+  if (live.length === 0) return 'off';
+  let heating = 0;
+  let cooling = 0;
+  let off = 0;
+  for (const z of live) {
+    if (z.hvacAction === 'heating') heating += 1;
+    else if (z.hvacAction === 'cooling') cooling += 1;
+    else if (z.hvacAction === 'off') off += 1;
+  }
+  if (heating > 0 && cooling > 0) return 'mixed';
+  if (heating > 0) return 'heating';
+  if (cooling > 0) return 'cooling';
+  if (off === live.length) return 'off';
+  return 'idle';
 }
 
 /**
@@ -67,7 +92,7 @@ export function resolveZoneDisplay(entityId, states, zoneConfig) {
 /**
  * Resolve risk level color object.
  * @param {string} level - None/Low/Medium/High/Critical.
- * @returns {{cssVar: string, fallback: string}}
+ * @returns {{token: string, fallback: string}}
  */
 export function resolveRiskColor(level) {
   // Normalise to Title Case for RISK_COLORS lookup (handles "critical", "CRITICAL", "Critical")
@@ -131,7 +156,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     const s = states[discoveredEntities[entityKey]];
     if (s && !['unavailable', 'unknown', 'none'].includes(s.state.toLowerCase())) {
       const riskColor = resolveRiskColor(s.state);
-      chips.push({ type, icon, label: s.state, color: `var(${riskColor.cssVar}, ${riskColor.fallback})`, severity: s.state, entityId: discoveredEntities[entityKey] });
+      chips.push({ type, icon, label: s.state, color: riskColor.token, severity: s.state, entityId: discoveredEntities[entityKey] });
     }
   };
 
@@ -141,7 +166,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
       const isOpen = s.state === 'on';
       chips.push({
         type: 'open_window', icon: isOpen ? 'mdi:window-open' : 'mdi:window-closed',
-        label: isOpen ? 'Open' : 'Closed', color: isOpen ? 'var(--label-badge-red, #F44336)' : undefined,
+        label: isOpen ? 'Open' : 'Closed', color: isOpen ? 'var(--pulse-status-red)' : undefined,
         entityId: discoveredEntities.open_window,
       });
     }
@@ -152,7 +177,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     if (s && s.state === 'on') {
       chips.push({
         type: 'window_predicted', icon: 'mdi:window-open-variant',
-        label: 'Window predicted', color: 'var(--label-badge-yellow, #FF9800)',
+        label: 'Window predicted', color: 'var(--pulse-status-yellow)',
         entityId: discoveredEntities.window_predicted,
       });
     }
@@ -171,7 +196,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   if (include('preheat_now') && discoveredEntities.preheat_now) {
     const s = states[discoveredEntities.preheat_now];
     if (s && s.state === 'on') {
-      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', color: 'var(--label-badge-yellow, #FF9800)', entityId: discoveredEntities.preheat_now });
+      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', color: 'var(--pulse-status-yellow)', entityId: discoveredEntities.preheat_now });
     }
   }
 
@@ -199,7 +224,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
         for (let i = 0; i < batteries.length; i++) {
           const b = batteries[i];
           const battIcon = b.lower === 'low' || b.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-          const battColor = b.lower === 'critical' ? 'var(--label-badge-red, #F44336)' : b.lower === 'low' ? 'var(--label-badge-yellow, #FF9800)' : undefined;
+          const battColor = b.lower === 'critical' ? 'var(--pulse-status-red)' : b.lower === 'low' ? 'var(--pulse-status-yellow)' : undefined;
           chips.push({ type: `battery${i > 0 ? `_${i + 1}` : ''}`, icon: battIcon, label: b.state, color: battColor, entityId: b.eid });
         }
       } else {
@@ -211,7 +236,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
           if ((SEVERITY[b.lower] || 0) > (SEVERITY[worst.lower] || 0)) worst = b;
         }
         const battIcon = worst.lower === 'low' || worst.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-        const battColor = worst.lower === 'critical' ? 'var(--label-badge-red, #F44336)' : worst.lower === 'low' ? 'var(--label-badge-yellow, #FF9800)' : undefined;
+        const battColor = worst.lower === 'critical' ? 'var(--pulse-status-red)' : worst.lower === 'low' ? 'var(--pulse-status-yellow)' : undefined;
         chips.push({ type: 'battery', icon: battIcon, label: worst.state, color: battColor, entityId: worst.eid });
       }
     }
@@ -226,11 +251,11 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     const backedOff = attrs.valve_control_backed_off;
     const valveEnabled = attrs.valve_control_enabled;
     if (backedOff === true) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Backed off', color: 'var(--disabled-color, #9E9E9E)' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Backed off', color: 'var(--pulse-disabled)' });
     } else if (valveActive === true && valveTarget !== undefined) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${formatNumericDisplay(valveTarget)}${zoneState.unit}`, color: 'var(--label-badge-yellow, #FF9800)' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${formatNumericDisplay(valveTarget)}${zoneState.unit}`, color: 'var(--pulse-status-yellow)' });
     } else if (valveEnabled === true) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Idle', color: 'var(--disabled-color, #9E9E9E)' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Idle', color: 'var(--pulse-disabled)' });
     }
   }
 
@@ -276,7 +301,8 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
   const tempStep = Number(attrs.target_temp_step ?? 0.5);
   const unit = attrs.unit_of_measurement || '°C';
 
-  // Heating power: from Tado CE sensor or climate attribute
+  /* Heating power: discovered Tado CE sensor takes priority, fall back to
+     the climate entity's own attribute. */
   let heatingPower = 0;
   if (discoveredEntities.heating_power) {
     const hp = states[discoveredEntities.heating_power];
@@ -285,14 +311,12 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
     heatingPower = parseFloat(attrs.heating_power) || 0;
   }
 
-  // AC power
   let coolingPower = 0;
   if (discoveredEntities.ac_power) {
     const ap = states[discoveredEntities.ac_power];
     if (ap && ap.state !== 'unavailable') coolingPower = parseFloat(ap.state) || 0;
   }
 
-  // Overlay type
   let overlayType = '';
   if (discoveredEntities.overlay) {
     const ov = states[discoveredEntities.overlay];
@@ -304,7 +328,6 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
   const name = zoneConfig.name || attrs.friendly_name || entityId.replace(/^(climate|sensor)\./, '');
   const icon = zoneConfig.icon || attrs.icon || 'mdi:thermometer';
 
-  // Resolve chips
   const chipFilter = zoneConfig.chips || cardConfig.chips || null;
 
   // Merge manual entity overrides into discoveredEntities (YAML overrides take priority).
@@ -337,8 +360,6 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
 
   return zoneState;
 }
-
-// ── Animation Utility Functions ──────────────────────────────────────
 
 /** Reference size for radial section scaling. */
 const RADIAL_REFERENCE_SIZE = 280;
@@ -423,7 +444,6 @@ export function normalizeClimateConfig(config) {
     }
   }
 
-  // Expand zones
   let zones;
   if (config.zones) {
     zones = config.zones.map((/** @type {*} */ z) => typeof z === 'string' ? { entity: z } : { ...z });
@@ -431,20 +451,27 @@ export function normalizeClimateConfig(config) {
     zones = [{ entity: config.entity }];
   }
 
-  // Validate zone entities
   for (const z of zones) {
     if (!z.entity || typeof z.entity !== 'string') {
       throw new Error('Each zone must have an entity ID');
     }
   }
 
-  // Merge defaults
+  /* Clamp atmosphere intensity to known tiers — unknown values fall to medium. */
+  const rawIntensity = config.atmosphere_intensity;
+  const atmosphereIntensity = (rawIntensity === 'subtle' || rawIntensity === 'bold') ? rawIntensity : 'medium';
+
   const merged = {
     ...config,
     columns: Number(config.columns) || DEFAULTS.columns,
     layout: config.layout || DEFAULTS.layout,
     show_temp_bar: config.show_temp_bar ?? DEFAULTS.show_temp_bar,
     show_power_bar: config.show_power_bar ?? DEFAULTS.show_power_bar,
+    show_atmosphere: config.show_atmosphere !== false,
+    atmosphere_intensity: atmosphereIntensity,
+    show_hero: config.show_hero === true,
+    hero_show_thermal_strip: config.hero_show_thermal_strip !== false,
+    hero_show_outside: config.hero_show_outside !== false,
     tap_action: config.tap_action || { ...DEFAULTS.tap_action },
     hold_action: config.hold_action || { ...DEFAULTS.hold_action },
     double_tap_action: config.double_tap_action || { ...DEFAULTS.double_tap_action },
@@ -452,7 +479,6 @@ export function normalizeClimateConfig(config) {
     _zones: zones,
   };
 
-  // Validate sections and apply defaults from SECTION_DEFAULTS
   if (Array.isArray(merged.sections)) {
     merged.sections = merged.sections.map((/** @type {*} */ s) => {
       const section = typeof s === 'string' ? { type: s } : { ...s };
