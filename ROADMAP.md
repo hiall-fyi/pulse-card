@@ -14,8 +14,7 @@ Pulse Bar Card is stable at 1.x. Focus is on compatibility and polish — bug fi
 
 ### Up Next
 
-- **Manual entity overrides — Phase 2** ([#28](https://github.com/hiall-fyi/pulse-card/issues/28) - @dragorex71) — Phase 1 shipped in v1.3.1 (`open_window_entity`, `battery_entity`, `mold_risk_entity`) for YAML config. Remaining: `heating_power_entity`, environment/thermal/schedule section entity overrides, and surfacing the existing overrides in the visual editor
-- **Visual editor refinements** — per-zone settings (name, icon, color, sparkline mode) directly in the GUI
+- **Manual entity overrides — Phase 2** ([#28](https://github.com/hiall-fyi/pulse-card/issues/28) - @dragorex71) — Phase 1 shipped in v1.3.1 (`open_window_entity`, `battery_entity`, `mold_risk_entity`) for YAML config. v1.7.0 added `heating_power_entity` and surfaced every zone override in the visual editor's per-zone Sensor overrides panel. Still to come: entity overrides for the environment / thermal / schedule sections.
 
 ### Exploring
 
@@ -27,7 +26,7 @@ Pulse Bar Card is stable at 1.x. Focus is on compatibility and polish — bug fi
 
 ## Pulse Family — In Development
 
-- **Pulse Weather Card** — outdoor conditions at a glance with [Atmos CE](https://github.com/hiall-fyi/atmos_ce) auto-discovery. Air quality, pollen, UV index, wind, and forecast — with the same strip charts and visual identity as Pulse Climate. Currently in private development; no public timeline yet
+- **Pulse Weather Card** — outdoor conditions at a glance with [Atmos CE](https://github.com/hiall-fyi/atmos_ce) auto-discovery. Air quality, pollen, UV index, wind, and forecast, with the same strip charts and visual identity as Pulse Climate. The card itself is mature and in daily use; we're getting the docs and install steps ready for a first public release.
 
 ---
 

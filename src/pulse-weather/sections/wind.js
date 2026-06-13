@@ -5,7 +5,7 @@
 
 import {
   windTier, beaufort, compassLabel, svgEl, escapeHtml, sanitizeCssValue, hexToRgba,
-  withSkyBaseline,
+  withSkyBaseline, readCeOrAttr,
 } from '../weather-primitives.js';
 import { SPEED_CAP, MAX_STREAKS, SHAKE_THRESHOLD, TIER_COLORS } from '../constants.js';
 import { brandMarkVariant } from '../brand-mark.js';
@@ -138,14 +138,7 @@ export function renderWind({ hass, config, discovery, weatherEntity }) {
   const ce = discovery.atmosCe;
   const speedMode = config.speed_mode || 'speed';
 
-  /** Read from Atmos CE sensor first, then weather entity attribute. */
-  function val(/** @type {string} */ sensorKey, /** @type {string} */ attrKey) {
-    if (ce[sensorKey]) {
-      const v = Number(hass.states[ce[sensorKey]]?.state);
-      if (!isNaN(v)) return v;
-    }
-    return Number(attrs[attrKey] ?? 0) || 0;
-  }
+  const val = (/** @type {string} */ s, /** @type {string} */ a) => readCeOrAttr(hass, ce, attrs, s, a);
 
   const speed = val('wind_speed', 'wind_speed');
   const gusts = val('wind_gusts', 'wind_gust_speed') || val('wind_gusts', 'wind_gusts') || speed;

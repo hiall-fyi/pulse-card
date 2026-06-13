@@ -4,7 +4,8 @@
  * Pure functions — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, uniqueDomId, smoothPathFromPoints } from '../shared/utils.js';
+import { mixToHex } from '../shared/color.js';
 
 /**
  * Downsample data into fixed time slots with averaging.
@@ -56,24 +57,7 @@ function buildSmoothPath(sampled, width, height, minV, maxV) {
     y: pad + drawH - ((d.v - minV) / rangeV) * drawH,
   }));
 
-  if (pts.length < 2) return '';
-  if (pts.length === 2) {
-    return `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}L${pts[1].x.toFixed(1)},${pts[1].y.toFixed(1)}`;
-  }
-
-  // Midpoint + quadratic Bézier smoothing
-  let last = pts[0];
-  let d = `M${last.x.toFixed(1)},${last.y.toFixed(1)}`;
-  for (let i = 1; i < pts.length; i++) {
-    const next = pts[i];
-    const mx = (last.x + next.x) / 2;
-    const my = (last.y + next.y) / 2;
-    d += ` ${mx.toFixed(1)},${my.toFixed(1)}`;
-    d += ` Q${next.x.toFixed(1)},${next.y.toFixed(1)}`;
-    last = next;
-  }
-  d += ` ${last.x.toFixed(1)},${last.y.toFixed(1)}`;
-  return d;
+  return smoothPathFromPoints(pts);
 }
 
 /**
@@ -157,18 +141,16 @@ export function buildDonutArcs(segments, size, outerRadius, innerRadius) {
  * Counter for unique bloom filter ids — every consumer gets its own id,
  * preventing CSS / SVG defs collision across multiple SVGs in a shadow DOM.
  */
-let _bloomFilterCounter = 0;
-
 /**
  * Generate a unique bloom filter id. Use as both the `<filter id>` and the
- * referencing `filter="url(#id)"` attribute.
+ * referencing `filter="url(#id)"` attribute. Thin wrapper over the shared
+ * unique-id counter with this card's default prefix.
  *
  * @param {string} [prefix] - Filter id prefix (default 'pc-bloom').
  * @returns {string} Unique id like 'pc-bloom-7'.
  */
 export function uniqueBloomId(prefix = 'pc-bloom') {
-  _bloomFilterCounter = (_bloomFilterCounter + 1) >>> 0;
-  return `${prefix}-${_bloomFilterCounter.toString(36)}`;
+  return uniqueDomId(prefix);
 }
 
 /**
@@ -284,18 +266,37 @@ export function buildLegendChips(items) {
  * @param {number} temp - Temperature in degrees.
  * @returns {string} Hex color string.
  */
+/**
+ * Discrete temperature → colour bands. `upper` is the inclusive upper
+ * bound for the band; `null` means the open-ended top band. Single source
+ * of truth for both temperatureToColor() (palette lookup) and the
+ * thermal-tab legend (band visualisation). Values are degrees Celsius.
+ *
+ * @type {Array<{upper: number|null, color: string}>}
+ */
+export const TEMP_COLOR_BANDS = [
+  { upper: 14,   color: '#1565C0' },
+  { upper: 16,   color: '#4FC3F7' },
+  { upper: 17,   color: '#4DB6AC' },
+  { upper: 18,   color: '#81C784' },
+  { upper: 19,   color: '#AED581' },
+  { upper: 20,   color: '#C5E1A5' },
+  { upper: 21,   color: '#FFF176' },
+  { upper: 22,   color: '#FFB74D' },
+  { upper: 23,   color: '#FF8A65' },
+  { upper: 24,   color: '#EF5350' },
+  { upper: null, color: '#C62828' },
+];
+
+/**
+ * @param {number} temp
+ * @returns {string}
+ */
 export function temperatureToColor(temp) {
-  if (temp <= 14) return '#1565C0';
-  if (temp <= 16) return '#4FC3F7';
-  if (temp <= 17) return '#4DB6AC';
-  if (temp <= 18) return '#81C784';
-  if (temp <= 19) return '#AED581';
-  if (temp <= 20) return '#C5E1A5';
-  if (temp <= 21) return '#FFF176';
-  if (temp <= 22) return '#FFB74D';
-  if (temp <= 23) return '#FF8A65';
-  if (temp <= 24) return '#EF5350';
-  return '#C62828';
+  for (const band of TEMP_COLOR_BANDS) {
+    if (band.upper === null || temp <= band.upper) return band.color;
+  }
+  return '#C62828';   /* unreachable; satisfies the type checker */
 }
 
 /**
@@ -502,4 +503,35 @@ export function resolveBreakdownSegments(attrs, palette) {
     idx++;
   }
   return segments;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Per-state gradient endpoints
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const STATE_ENDPOINTS = {
+  heating: { cold: '#171717', hot: '#ff9f0a' },
+  cooling: { cold: '#171717', hot: '#5ac8fa' },
+  idle:    { cold: '#171717', hot: '#525252' },
+  off:     { cold: '#171717', hot: '#262626' },
+};
+
+/**
+ * Map a temperature to a state-tier gradient endpoint. Linear sRGB
+ * interpolation between dark cold-end and state-tier hot-end. Out-of-range
+ * temps clamp to the nearest endpoint. Unknown states fall back to off
+ * endpoints (charcoal — quiet, doesn't draw the eye).
+ *
+ * @param {number} temp
+ * @param {{minTemp: number, maxTemp: number}} range
+ * @param {'heating'|'cooling'|'idle'|'off'|string|undefined} state
+ * @returns {string} hex colour
+ */
+export function stateTemperatureToColor(temp, range, state) {
+  const endpoints = (state && /** @type {Record<string, {cold: string, hot: string}>} */ (STATE_ENDPOINTS)[state])
+    || STATE_ENDPOINTS.off;
+  const span = (range?.maxTemp ?? 30) - (range?.minTemp ?? 0);
+  if (span <= 0) return endpoints.cold;
+  const t = Math.max(0, Math.min(1, (temp - (range?.minTemp ?? 0)) / span));
+  return mixToHex(endpoints.cold, endpoints.hot, t);
 }

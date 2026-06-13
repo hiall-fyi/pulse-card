@@ -9,15 +9,11 @@
 export {};
 
 /**
- * @typedef {object} ActionConfig
- * @property {string} action - 'more-info' | 'navigate' | 'call-service' | 'perform-action' | 'url' | 'none'
- * @property {string} [entity]
- * @property {string} [navigation_path]
- * @property {string} [service]
- * @property {string} [perform_action]
- * @property {Record<string, *>} [service_data]
- * @property {Record<string, *>} [data]
- * @property {string} [url_path]
+ * HA-framework typedefs are shared — see src/shared/types.js.
+ * @typedef {import('../shared/types.js').ActionConfig} ActionConfig
+ * @typedef {import('../shared/types.js').Hass} Hass
+ * @typedef {import('../shared/types.js').HassEntityState} HassEntityState
+ * @typedef {import('../shared/types.js').HassEntityRegistryEntry} HassEntityRegistryEntry
  */
 
 /**
@@ -179,31 +175,6 @@ export {};
  * @typedef {object} AttributeColorConfig
  * @property {string} attribute - Entity attribute name to read value from.
  * @property {Record<string, string>} map - Attribute value → color mapping.
- */
-
-/**
- * @typedef {object} HassEntityState
- * @property {string} entity_id
- * @property {string} state
- * @property {Record<string, *>} attributes
- * @property {string} last_updated
- * @property {string} [last_changed]
- */
-
-/**
- * Entity registry entry exposed via hass.entities (subset of fields).
- * @typedef {object} HassEntityRegistryEntry
- * @property {string} entity_id
- * @property {number|null} [display_precision]
- * @property {string|null} [platform]
- */
-
-/**
- * @typedef {object} Hass
- * @property {Record<string, HassEntityState>} states
- * @property {Record<string, HassEntityRegistryEntry>} [entities]
- * @property {function(string, string, Record<string, *>=): Promise<void>} callService
- * @property {function(Record<string, *>): Promise<*>} callWS
  */
 
 /**

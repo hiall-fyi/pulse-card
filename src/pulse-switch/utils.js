@@ -6,7 +6,8 @@
  */
 
 import { LOG_PREFIX, DEFAULT_AVG_PACKET_SIZE } from './constants.js';
-export { escapeHtml, sanitizeCssValue } from '../shared/utils.js';
+export { escapeHtml, sanitizeCssValue, isUnavailableState } from '../shared/utils.js';
+import { makeWarn } from '../shared/utils.js';
 
 /**
  * Format a speed value in Mbit/s for display.
@@ -152,9 +153,6 @@ export function normalizePositiveNumber(value, fallback) {
 
 /**
  * Log a warning with the Pulse Switch Card prefix.
- * @param {string} msg
- * @param {...*} args
+ * @type {(msg: string, ...args: *[]) => void}
  */
-export function warn(msg, ...args) {
-  console.warn(`${LOG_PREFIX} ${msg}`, ...args);
-}
+export const warn = makeWarn(LOG_PREFIX);

@@ -1,13 +1,26 @@
 /**
  * @module pulse-climate/sections/hero
- * @description Card-level hero block — large home avg temperature, climate
- * state pill, breakdown counts, optional 24h thermal mini-strip. Pure
- * renderer; consumes pre-resolved zone states from the card.
+ * @description Hero block — large home avg temperature, per-zone dot
+ * cluster (state-coloured, breathing on the master pulse phase), and
+ * per-zone 24h temperature strips with state ribbon. Pure renderer;
+ * consumes pre-resolved zone states from the card.
  */
 
 import { escapeHtml, formatNumericDisplay, sanitizeCssValue } from '../../shared/utils.js';
 import { classifyClimateState } from '../utils.js';
-import { temperatureToColor } from '../chart-primitives.js';
+import { stateTemperatureToColor } from '../chart-primitives.js';
+
+/** Map climate state to hero status label. */
+const STATE_LABELS = {
+  heating: 'Heating',
+  cooling: 'Cooling',
+  mixed:   'Mixed',
+  idle:    'Idle',
+  off:     'Off',
+};
+
+/** Cap on per-zone strip rows to keep hero height predictable. */
+const STRIP_ROW_CAP = 6;
 
 /**
  * @typedef {object} HeroZoneInput
@@ -19,6 +32,8 @@ import { temperatureToColor } from '../chart-primitives.js';
  * @property {number|null} targetTemp
  * @property {number} heatingPower
  * @property {string} unit
+ * @property {number} [minTemp]
+ * @property {number} [maxTemp]
  */
 
 /**
@@ -28,97 +43,185 @@ import { temperatureToColor } from '../chart-primitives.js';
  * @property {string|null} entityId
  */
 
-/** Map climate state to hero label. */
-const STATE_LABELS = {
-  heating: 'Heating',
-  cooling: 'Cooling',
-  mixed:   'Mixed',
-  idle:    'Idle',
-  off:     'Off',
-};
+/**
+ * Map a zone's hvacAction to the dot's state-modifier class.
+ * @param {HeroZoneInput} zone
+ * @returns {string}
+ */
+function dotStateClass(zone) {
+  /* Template-literal form keeps the audit's dynamic-prefix detection happy:
+     `pc-hero-dot-${state}` matches the css-audit script's regex for
+     dynamically composed class names. */
+  let state = 'idle';
+  if (zone.isUnavailable) state = 'unavail';
+  else if (zone.hvacAction === 'heating') state = 'heating';
+  else if (zone.hvacAction === 'cooling') state = 'cooling';
+  else if (zone.hvacAction === 'off') state = 'off';
+  return `pc-hero-dot-${state}`;
+}
+
+/**
+ * Map a zone's hvacAction to the strip-row state class (drives left ribbon).
+ * @param {HeroZoneInput} zone
+ * @returns {string}
+ */
+function stripRowClass(zone) {
+  let state = 'idle';
+  if (zone.isUnavailable) state = 'unavail';
+  else if (zone.hvacAction === 'heating') state = 'heat';
+  else if (zone.hvacAction === 'cooling') state = 'cool';
+  else if (zone.hvacAction === 'off') state = 'off';
+  return `pc-row-${state}`;
+}
 
 /**
  * Render the Hero block.
  *
  * @param {HeroZoneInput[]} zoneStates - Resolved zone states from the card.
  * @param {{hero_show_thermal_strip?: boolean, hero_show_outside?: boolean}} cardConfig
- * @param {Array<{t:number,v:number}>} homeHistory - Home-avg history; empty array hides strip.
- * @param {HeroOutdoor|null} [outdoor] - Resolved outdoor temp; null/missing hides outside line.
+ * @param {Map<string, Array<{t: number, v: number}>>} historyMap - Per-zone temperature history; missing keys → empty.
+ * @param {HeroOutdoor|null} [outdoor] - Outdoor data; null/missing hides outside line.
  * @returns {string} HTML string. Empty when zoneStates is empty.
  */
-export function renderHero(zoneStates, cardConfig, homeHistory, outdoor) {
+export function renderHero(zoneStates, cardConfig, historyMap, outdoor) {
   if (!Array.isArray(zoneStates) || zoneStates.length === 0) return '';
 
   const live = zoneStates.filter((z) => !z.isUnavailable);
   const state = classifyClimateState(zoneStates);
 
-  const tempLive = live.filter((z) => typeof z.currentTemp === 'number' && Number.isFinite(z.currentTemp));
-  const avgTemp = tempLive.length > 0
-    ? tempLive.reduce((s, z) => s + /** @type {number} */ (z.currentTemp), 0) / tempLive.length
+  /* Home avg samples ALL zones with finite currentTemp regardless of
+     hvacAction — sensors keep reading even when zones are off. */
+  const tempSamples = zoneStates.filter(
+    (z) => !z.isUnavailable && typeof z.currentTemp === 'number' && Number.isFinite(z.currentTemp),
+  );
+  const avgTemp = tempSamples.length > 0
+    ? tempSamples.reduce((s, z) => s + /** @type {number} */ (z.currentTemp), 0) / tempSamples.length
     : null;
   const unit = (zoneStates[0] && zoneStates[0].unit) || '°C';
 
   const heat = live.filter((z) => z.hvacAction === 'heating').length;
   const cool = live.filter((z) => z.hvacAction === 'cooling').length;
-  const idle = live.filter((z) => z.hvacAction === 'idle').length;
-  const off = live.filter((z) => z.hvacAction === 'off').length;
-  const unavail = zoneStates.length - live.length;
-
   const stateLabel = STATE_LABELS[state] || 'Idle';
+
   const tempDisplay = avgTemp === null
     ? '—'
     : `${formatNumericDisplay(avgTemp)}${escapeHtml(unit)}`;
 
   let html = `<div class="pc-hero pc-state-${state}">`;
 
-  html += `<div class="pc-hero-left">`;
+  /* Top row: temp block · dot cluster · status text */
+  html += `<div class="pc-hero-top-row">`;
+
+  html += `<div class="pc-hero-temp-block">`;
   html += `<div class="pc-hero-label">Home avg</div>`;
   html += `<div class="pc-hero-temp">${tempDisplay}</div>`;
   html += `</div>`;
 
+  html += `<div class="pc-hero-dots">`;
+  for (const zone of zoneStates) {
+    const cls = dotStateClass(zone);
+    const titleParts = [escapeHtml(zone.name)];
+    if (!zone.isUnavailable && zone.hvacAction) titleParts.push(escapeHtml(zone.hvacAction));
+    html += `<span class="pc-hero-zone-dot ${cls}" data-entity="${escapeHtml(zone.entityId)}" title="${titleParts.join(' — ')}"></span>`;
+  }
+  html += `</div>`;
+
   html += `<div class="pc-hero-right">`;
-  const dotClass = (state === 'heating' || state === 'cooling' || state === 'mixed') ? ' pc-hero-dot-active' : '';
-  // "Active" counts heating/cooling only; idle/off zones are surfaced in the breakdown line.
   const activeCount = heat + cool;
   const summary = activeCount > 0
     ? `${escapeHtml(stateLabel)} · ${activeCount} active`
     : `${escapeHtml(stateLabel)} · ${live.length} ${live.length === 1 ? 'zone' : 'zones'}`;
-  html += `<div class="pc-hero-status"><span class="pc-hero-dot${dotClass}"></span>${summary}</div>`;
-  const parts = [];
-  if (heat) parts.push(`${heat} heat`);
-  if (cool) parts.push(`${cool} cool`);
-  if (idle) parts.push(`${idle} idle`);
-  if (off)  parts.push(`${off} off`);
-  if (unavail) parts.push(`${unavail} unavail`);
-  if (parts.length > 0) {
-    html += `<div class="pc-hero-breakdown">${parts.map((p) => escapeHtml(p)).join(' · ')}</div>`;
-  }
-  html += `</div>`;
+  html += `<div class="pc-hero-status">${summary}</div>`;
 
   const showOutside = cardConfig?.hero_show_outside !== false
     && outdoor && typeof outdoor.value === 'number' && Number.isFinite(outdoor.value);
   if (showOutside) {
     const outdoorVal = /** @type {HeroOutdoor} */ (outdoor);
     html += `<div class="pc-hero-outside">`;
-    html += `<span class="pc-hero-outside-label">Last 24h</span>`;
-    html += `<span class="pc-hero-outside-value">Outside ${formatNumericDisplay(/** @type {number} */ (outdoorVal.value))}${escapeHtml(outdoorVal.unit)}</span>`;
+    html += `Outside ${formatNumericDisplay(/** @type {number} */ (outdoorVal.value))}${escapeHtml(outdoorVal.unit)}`;
     html += `</div>`;
   }
+  html += `</div>`;
 
-  const showStrip = cardConfig?.hero_show_thermal_strip !== false
-    && Array.isArray(homeHistory) && homeHistory.length >= 2;
-  if (showStrip) {
-    const slots = 24;
-    const step = Math.max(1, Math.floor(homeHistory.length / slots));
-    let cells = '';
-    for (let i = 0; i < slots; i++) {
-      const sample = homeHistory[Math.min(homeHistory.length - 1, i * step)];
-      const color = temperatureToColor(sample.v);
-      cells += `<span style="background:${sanitizeCssValue(color)}"></span>`;
-    }
-    html += `<div class="pc-hero-strip" aria-hidden="true">${cells}</div>`;
+  html += `</div>`;  /* end .pc-hero-top-row */
+
+  /* Per-zone strip block: optional via hero_show_thermal_strip; default true. */
+  const showStrips = cardConfig?.hero_show_thermal_strip !== false;
+  if (showStrips) {
+    const stripsHtml = renderStripsBlock(zoneStates, historyMap);
+    if (stripsHtml) html += stripsHtml;
   }
 
   html += `</div>`;
   return html;
+}
+
+/**
+ * Render the per-zone strip block. Empty string when no zone has any history
+ * AND no zone has a current temp to render a single-cell ghost.
+ *
+ * @param {HeroZoneInput[]} zoneStates
+ * @param {Map<string, Array<{t: number, v: number}>>} historyMap
+ * @returns {string}
+ */
+function renderStripsBlock(zoneStates, historyMap) {
+  const SLOTS = 24;
+  const visible = zoneStates.slice(0, STRIP_ROW_CAP);
+  const overflow = zoneStates.length - visible.length;
+
+  /* Skip the entire strips block when no history is available for any zone — keeps
+     the hero compact during initial load before the history fetch resolves. */
+  let anyHistory = false;
+  for (const zone of visible) {
+    const h = historyMap?.get?.(zone.entityId);
+    if (Array.isArray(h) && h.length >= 2) { anyHistory = true; break; }
+  }
+  if (!anyHistory) return '';
+
+  let html = `<div class="pc-hero-strips">`;
+  for (const zone of visible) {
+    html += renderStripRow(zone, historyMap?.get?.(zone.entityId) || [], SLOTS);
+  }
+  if (overflow > 0) {
+    html += `<div class="pc-hero-zone-strip pc-hero-zone-strip-overflow">`;
+    html += `<div class="pc-hero-zone-strip-label">+${overflow} more</div>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+/**
+ * Render a single strip row (24 cells, dark→state-accent gradient by sample temperature).
+ * @param {HeroZoneInput} zone
+ * @param {Array<{t: number, v: number}>} history
+ * @param {number} slots
+ * @returns {string}
+ */
+function renderStripRow(zone, history, slots) {
+  const rowClass = stripRowClass(zone);
+  let cells = '';
+  if (Array.isArray(history) && history.length >= 2) {
+    const range = {
+      minTemp: zone.minTemp ?? 18,
+      maxTemp: zone.maxTemp ?? 26,
+    };
+    const stateKey = zone.isUnavailable ? 'off' : zone.hvacAction;
+    const step = Math.max(1, Math.floor(history.length / slots));
+    for (let i = 0; i < slots; i++) {
+      const sample = history[Math.min(history.length - 1, i * step)];
+      const colour = stateTemperatureToColor(sample.v, range, stateKey);
+      cells += `<span style="background:${sanitizeCssValue(colour)}"></span>`;
+    }
+  } else {
+    /* Ghost cells when history empty — keeps row layout aligned with peers. */
+    for (let i = 0; i < slots; i++) {
+      cells += `<span class="pc-hero-zone-strip-cell-ghost"></span>`;
+    }
+  }
+
+  return `<div class="pc-hero-zone-strip ${rowClass}" data-entity="${escapeHtml(zone.entityId)}">`
+    + `<div class="pc-hero-zone-strip-label">${escapeHtml(zone.name)}</div>`
+    + `<div class="pc-hero-zone-strip-cells">${cells}</div>`
+    + `</div>`;
 }

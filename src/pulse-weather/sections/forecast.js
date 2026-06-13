@@ -3,7 +3,7 @@
  * @description 7-day forecast list with week-wide range bar normalisation.
  */
 
-import { conditionIcon, escapeHtml, finiteNumber, sanitizeCssValue } from '../weather-primitives.js';
+import { conditionIcon, escapeHtml, finiteNumber, sanitizeCssValue, deriveBrandVariant } from '../weather-primitives.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 
@@ -91,8 +91,7 @@ export function renderForecast({ hass, config, discovery, forecastData, weatherE
       </div>`;
   }).join('');
 
-  const condition = weatherEntity?.state || 'sunny';
-  const isNight = condition === 'clear-night';
+  const { condition, isNight } = deriveBrandVariant(hass, weatherEntity, discovery);
   const variant = brandMarkVariant(condition, isNight);
   const narrativeLine = composeForecastLine(days);
 

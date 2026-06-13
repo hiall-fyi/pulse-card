@@ -4,7 +4,7 @@
  * contextual weather summary, day progress arc, and tier-coloured stats.
  */
 
-import { tempToColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, cloudCoverColor, dewPointComfortColor, uniqueSvgId, futureHourly as filterFutureHourly, deriveTodaySunBoundaries } from '../weather-primitives.js';
+import { tempToColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, cloudCoverColor, dewPointComfortColor, uniqueSvgId, futureHourly as filterFutureHourly, deriveTodaySunBoundaries, readCeOrAttr, readCeUnit, readSensorValue, deriveBrandVariant, formatHHMM } from '../weather-primitives.js';
 import { intensityRatio, tensionGlow, tensionVignette } from '../../shared/visual-tension.js';
 import { ATMOS_CE_TIER_MAP } from './atmosphere.js';
 import { LIFTED_INDEX_TIERS } from '../constants.js';
@@ -179,7 +179,7 @@ export function buildPrecipLabel(precipNow, precipUnit, rainNow, rainUnit, showe
  */
 function fmtTime(date) {
   if (!date || isNaN(date.getTime())) return '';
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return formatHHMM(date);
 }
 
 
@@ -191,52 +191,25 @@ function fmtTime(date) {
 export function renderOverview({ hass, config, discovery, weatherEntity, forecastData }) {
   const attrs = weatherEntity.attributes;
   const ce = discovery.atmosCe;
-  const condition = weatherEntity.state || 'sunny';
-
   const sunEntityId = discovery.sunEntityId || '';
-  const isNight = condition === 'clear-night'
-    || (hass.states[sunEntityId]?.state === 'below_horizon');
+  const { condition, isNight } = deriveBrandVariant(hass, weatherEntity, discovery);
 
-  /**
-   * Read a value from Atmos CE sensor first, then fall back to weather entity attribute.
-   * @param {string} sensorKey - Atmos CE sensor key.
-   * @param {string} attrKey - Weather entity attribute key.
-   * @returns {number}
-   */
-  function val(sensorKey, attrKey) {
-    if (ce[sensorKey]) {
-      const v = Number(hass.states[ce[sensorKey]]?.state);
-      if (!isNaN(v)) return v;
-    }
-    return Number(attrs[attrKey] ?? 0) || 0;
-  }
+  const val = (/** @type {string} */ s, /** @type {string} */ a) => readCeOrAttr(hass, ce, attrs, s, a);
+  const unit = (/** @type {string} */ s, /** @type {string} */ f) => readCeUnit(hass, ce, s, f);
 
   const temp = val('temperature', 'temperature');
   const feelsLike = val('apparent_temperature', 'apparent_temperature') || temp;
   const humidity = val('humidity', 'humidity');
   const windSpeed = val('wind_speed', 'wind_speed');
   const windBearing = val('wind_direction', 'wind_bearing');
-  // Gust attribute name varies by integration: HA's standard is
-  // `wind_gust_speed` (OpenWeatherMap, met.no, others), older Atmos
-  // CE composite sensors expose `wind_gusts`. Read both so the
-  // 4-col Gust stat stays consistent with Wind section's rose.
+  /* Gust attribute name varies by integration: HA's standard is
+     `wind_gust_speed` (OpenWeatherMap, met.no, others); older Atmos CE
+     composite sensors expose `wind_gusts`. Read both so the 4-col Gust
+     stat stays consistent with Wind section's rose. */
   const windGusts = val('wind_gusts', 'wind_gust_speed') || val('wind_gusts', 'wind_gusts');
   const dewPoint = val('dew_point', 'dew_point');
   const visibility = val('visibility', 'visibility');
   const pressure = val('pressure', 'pressure');
-
-  /**
-   * Read unit_of_measurement from Atmos CE sensor, fallback to default.
-   * @param {string} sensorKey
-   * @param {string} fallback
-   * @returns {string}
-   */
-  function unit(sensorKey, fallback) {
-    if (ce[sensorKey]) {
-      return /** @type {string} */ (hass.states[ce[sensorKey]]?.attributes?.unit_of_measurement || fallback);
-    }
-    return fallback;
-  }
 
   const tempUnit = unit('temperature', '°C');
   const visUnit = unit('visibility', 'km');
@@ -306,22 +279,17 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
     ? Number(hass.states[uvSensor]?.state) || 0
     : Number(attrs.uv_index ?? 0);
 
-  const precipSensor = ce.precipitation ? hass.states[ce.precipitation] : null;
-  const precipNow = precipSensor ? Number(precipSensor.state) || 0 : 0;
-  const precipUnit = /** @type {string} */ (precipSensor?.attributes?.unit_of_measurement || 'mm');
+  const { value: precipNow, unit: precipUnitRaw } = readSensorValue(hass, ce.precipitation);
+  const precipUnit = /** @type {string} */ (precipUnitRaw || 'mm');
 
-  const rainSensor = ce.rain ? hass.states[ce.rain] : null;
-  const showersSensor = ce.showers ? hass.states[ce.showers] : null;
-  const snowfallSensor = ce.snowfall ? hass.states[ce.snowfall] : null;
-  const rainNow = rainSensor ? Number(rainSensor.state) || 0 : 0;
-  const showersNow = showersSensor ? Number(showersSensor.state) || 0 : 0;
-  const snowfallNow = snowfallSensor ? Number(snowfallSensor.state) || 0 : 0;
-  const rainUnit = /** @type {string} */ (rainSensor?.attributes?.unit_of_measurement || 'mm');
-  const showersUnit = /** @type {string} */ (showersSensor?.attributes?.unit_of_measurement || 'mm');
-  const snowfallUnit = /** @type {string} */ (snowfallSensor?.attributes?.unit_of_measurement || 'cm');
+  const { value: rainNow, unit: rainUnitRaw } = readSensorValue(hass, ce.rain);
+  const { value: showersNow, unit: showersUnitRaw } = readSensorValue(hass, ce.showers);
+  const { value: snowfallNow, unit: snowfallUnitRaw } = readSensorValue(hass, ce.snowfall);
+  const rainUnit = /** @type {string} */ (rainUnitRaw || 'mm');
+  const showersUnit = /** @type {string} */ (showersUnitRaw || 'mm');
+  const snowfallUnit = /** @type {string} */ (snowfallUnitRaw || 'cm');
 
-  const uvClearSkySensor = ce.uv_index_clear_sky ? hass.states[ce.uv_index_clear_sky] : null;
-  const uvClearSky = uvClearSkySensor ? Number(uvClearSkySensor.state) || 0 : 0;
+  const { value: uvClearSky, entity: uvClearSkySensor } = readSensorValue(hass, ce.uv_index_clear_sky);
 
   const dewComfortSensor = ce.dew_point_comfort ? hass.states[ce.dew_point_comfort] : null;
   const visibilityCatSensor = ce.visibility_category ? hass.states[ce.visibility_category] : null;
@@ -611,9 +579,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       const peakDt = slots[spark.peakIndex]?.datetime
         ? new Date(/** @type {string} */ (slots[spark.peakIndex].datetime))
         : null;
-      const peakTime = peakDt
-        ? `${String(peakDt.getHours()).padStart(2, '0')}:${String(peakDt.getMinutes()).padStart(2, '0')}`
-        : '';
+      const peakTime = peakDt ? formatHHMM(peakDt) : '';
 
       const capeGradId = uniqueSvgId('pw-cape-grad');
       // eslint-disable-next-line no-unused-vars
@@ -669,13 +635,8 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   // eslint-disable-next-line no-unused-vars
   const uvValue = `${escapeHtml(Math.round(uvIndex))}${showClearSky ? ` <span style="opacity:0.5">/ ${escapeHtml(String(Math.round(uvClearSky)))}</span>` : ''}`;
 
-  /**
-   * Format current time as HH:MM.
-   * @returns {string}
-   */
   function timeStamp() {
-    const d = new Date();
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return formatHHMM(new Date());
   }
 
   // \u2500\u2500 Hero first + narrative caption + 4-col stats \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500

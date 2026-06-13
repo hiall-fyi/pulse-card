@@ -14,8 +14,10 @@ import {
   CONDITION_ICONS,
 } from './constants.js';
 
-import { escapeHtml, sanitizeCssValue } from '../shared/utils.js';
-export { escapeHtml, sanitizeCssValue };
+import { escapeHtml, sanitizeCssValue, formatHHMM, uniqueDomId } from '../shared/utils.js';
+import { hexToRgba } from '../shared/color.js';
+export { escapeHtml, sanitizeCssValue, formatHHMM };
+export { hexToRgba };
 
 /**
  * Filter an array to entries whose numeric accessor returns a finite number.
@@ -43,33 +45,77 @@ export function finiteNumber(value, fallback = 0) {
 }
 
 /**
- * Convert a colour string to rgba() at the given alpha.
- * Supports #rgb, #rrggbb, and rgb(r,g,b) inputs. Unknown/unsupported
- * formats (named colours, HSL, currentColor) fall through unchanged —
- * callers cannot expect those to carry an alpha override.
- * @param {string} color
- * @param {number} alpha - 0..1
- * @returns {string}
+ * Read an Atmos CE sensor value first; fall back to a weather-entity
+ * attribute. Both branches coerce to Number with `fallback` on NaN.
+ *
+ * @param {*} hass
+ * @param {Record<string, string>} ce - Discovery's atmosCe entity map.
+ * @param {Record<string, *>} attrs - Weather entity attributes.
+ * @param {string} sensorKey - Key into `ce` for the sensor entity ID.
+ * @param {string} attrKey - Key into `attrs` for the fallback attribute.
+ * @param {number} [fallback=0]
+ * @returns {number}
  */
-export function hexToRgba(color, alpha) {
-  if (typeof color !== 'string') return String(color);
-  const a = Math.max(0, Math.min(1, Number(alpha)));
-  let m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
-  if (m) {
-    return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})`;
+export function readCeOrAttr(hass, ce, attrs, sensorKey, attrKey, fallback = 0) {
+  if (ce?.[sensorKey]) {
+    const v = Number(hass?.states?.[ce[sensorKey]]?.state);
+    if (Number.isFinite(v)) return v;
   }
-  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(color);
-  if (m) {
-    return `rgba(${parseInt(m[1] + m[1], 16)},${parseInt(m[2] + m[2], 16)},${parseInt(m[3] + m[3], 16)},${a})`;
-  }
-  m = /^rgb\(\s*(\d+)\s*[,\s]\s*(\d+)\s*[,\s]\s*(\d+)\s*\)$/i.exec(color);
-  if (m) {
-    return `rgba(${m[1]},${m[2]},${m[3]},${a})`;
-  }
-  return color;
+  return Number(attrs?.[attrKey] ?? fallback) || fallback;
 }
 
-let _svgIdCounter = 0;
+/**
+ * Read the unit_of_measurement of an Atmos CE sensor, with a fallback.
+ *
+ * @param {*} hass
+ * @param {Record<string, string>} ce
+ * @param {string} sensorKey
+ * @param {string} fallback
+ * @returns {string}
+ */
+export function readCeUnit(hass, ce, sensorKey, fallback) {
+  if (ce?.[sensorKey]) {
+    return /** @type {string} */ (hass?.states?.[ce[sensorKey]]?.attributes?.unit_of_measurement || fallback);
+  }
+  return fallback;
+}
+
+/**
+ * Read a sensor entity's state + unit + the entity itself. Returns a
+ * tuple-shaped object; callers destructure what they need.
+ *
+ * @param {*} hass
+ * @param {string} entityId
+ * @param {number} [fallback=0]
+ * @returns {{ value: number, unit: string|undefined, entity: *|null }}
+ */
+export function readSensorValue(hass, entityId, fallback = 0) {
+  const entity = entityId ? hass?.states?.[entityId] : null;
+  if (!entity) return { value: fallback, unit: undefined, entity: null };
+  const v = Number(entity.state);
+  return {
+    value: Number.isFinite(v) ? v : fallback,
+    unit: entity.attributes?.unit_of_measurement,
+    entity,
+  };
+}
+
+/**
+ * Resolve the brand-mark variant from current weather conditions. Uses
+ * the weather entity's state + the sun entity's `below_horizon` flag (or
+ * `clear-night` condition) to choose day vs night.
+ *
+ * @param {*} hass
+ * @param {*} weatherEntity - hass.states[weatherEntityId]
+ * @param {{ sunEntityId?: string|null }} discovery
+ * @returns {{ condition: string, isNight: boolean }}
+ */
+export function deriveBrandVariant(hass, weatherEntity, discovery) {
+  const condition = weatherEntity?.state || 'sunny';
+  const sunState = discovery?.sunEntityId ? hass?.states?.[discovery.sunEntityId]?.state : null;
+  const isNight = condition === 'clear-night' || sunState === 'below_horizon';
+  return { condition, isNight };
+}
 
 /**
  * Generate a unique SVG id for use in <defs> gradients / filters / clipPaths.
@@ -77,13 +123,12 @@ let _svgIdCounter = 0;
  * prevented, but duplicate sections (e.g. two meteograms, two astro blocks)
  * in the same card render with the same static id would make url(#id)
  * resolve to the first match — the later sections silently pick up the
- * wrong gradient.
+ * wrong gradient. Backed by the shared id counter.
  * @param {string} [prefix='pw-id']
  * @returns {string}
  */
 export function uniqueSvgId(prefix = 'pw-id') {
-  _svgIdCounter = (_svgIdCounter + 1) >>> 0;
-  return `${prefix}-${_svgIdCounter.toString(36)}`;
+  return uniqueDomId(prefix);
 }
 
 /**

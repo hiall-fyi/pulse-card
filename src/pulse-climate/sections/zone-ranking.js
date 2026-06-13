@@ -4,9 +4,8 @@
  * of zones sorted by a selectable metric with proportional bars and summary stats.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
-import { resolveZoneState } from '../utils.js';
-import { extractZoneName } from '../zone-resolver.js';
+import { escapeHtml, sanitizeCssValue, formatNumericDisplay } from '../../shared/utils.js';
+import { resolveZoneContext, rowStateClass } from '../utils.js';
 import { getAvailableMetrics, resolveMetricValue } from '../feature-availability.js';
 
 /** Uniform calm blue for temp and humidity bars (Apple system, shared tier token). */
@@ -75,16 +74,16 @@ export function computeRankingSummary(values, unit) {
   if (valid.length === 0) {
     return { avg: '--', high: '--', low: '--', spread: '--' };
   }
-  const avg = (/** @type {number[]} */ (valid).reduce((s, v) => s + v, 0) / valid.length).toFixed(1);
+  const avg = /** @type {number[]} */ (valid).reduce((s, v) => s + v, 0) / valid.length;
   const high = Math.max(.../** @type {number[]} */ (valid));
   const low = Math.min(.../** @type {number[]} */ (valid));
-  const spread = (high - low).toFixed(1);
+  const spread = high - low;
   const u = unit || '';
   return {
-    avg: `${avg}${u}`,
-    high: `${Number.isInteger(high) ? high : high.toFixed(1)}${u}`,
-    low: `${Number.isInteger(low) ? low : low.toFixed(1)}${u}`,
-    spread: `${spread}${u}`,
+    avg: `${formatNumericDisplay(avg)}${u}`,
+    high: `${formatNumericDisplay(high)}${u}`,
+    low: `${formatNumericDisplay(low)}${u}`,
+    spread: `${formatNumericDisplay(spread)}${u}`,
   };
 }
 
@@ -104,15 +103,12 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
   const def = METRIC_DEFS[metric];
   if (!def) return '';
 
-  /** @type {Array<{entityId: string, name: string, value: number|null, unit: string}>} */
+  /** @type {Array<{entityId: string, name: string, value: number|null, unit: string, rowClass: string}>} */
   const zoneData = [];
   for (const zoneConfig of zones) {
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const discoveredEntities = discovery?.zoneEntities?.[zoneName] || {};
-    const zs = resolveZoneState(entityId, discoveredEntities, states, zoneConfig, {});
+    const { entityId, zoneName, zoneState: zs } = resolveZoneContext(zoneConfig, discovery, states);
     const value = extractValue(metric, zs, zoneName, discovery, states);
-    zoneData.push({ entityId, name: zs.name, value, unit: zs.unit || '°C' });
+    zoneData.push({ entityId, name: zs.name, value, unit: zs.unit || '°C', rowClass: rowStateClass(zs) });
   }
 
   /* Sort descending by value, nulls to bottom. */
@@ -163,7 +159,7 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
       displayValue = `${z.value}${displayUnit}`;
     }
 
-    html += `<div class="pc-rank-row" role="button" tabindex="0" data-entity="${escapeHtml(z.entityId)}">`;
+    html += `<div class="pc-rank-row${z.rowClass}" role="button" tabindex="0" data-entity="${escapeHtml(z.entityId)}">`;
     html += `<div class="pc-rank-num${topClass}">${rank}</div>`;
     html += `<div class="pc-rank-name">${escapeHtml(z.name)}</div>`;
     html += `<div class="pc-rank-bar-track"><div class="pc-rank-bar-fill" style="width:${sanitizeCssValue(barWidth)};background:${sanitizeCssValue(barColor)}"></div></div>`;

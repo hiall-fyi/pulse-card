@@ -8,6 +8,26 @@
 import { SHARED_STYLES } from '../shared/styles.js';
 
 export const STYLES = `${SHARED_STYLES}
+/* Master pulse phase — typed CSS variable interpolated by :host animation.
+   Sub-elements that breathe read calc(... * var(--pc-pulse-phase)) so all
+   motion stays in lockstep without any JS timer. Reduced-motion locks the
+   variable at its initial value (0.5, mid-state) and suspends the host
+   animation so identity is preserved but motion ceases. */
+@property --pc-pulse-phase {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.5;
+}
+
+@keyframes pc-master-pulse {
+  0%, 100% { --pc-pulse-phase: 0; }
+  50%      { --pc-pulse-phase: 1; }
+}
+
+:host {
+  animation: pc-master-pulse 4s ease-in-out infinite;
+}
+
 :host {
   display: block;
 
@@ -30,7 +50,6 @@ export const STYLES = `${SHARED_STYLES}
 
   /* Section-local typography — values used by only one section, kept card-local
      so they don't pollute the shared token surface. */
-  --pc-rank-text: 13px;     /* zone-ranking row name + value */
   --pc-detail-name: 15px;   /* zone detail panel — clicked-zone heading */
   --pc-detail-stat: 22px;   /* zone detail panel — primary stat value */
 }
@@ -56,6 +75,33 @@ ha-card {
 .pc-section:first-child { margin-top: 0; }
 .pulse-section-label { margin-bottom: 6px; }
 
+.pc-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--pulse-space-element);
+}
+.pc-section-header .pulse-section-label { margin-bottom: 0; }
+.pc-section-header.pc-section-header-center { align-items: center; }
+
+.pc-section-subtitle {
+  font-size: var(--pulse-font-label);
+  color: var(--pulse-text-secondary);
+}
+
+.pc-energy-flow-header-value {
+  font-size: var(--pulse-font-label);
+  font-weight: var(--pulse-weight-medium);
+}
+
+.pc-comparison-legend {
+  display: flex;
+  gap: var(--pulse-space-element);
+  margin-top: 4px;
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
+}
+
 /* Zone row */
 .pc-zone-row {
   display: flex;
@@ -64,8 +110,26 @@ ha-card {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  padding-left: 12px;     /* leaves room for the leading state ribbon */
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Leading state ribbon — colour set by .pc-row-{state} below */
+.pc-row-ribbon {
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--pc-row-ribbon, transparent);
+  transition: background var(--pulse-anim-base) ease-out;
+}
+
+.pc-zone-row.pc-row-heat   { --pc-row-ribbon: var(--pulse-tier-strong); }
+.pc-zone-row.pc-row-cool   { --pc-row-ribbon: var(--pulse-tier-calm); }
+.pc-zone-row.pc-row-idle,
+.pc-zone-row.pc-row-at-target { --pc-row-ribbon: rgba(255, 255, 255, 0.15); }
+.pc-zone-row.pc-row-off,
+.pc-zone-row.pc-row-unavail   { --pc-row-ribbon: rgba(255, 255, 255, 0.06); }
 .pc-zone-row:focus-visible {
   outline: 2px solid var(--pulse-accent);
   outline-offset: 2px;
@@ -93,15 +157,15 @@ ha-card {
   font-weight: var(--pulse-weight-medium);
   vertical-align: middle;
 }
-.pc-tag-heat { background: color-mix(in srgb, var(--pulse-status-yellow) 18%, transparent); color: var(--pulse-status-yellow); }
+.pc-tag-heat { background: color-mix(in srgb, var(--pulse-tier-strong) 18%, transparent); color: var(--pulse-tier-strong); }
 .pc-tag-cool { background: color-mix(in srgb, var(--pulse-tier-calm) 18%, transparent); color: var(--pulse-tier-calm); }
 .pc-tag-idle { color: var(--pulse-text-secondary); opacity: 0.7; }
-.pc-tag-at-target { color: var(--pulse-status-green); opacity: 0.9; }
+.pc-tag-at-target { color: var(--pulse-tier-moderate); opacity: 0.9; }
 .pc-tag-off { color: var(--pulse-text-secondary); opacity: 0.6; }
-.pc-tag-unavail { background: color-mix(in srgb, var(--pulse-status-red) 12%, transparent); color: color-mix(in srgb, var(--pulse-status-red) 80%, white); }
+.pc-tag-unavail { background: color-mix(in srgb, var(--pulse-tier-gale) 12%, transparent); color: color-mix(in srgb, var(--pulse-tier-gale) 80%, white); }
 
 /* State-tinted current temperature on rows */
-.pc-zone-row.pc-row-heat .pc-zone-temp { color: var(--pulse-status-yellow); }
+.pc-zone-row.pc-row-heat .pc-zone-temp { color: var(--pulse-tier-strong); }
 .pc-zone-row.pc-row-cool .pc-zone-temp { color: var(--pulse-tier-calm); }
 .pc-zone-row.pc-row-off .pc-zone-temp,
 .pc-zone-row.pc-row-unavail .pc-zone-temp { color: var(--pulse-text-secondary); }
@@ -123,6 +187,51 @@ ha-card {
   white-space: nowrap;
   min-width: 0;
 }
+
+/* State hierarchy aggregator — driven by rowStateClass() in utils.js.
+   Granular pc-row-heat / -cool / -off etc. stay for ribbon colour and
+   per-state visual cues; aggregators (active / mid / quiet) drive the
+   unified text + dim treatment across every section. */
+.pc-row-active .pc-zone-name,
+.pc-row-active .pc-rank-name,
+.pc-row-active .pc-home-status-zone-name,
+.pc-row-active .pc-timeline-group-name,
+.pc-row-active .pc-zone-label,
+.pc-row-active.pc-legend-item .pc-legend-name {
+  color: var(--pulse-text-primary);
+  font-weight: var(--pulse-weight-medium);
+}
+
+.pc-row-mid .pc-zone-name,
+.pc-row-mid .pc-rank-name,
+.pc-row-mid .pc-home-status-zone-name,
+.pc-row-mid .pc-timeline-group-name,
+.pc-row-mid .pc-zone-label,
+.pc-row-mid.pc-legend-item .pc-legend-name {
+  color: var(--pulse-text-primary);
+  font-weight: var(--pulse-weight-regular);
+}
+
+.pc-row-quiet .pc-zone-name,
+.pc-row-quiet .pc-rank-name,
+.pc-row-quiet .pc-home-status-zone-name,
+.pc-row-quiet .pc-timeline-group-name,
+.pc-row-quiet .pc-zone-label,
+.pc-row-quiet.pc-legend-item .pc-legend-name {
+  color: var(--pulse-text-secondary);
+  font-weight: var(--pulse-weight-regular);
+}
+
+/* Quiet rows dim the whole row so right-side stats (value, slider, delta
+   text) follow the name's brightness. .pc-zone-row keeps its own opacity
+   from the legacy ribbon path. */
+.pc-rank-row.pc-row-quiet,
+.pc-home-status-row.pc-row-quiet,
+.pc-timeline-row.pc-row-quiet,
+.pc-state-row.pc-row-quiet,
+.pc-heatmap-row.pc-row-quiet {
+  opacity: 0.6;
+}
 .pc-zone-temp {
   font-size: var(--pulse-font-body);
   font-weight: var(--pulse-weight-semibold);
@@ -131,12 +240,12 @@ ha-card {
   flex-shrink: 0;
 }
 .pc-zone-target {
-  font-size: 0.8em;
+  font-size: var(--pulse-font-label);
   color: var(--pulse-text-secondary);
   margin-left: 4px;
 }
 .pc-zone-humidity {
-  font-size: 0.8em;
+  font-size: var(--pulse-font-label);
   font-weight: var(--pulse-weight-regular);
   color: var(--pulse-text-secondary);
   opacity: 0.7;
@@ -237,9 +346,14 @@ ha-card {
   -webkit-tap-highlight-color: transparent;
 }
 .pc-chip ha-icon { --mdc-icon-size: 14px; }
-.pc-chip.pc-severity-high { color: var(--pulse-status-red); }
-.pc-chip.pc-severity-medium { color: var(--pulse-status-yellow); }
-.pc-chip.pc-severity-critical { color: var(--pulse-status-red); font-weight: var(--pulse-weight-semibold); }
+.pc-chip.pc-severity-high { color: var(--pulse-tier-gale); }
+.pc-chip.pc-severity-medium { color: var(--pulse-tier-strong); }
+.pc-chip.pc-severity-critical { color: var(--pulse-tier-gale); font-weight: var(--pulse-weight-semibold); }
+
+.pc-chip-aside {
+  font-size: var(--pulse-font-caption);
+  opacity: 0.6;
+}
 
 /* Multi-column zone grid */
 .pc-section-zones.pc-columns {
@@ -265,9 +379,10 @@ ha-card {
   padding: 4px 2px;
 }
 .pc-system-label {
-  font-size: var(--pulse-font-kicker);
-  color: var(--pulse-text-secondary);
-  min-width: 80px;
+  font-size: var(--pulse-font-body);
+  color: var(--pulse-text-primary);
+  min-width: 72px;
+  font-weight: var(--pulse-weight-regular);
 }
 /* ── Chart Styles ──────────────────────────────────────────────────── */
 
@@ -325,6 +440,17 @@ ha-card {
 .pc-donut-container {
   position: relative;
   margin: 8px auto;
+}
+.pc-donut-container.pc-api-breakdown-donut {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* API breakdown row inside the API tab — donut + legend chips side by side */
+.pc-api-breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pulse-space-card);
 }
 .pc-donut-container svg {
   width: 100%;
@@ -390,6 +516,7 @@ ha-card {
   height: 100%;
   display: block;
 }
+.pc-sparkline-filled.pc-sparkline-prominent { height: 40px; }
 
 /* Zone Pulse mode — waveform as row background */
 .pc-zone-row-pulse {
@@ -464,8 +591,10 @@ ha-card {
   50% { box-shadow: 0 0 16px 2px rgba(255, 152, 0, 0.4), inset 0 0 14px 2px rgba(255, 152, 0, 0.1); }
 }
 
-/* Thermal Timeline layout */
-.pc-section-thermal-strip .pc-timeline-row {
+/* Strip rows — shared by thermal-strip's .pc-timeline-row and
+   comfort-strip's .pc-heatmap-row. */
+.pc-section-thermal-strip .pc-timeline-row,
+.pc-section-comfort-strip .pc-heatmap-row {
   display: flex;
   align-items: center;
   margin-bottom: 4px;
@@ -476,25 +605,32 @@ ha-card {
   overflow: visible;
   transition: background var(--pulse-anim-fast);
 }
-.pc-section-thermal-strip .pc-timeline-row:hover {
-  background: var(--pulse-bg-hover);
-}
-.pc-section-thermal-strip .pc-timeline-row.pc-selected {
+.pc-section-thermal-strip .pc-timeline-row:hover,
+.pc-section-comfort-strip .pc-heatmap-row:hover { background: var(--pulse-bg-hover); }
+.pc-section-thermal-strip .pc-timeline-row.pc-selected,
+.pc-section-comfort-strip .pc-heatmap-row.pc-selected {
   background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--pulse-tier-strong) 14%, transparent) 50%, transparent 100%);
 }
 .pc-section-thermal-strip .pc-timeline-row.pc-selected .pc-strip-container,
 .pc-section-comfort-strip .pc-heatmap-row.pc-selected .pc-strip-container { height: 18px; }
-.pc-section-thermal-strip .pc-timeline-row.pc-selected .pc-zone-label { color: var(--pulse-text-primary); font-weight: var(--pulse-weight-medium); }
-.pc-section-thermal-strip .pc-zone-label {
-  width: 76px;
-  font-size: var(--pulse-font-label);
-  color: var(--pulse-text-secondary);
+.pc-section-thermal-strip .pc-timeline-row.pc-selected .pc-zone-label,
+.pc-section-comfort-strip .pc-heatmap-row.pc-selected .pc-zone-label {
+  color: var(--pulse-text-primary);
+  font-weight: var(--pulse-weight-medium);
+}
+
+.pc-section-thermal-strip .pc-zone-label,
+.pc-section-comfort-strip .pc-zone-label {
+  width: 72px;
+  font-size: var(--pulse-font-body);
+  color: var(--pulse-text-primary);
   text-align: right;
-  padding-right: 10px;
+  padding-right: 8px;
   flex-shrink: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color var(--pulse-anim-base);
 }
 /* Strip container — shared by thermal strip and comfort strip (timeline mode) */
 .pc-section-thermal-strip .pc-strip-container,
@@ -520,11 +656,11 @@ ha-card {
   display: flex;
   justify-content: space-between;
   padding: 4px 0 8px;
+  margin-left: 72px;
 }
 .pc-section-thermal-strip .pc-time-label {
-  font-size: var(--pulse-font-micro);
+  font-size: var(--pulse-font-caption);
   color: var(--pulse-text-secondary);
-  opacity: 0.7;
 }
 
 /* Strip tooltip — shared by timeline and heatmap */
@@ -550,7 +686,6 @@ ha-card {
   z-index: 9999;
 }
 
-/* Strip crosshair — vertical line across all zone rows */
 .pc-strip-crosshair {
   position: absolute;
   top: 0;
@@ -560,6 +695,7 @@ ha-card {
   opacity: 0.25;
   pointer-events: none;
   z-index: 5;
+  display: none;
 }
 
 /* Drag selection highlight */
@@ -575,46 +711,21 @@ ha-card {
 }
 
 /* Comfort Heatmap — HTML div cells for hover/click */
-.pc-section-comfort-strip .pc-heatmap-body { padding: 4px 0; }
-.pc-section-comfort-strip .pc-heatmap-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 3px;
-  cursor: pointer;
-  border-radius: var(--pulse-radius-pill);
-  padding: 2px 0;
-  position: relative;
-  overflow: visible;
-  transition: background var(--pulse-anim-fast);
-}
-.pc-section-comfort-strip .pc-heatmap-row:hover { background: var(--pulse-bg-hover); }
-.pc-section-comfort-strip .pc-heatmap-row.pc-selected {
-  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--pulse-tier-strong) 14%, transparent) 50%, transparent 100%);
-}
-.pc-section-comfort-strip .pc-zone-label {
-  width: 66px;
-  font-size: var(--pulse-font-caption);
-  color: var(--pulse-text-secondary);
-  text-align: right;
-  padding-right: 8px;
-  flex-shrink: 0;
-  transition: color var(--pulse-anim-base);
-}
-.pc-section-comfort-strip .pc-heatmap-row.pc-selected .pc-zone-label {
-  color: var(--pulse-text-primary);
-  font-weight: var(--pulse-weight-medium);
-}
+.pc-section-comfort-strip .pc-heatmap-body { padding: 4px 0; position: relative; }
 
-/* Heatmap cells — shared by comfort strip and thermal strip (heatmap mode) */
+/* Heatmap cells — shared by comfort strip, thermal strip (heatmap mode),
+   and timeline-group's Thermal tab. */
 .pc-section-comfort-strip .pc-cells,
-.pc-section-thermal-strip .pc-cells {
+.pc-section-thermal-strip .pc-cells,
+.pc-section-timeline-group .pc-cells {
   display: flex;
   gap: var(--pulse-space-pin);
   flex: 1;
   touch-action: pan-y;
 }
 .pc-section-comfort-strip .pc-cell,
-.pc-section-thermal-strip .pc-cell {
+.pc-section-thermal-strip .pc-cell,
+.pc-section-timeline-group .pc-cell {
   flex: 1;
   height: 16px;
   border-radius: var(--pulse-radius-bar);
@@ -657,12 +768,15 @@ ha-card {
   height: 8px;
   border-radius: var(--pulse-radius-bar);
 }
+.pc-legend-swatch-good { background: color-mix(in srgb, var(--pulse-tier-moderate) 70%, transparent); }
+.pc-legend-swatch-fair { background: color-mix(in srgb, var(--pulse-tier-strong) 65%, transparent); }
+.pc-legend-swatch-poor { background: color-mix(in srgb, var(--pulse-tier-gale) 60%, transparent); }
 .pc-heatmap-time-axis {
   display: flex;
   justify-content: space-between;
-  margin-left: 66px;
+  margin-left: 72px;
   padding: 4px 0 14px;
-  font-size: var(--pulse-font-micro);
+  font-size: var(--pulse-font-caption);
   color: var(--pulse-text-secondary);
 }
 
@@ -674,6 +788,7 @@ ha-card {
 
 /* Radial */
 .pc-section-radial { text-align: center; }
+.pc-radial-svg { display: block; margin: 0 auto; }
 .pc-radial-container {
   display: flex;
   justify-content: center;
@@ -877,6 +992,10 @@ ha-card {
   text-align: center;
   line-height: 1.2;
 }
+.pc-gauge-center-limit {
+  font-size: var(--pulse-font-caption);
+  opacity: 0.6;
+}
 
 /* HomeKit pulse dot */
 .pc-pulse-dot {
@@ -888,11 +1007,11 @@ ha-card {
   vertical-align: middle;
 }
 .pc-pulse-dot.pc-connected {
-  background: var(--pulse-status-green);
+  background: var(--pulse-tier-moderate);
   animation: pc-pulse-dot-glow 2s ease-in-out infinite;
 }
 .pc-pulse-dot.pc-disconnected {
-  background: var(--pulse-status-red);
+  background: var(--pulse-tier-gale);
 }
 @keyframes pc-pulse-dot-glow {
   0%, 100% { opacity: 1; }
@@ -900,6 +1019,15 @@ ha-card {
 }
 
 /* Bridge flow temp */
+.pc-flow-temp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pulse-space-tight);
+  margin-top: 4px;
+}
+.pc-homekit-bar-stack { margin-top: 4px; }
+
+.pc-strip-rows { position: relative; }
 .pc-flow-temp-value {
   font-size: var(--pulse-font-stat);
   font-weight: var(--pulse-weight-semibold);
@@ -951,10 +1079,10 @@ ha-card {
   border-radius: var(--pulse-radius-small);
 }
 .pc-home-status-zone-name {
-  width: 70px;
+  width: 72px;
   flex-shrink: 0;
-  font-size: var(--pulse-font-kicker);
-  color: var(--pulse-text-secondary);
+  font-size: var(--pulse-font-body);
+  color: var(--pulse-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1019,6 +1147,7 @@ ha-card {
   font-variant-numeric: tabular-nums;
   width: 40px;
   text-align: right;
+  color: var(--pulse-text-secondary);
 }
 .pc-home-status-summary {
   display: flex;
@@ -1054,29 +1183,24 @@ ha-card {
   gap: var(--pulse-space-panel);
 }
 .pc-ranking-tab {
-  font-size: var(--pulse-font-micro);
+  font-size: var(--pulse-font-caption);
   text-transform: uppercase;
-  letter-spacing: var(--pulse-ls-kicker);
+  letter-spacing: 0.6px;
+  font-weight: var(--pulse-weight-semibold);
   color: var(--pulse-text-secondary);
-  opacity: 0.6;
-  padding: 4px 0;
+  padding: 6px 8px;
   border: none;
-  border-bottom: 1.5px solid transparent;
+  border-bottom: 1px solid transparent;
   background: none;
   border-radius: 0;
   cursor: pointer;
-  transition: color var(--pulse-anim-base), border-color var(--pulse-anim-base), opacity var(--pulse-anim-base);
+  transition: color var(--pulse-anim-fast), border-bottom-color var(--pulse-anim-fast);
+  user-select: none;
 }
-.pc-ranking-tab:hover {
-  color: var(--pulse-text-primary);
-  background: none;
-  opacity: 1;
-}
+.pc-ranking-tab:hover { color: var(--pulse-text-primary); }
 .pc-ranking-tab.pc-active {
-  color: var(--pulse-text-primary);
-  background: none;
-  border-bottom-color: var(--pulse-accent);
-  opacity: 1;
+  color: var(--pulse-tier-strong);
+  border-bottom-color: var(--pulse-tier-strong);
 }
 .pc-ranking-list { }
 .pc-rank-row {
@@ -1106,8 +1230,7 @@ ha-card {
 .pc-rank-num.pc-top { color: var(--pulse-tier-strong); }
 .pc-rank-name {
   flex: 1;
-  font-size: var(--pc-rank-text);
-  font-weight: var(--pulse-weight-medium);
+  font-size: var(--pulse-font-body);
   margin-left: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1127,7 +1250,7 @@ ha-card {
   transition: width var(--pulse-anim-reveal) ease, background var(--pulse-anim-color) ease;
 }
 .pc-rank-value {
-  font-size: var(--pc-rank-text);
+  font-size: var(--pulse-font-body);
   font-weight: var(--pulse-weight-medium);
   font-variant-numeric: tabular-nums;
   width: 50px;
@@ -1170,99 +1293,184 @@ ha-card {
 
 /* ── Hero ─────────────────────────────────────────────────────────── */
 
-.pc-hero { display: flex; align-items: flex-end; justify-content: space-between; padding: 4px 0 16px; gap: var(--pulse-space-section); flex-wrap: wrap; }
-.pc-hero-left { display: flex; flex-direction: column; gap: var(--pulse-space-tight); min-width: 0; }
-.pc-hero-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--pulse-text-secondary); }
-.pc-hero-temp { font-size: 44px; font-weight: 200; letter-spacing: -1.5px; line-height: 1; color: var(--pulse-text-primary); font-variant-numeric: tabular-nums; }
-.pc-hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: var(--pulse-space-tight); font-size: 10px; color: var(--pulse-text-secondary); text-align: right; line-height: 1.5; flex-shrink: 0; }
-.pc-hero-status { display: flex; align-items: center; gap: var(--pulse-space-tight); }
-.pc-hero-dot { display: inline-block; width: 6px; height: 6px; border-radius: var(--pulse-radius-circle); background: var(--pulse-text-secondary); flex-shrink: 0; }
-.pc-hero-dot.pc-hero-dot-active { background: var(--pulse-accent); box-shadow: 0 0 8px var(--pulse-accent); animation: pc-hero-dot-blink 1.6s ease-in-out infinite; }
-@keyframes pc-hero-dot-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.pc-hero-breakdown { opacity: 0.7; }
-.pc-hero-strip { display: flex; gap: var(--pulse-space-pin); height: 8px; margin: 0 0 14px; border-radius: var(--pulse-radius-bar); overflow: hidden; flex-basis: 100%; }
-.pc-hero-strip span { flex: 1; }
+.pc-hero {
+  display: flex; flex-direction: column;
+  padding: 4px 0 16px;
+  gap: var(--pulse-space-section);
+}
+
+.pc-hero-top-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--pulse-space-section);
+  flex-wrap: wrap;
+}
+
+.pc-hero-temp-block {
+  display: flex; flex-direction: column;
+  gap: var(--pulse-space-tight);
+  min-width: 0;
+}
+
+.pc-hero-label {
+  font-size: var(--pulse-font-micro); text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--pulse-text-secondary);
+}
+
+.pc-hero-temp {
+  font-size: 44px; font-weight: var(--pulse-weight-thin); letter-spacing: var(--pulse-ls-display);
+  line-height: 1; color: var(--pulse-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-hero.pc-state-off .pc-hero-temp,
+.pc-hero.pc-state-idle .pc-hero-temp { color: var(--pulse-text-secondary); }
+
+.pc-hero-right {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: var(--pulse-space-tight);
+  font-size: var(--pulse-font-caption); color: var(--pulse-text-secondary);
+  text-align: right; line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.pc-hero-status {
+  display: flex; align-items: center; gap: var(--pulse-space-tight);
+  color: var(--pulse-text-primary);
+  font-weight: var(--pulse-weight-medium);
+}
+
 .pc-hero-outside {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding-top: 8px; flex-basis: 100%;
-  border-top: 1px solid var(--pulse-border-subtle);
-}
-.pc-hero-outside-label {
-  font-size: var(--pulse-font-micro); text-transform: uppercase;
-  letter-spacing: var(--pulse-ls-kicker);
-  color: var(--pulse-text-secondary); opacity: 0.7;
-}
-.pc-hero-outside-value {
-  font-size: var(--pulse-font-label);
+  font-size: var(--pulse-font-micro);
   color: var(--pulse-text-secondary);
   font-variant-numeric: tabular-nums;
 }
-.pc-hero.pc-state-off .pc-hero-temp,
-.pc-hero.pc-state-idle .pc-hero-temp { color: var(--pulse-text-secondary); }
+
+/* Per-zone dot cluster — breathes via master pulse phase */
+.pc-hero-dots {
+  display: flex; align-items: center;
+  gap: 10px; flex: 0 1 auto;
+  flex-wrap: wrap;
+  max-width: 280px;
+}
+
+.pc-hero-zone-dot {
+  width: 10px; height: 10px;
+  border-radius: var(--pulse-radius-circle);
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.5);
+  transition: opacity var(--pulse-anim-base) ease;
+}
+
+.pc-hero-zone-dot.pc-hero-dot-heating {
+  background: var(--pulse-tier-strong);
+  box-shadow: 0 0 12px var(--pulse-tier-strong);
+  opacity: calc(0.7 + 0.3 * var(--pc-pulse-phase));
+}
+
+.pc-hero-zone-dot.pc-hero-dot-cooling {
+  background: var(--pulse-tier-calm);
+  box-shadow: 0 0 12px var(--pulse-tier-calm);
+  opacity: calc(0.7 + 0.3 * var(--pc-pulse-phase));
+}
+
+.pc-hero-zone-dot.pc-hero-dot-idle    { background: rgba(255,255,255,0.5); opacity: 0.5; }
+.pc-hero-zone-dot.pc-hero-dot-off,
+.pc-hero-zone-dot.pc-hero-dot-unavail { background: rgba(255,255,255,0.15); opacity: 0.3; }
+
+/* Per-zone strip block — N rows of 24 cells, left-edge state ribbon */
+.pc-hero-strips {
+  display: flex; flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.pc-hero-zone-strip {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.pc-hero-zone-strip-label {
+  font-size: var(--pulse-font-caption); font-weight: var(--pulse-weight-medium);
+  text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--pulse-text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.pc-hero-zone-strip-cells {
+  display: flex; gap: var(--pulse-space-pin);
+  height: 7px;
+  flex: 1;
+  border-radius: var(--pulse-radius-small);
+  overflow: hidden;
+  position: relative;
+}
+
+.pc-hero-zone-strip-cells::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--pc-strip-edge, transparent);
+  z-index: 2;
+}
+
+.pc-hero-zone-strip-cells span { flex: 1; }
+.pc-hero-zone-strip-cell-ghost { background: var(--pulse-bg-card-strong, rgba(255, 255, 255, 0.04)); }
+
+.pc-hero-zone-strip.pc-row-heat   { --pc-strip-edge: var(--pulse-tier-strong); }
+.pc-hero-zone-strip.pc-row-cool   { --pc-strip-edge: var(--pulse-tier-calm); }
+.pc-hero-zone-strip.pc-row-idle   { --pc-strip-edge: rgba(255,255,255,0.15); }
+.pc-hero-zone-strip.pc-row-off,
+.pc-hero-zone-strip.pc-row-unavail { --pc-strip-edge: rgba(255,255,255,0.06); }
+.pc-hero-zone-strip.pc-row-off .pc-hero-zone-strip-cells { opacity: 0.3; }
+
+.pc-hero-zone-strip-overflow .pc-hero-zone-strip-label {
+  color: var(--pulse-text-secondary);
+  font-style: italic;
+}
+
 @container (max-width: 280px) {
-  .pc-hero { flex-direction: column; align-items: flex-start; }
+  .pc-hero-top-row { flex-direction: column; align-items: flex-start; }
   .pc-hero-right { align-items: flex-start; text-align: left; }
 }
 
-/* ── Atmosphere backdrop ──────────────────────────────────────────── */
+/* ── Atmosphere wash ───────────────────────────────────────────────────
+ * Single radial wash that flips with home state: heating sweeps down
+ * from the top, cooling sweeps up from the bottom, mixed shows both
+ * with reduced intensity. Idle/off render no markup at all (handled
+ * in atmosphere.js); the wash element only exists for active states. */
 
-.pc-atmosphere-backdrop {
+.pc-atmosphere-wash {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 0;
   border-radius: inherit;
   overflow: hidden;
-  opacity: var(--pc-atmosphere-opacity, 0.7);
-  transition: opacity var(--pulse-anim-reveal) ease;
-}
-.pc-atmosphere-backdrop::before {
-  content: '';
-  position: absolute;
-  inset: -10%;
-  background: var(--pc-atmosphere-gradient, transparent);
-  filter: blur(34px);
-  animation: pc-atmosphere-rotate var(--pc-atmosphere-rotate, 30s) linear infinite;
-}
-@keyframes pc-atmosphere-rotate {
-  from { transform: rotate(0deg) scale(1.25); }
-  to   { transform: rotate(360deg) scale(1.25); }
+  opacity: var(--pc-atmosphere-opacity, 0.4);
+  transition: opacity var(--pulse-anim-reveal) ease,
+              background var(--pulse-anim-reveal) ease;
 }
 
-/* Intensity tiers */
-.pc-atmosphere-backdrop.pc-intensity-subtle  { --pc-atmosphere-opacity: 0.4; }
-.pc-atmosphere-backdrop.pc-intensity-medium  { --pc-atmosphere-opacity: 0.7; }
-.pc-atmosphere-backdrop.pc-intensity-bold    { --pc-atmosphere-opacity: 1.0; }
+.pc-atmosphere-wash.pc-state-heating {
+  background: radial-gradient(ellipse 80% 50% at 50% -30%,
+    rgba(255, 159, 10, 0.5), transparent 60%);
+}
 
-/* State palettes — rgba kept inline for bundle size; override via --pc-atmosphere-gradient */
-.pc-atmosphere-backdrop.pc-state-heating {
-  --pc-atmosphere-gradient: conic-gradient(from 220deg at 30% 70%,
-    rgba(255,90,40,0.22) 0deg, rgba(255,140,60,0.14) 90deg,
-    rgba(80,120,200,0.08) 200deg, rgba(255,90,40,0.22) 360deg);
+.pc-atmosphere-wash.pc-state-cooling {
+  background: radial-gradient(ellipse 80% 50% at 50% 130%,
+    rgba(90, 200, 250, 0.5), transparent 60%);
 }
-.pc-atmosphere-backdrop.pc-state-cooling {
-  --pc-atmosphere-gradient: conic-gradient(from 220deg at 70% 30%,
-    rgba(74,144,226,0.22) 0deg, rgba(126,192,255,0.14) 90deg,
-    rgba(120,90,200,0.08) 200deg, rgba(74,144,226,0.22) 360deg);
+
+.pc-atmosphere-wash.pc-state-mixed {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -30%, rgba(255, 159, 10, 0.35), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 130%, rgba(90, 200, 250, 0.25), transparent 60%);
 }
-.pc-atmosphere-backdrop.pc-state-mixed {
-  --pc-atmosphere-gradient: conic-gradient(from 0deg at 50% 50%,
-    rgba(255,90,40,0.18) 0deg, rgba(255,140,60,0.12) 90deg,
-    rgba(74,144,226,0.18) 180deg, rgba(126,192,255,0.12) 270deg,
-    rgba(255,90,40,0.18) 360deg);
-  --pc-atmosphere-rotate: 28s;
-}
-.pc-atmosphere-backdrop.pc-state-idle {
-  --pc-atmosphere-gradient: radial-gradient(ellipse 80% 60% at 50% 30%,
-    rgba(255,255,255,0.06) 0%, transparent 70%);
-}
-.pc-atmosphere-backdrop.pc-state-idle::before { animation: none; }
-.pc-atmosphere-backdrop.pc-state-off {
-  --pc-atmosphere-gradient: radial-gradient(ellipse 80% 60% at 50% 50%,
-    rgba(255,255,255,0.04) 0%, transparent 70%);
-  --pc-atmosphere-opacity: 0.5;
-}
-.pc-atmosphere-backdrop.pc-state-off::before { animation: none; }
+
+.pc-atmosphere-wash.pc-intensity-subtle { --pc-atmosphere-opacity: 0.25; }
+.pc-atmosphere-wash.pc-intensity-medium { --pc-atmosphere-opacity: 0.4; }
+.pc-atmosphere-wash.pc-intensity-bold   { --pc-atmosphere-opacity: 0.6; }
 
 /* Card content sits above backdrop */
 .pc-card-content {
@@ -1272,12 +1480,181 @@ ha-card {
 
 /* Reduced motion — respect prefers-reduced-motion for users sensitive to animation */
 @media (prefers-reduced-motion: reduce) {
+  :host { animation: none; }
   .pc-power-bar-fill.pc-bar-active { animation: none; }
   .pc-heating-glow { animation: none; }
   .pc-zone-row-pulse.pc-heating { animation: none; }
   .pc-pulse-dot.pc-connected { animation: none; }
   .pc-temp-transitioning { filter: none; transition: none; }
-  .pc-atmosphere-backdrop::before { animation: none; }
-  .pc-hero-dot.pc-hero-dot-active { animation: none; box-shadow: none; }
+  .pc-atmosphere-wash { --pc-atmosphere-opacity: 0.3; }
 }
+
+/* ── Timeline group ────────────────────────────────────────────────────
+ * Shared row grid for both Thermal and State tabs inside timeline_group.
+ * Layout: 70px name · 1fr cells · 60px stat. State and thermal views render
+ * row-by-row using this grid so zones stay vertically aligned across tab
+ * switches. Body renderers also drive system_health_group rows; the host
+ * owns the section header + tab strip. */
+
+.pc-section-timeline-group {
+  display: flex; flex-direction: column;
+  gap: var(--pulse-space-tight);
+}
+
+
+.pc-timeline-group-tabs,
+.pc-system-health-group-tabs {
+  display: flex; gap: 0;
+  font-size: var(--pulse-font-caption);
+  margin-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pulse-text-primary) 6%, transparent);
+}
+
+.pc-timeline-group-tab,
+.pc-system-health-group-tab {
+  padding: 8px 14px; cursor: pointer;
+  color: var(--pulse-text-secondary);
+  border-bottom: 1px solid transparent;
+  text-transform: uppercase; letter-spacing: 0.6px;
+  font-weight: var(--pulse-weight-semibold);
+  transition: color var(--pulse-anim-fast), border-bottom-color var(--pulse-anim-fast);
+  user-select: none;
+}
+
+.pc-timeline-group-tab:hover,
+.pc-system-health-group-tab:hover { color: var(--pulse-text-primary); }
+
+.pc-timeline-group-tab.pc-active,
+.pc-system-health-group-tab.pc-active {
+  color: var(--pulse-tier-strong);
+  border-bottom-color: var(--pulse-tier-strong);
+}
+
+.pc-timeline-group-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 56px;
+  gap: 6px;
+  align-items: center;
+  font-size: var(--pulse-font-body);
+  margin-bottom: 4px;
+}
+
+.pc-timeline-group-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.pc-timeline-group-stat {
+  text-align: right;
+  font-size: var(--pulse-font-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--pulse-text-secondary);
+}
+
+.pc-timeline-group-stat.pc-state-active-heat { color: var(--pulse-tier-strong); }
+.pc-timeline-group-stat.pc-state-active-cool { color: var(--pulse-tier-calm); }
+
+.pc-timeline-group-axis {
+  margin-top: 6px;
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
+  display: grid;
+  grid-template-columns: 72px 1fr 56px;
+  gap: 6px;
+}
+
+.pc-timeline-group-axis .ticks {
+  display: flex; justify-content: space-between;
+}
+
+.pc-timeline-group-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--pulse-text-primary) 4%, transparent);
+  display: flex; justify-content: space-between;
+  font-size: var(--pulse-font-micro);
+  color: var(--pulse-text-secondary);
+  flex-wrap: wrap;
+  gap: var(--pulse-space-element);
+}
+
+.pc-timeline-group-footer strong {
+  color: var(--pulse-text-primary);
+  font-weight: var(--pulse-weight-medium);
+}
+
+.pc-state-legend {
+  display: flex; gap: var(--pulse-space-element);
+  flex-wrap: wrap;
+}
+
+.pc-state-legend-pill {
+  display: inline-flex; align-items: center;
+  gap: var(--pulse-space-tight);
+}
+
+.pc-state-legend-pip {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+}
+
+.pc-state-legend-pip-heat { background: var(--pulse-tier-strong); }
+.pc-state-legend-pip-cool { background: var(--pulse-tier-calm); }
+.pc-state-legend-pip-idle { background: rgba(255, 255, 255, 0.08); }
+.pc-state-legend-pip-off  { background: rgba(255, 255, 255, 0.025); }
+
+/* State row tap-for-details — single-zone drill-down. Compare overlay is
+   intentionally not offered (categorical state timelines don't read
+   stacked; the multi-row layout itself is the compare view). */
+.pc-state-row { cursor: pointer; border-radius: var(--pulse-radius-pill); transition: background var(--pulse-anim-fast); }
+.pc-state-row:hover { background: var(--pulse-bg-hover); }
+.pc-state-row.pc-selected {
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--pulse-tier-strong) 14%, transparent) 50%, transparent 100%);
+}
+
+.pc-state-detail-footer {
+  margin-top: var(--pulse-space-element);
+  font-size: var(--pulse-font-caption);
+  color: var(--pulse-text-secondary);
+  text-align: right;
+}
+
+/* Thermal tab temperature legend — colour pips paired with anchor temps */
+.pc-temp-legend {
+  display: flex; gap: var(--pulse-space-element);
+  flex-wrap: wrap;
+}
+
+.pc-temp-legend-pill {
+  display: inline-flex; align-items: center;
+  gap: var(--pulse-space-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-temp-legend-pip {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+}
+
+/* State timeline cells (consumed by state-timeline-view) */
+.pc-state-timeline-cells {
+  display: grid;
+  grid-template-columns: repeat(48, 1fr);
+  gap: 1px;
+  height: 16px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pc-state-cell { display: block; }
+.pc-state-cell.pc-state-cell-heat     { background: var(--pulse-tier-strong); }
+.pc-state-cell.pc-state-cell-heat-mid { background: rgba(255, 159, 10, 0.55); }
+.pc-state-cell.pc-state-cell-heat-low { background: rgba(255, 159, 10, 0.30); }
+.pc-state-cell.pc-state-cell-cool     { background: var(--pulse-tier-calm); }
+.pc-state-cell.pc-state-cell-cool-mid { background: rgba(90, 200, 250, 0.55); }
+.pc-state-cell.pc-state-cell-cool-low { background: rgba(90, 200, 250, 0.30); }
+.pc-state-cell.pc-state-cell-idle     { background: rgba(255, 255, 255, 0.08); }
+.pc-state-cell.pc-state-cell-off      { background: rgba(255, 255, 255, 0.025); }
+
 `;

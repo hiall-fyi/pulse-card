@@ -11,6 +11,7 @@
  */
 
 import { extractZoneName } from './zone-resolver.js';
+import { isUnavailableState } from '../shared/utils.js';
 
 /**
  * Tado CE exclusive metric definitions.
@@ -45,7 +46,7 @@ export function isMetricAvailable(metricKey, zones, discovery, states) {
     const zoneName = extractZoneName(zoneConfig.entity);
     const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
     const entityId = zoneEntities[entityKey];
-    if (entityId && states[entityId] && states[entityId].state !== 'unavailable') {
+    if (entityId && !isUnavailableState(states[entityId])) {
       return true;
     }
   }
@@ -75,7 +76,7 @@ export function resolveMetricValue(metricKey, zoneName, discovery, states) {
   if (!entityId) return null;
 
   const state = states[entityId];
-  if (!state || state.state === 'unavailable' || state.state === 'unknown') return null;
+  if (isUnavailableState(state)) return null;
 
   // Comfort: score from deviation between actual temp and comfort target
   // Both values are in the sensor's extra_state_attributes

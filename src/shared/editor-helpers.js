@@ -103,3 +103,81 @@ export function renderReorderButtons(index, total, onMove, onRemove) {
 export function computeLabel(schema) {
   return schema.label || schema.name || '';
 }
+
+/**
+ * Set or clear a field on one list item, returning a new list (no mutation).
+ * An empty string or undefined value deletes the field; boolean false is a
+ * real value and is stored (false !== '').
+ * @param {Record<string, *>[]} list
+ * @param {number} index
+ * @param {string} field
+ * @param {*} value
+ * @returns {Record<string, *>[]}
+ */
+export function updateListItemField(list, index, field, value) {
+  const next = list.map((item) => ({ ...item }));
+  if (value === '' || value === undefined) {
+    delete next[index][field];
+  } else {
+    next[index][field] = value;
+  }
+  return next;
+}
+
+/**
+ * Set or clear a sub-field inside a nested object on one list item, returning
+ * a new list. Empty value removes the sub-field; if the nested object becomes
+ * empty it is removed entirely.
+ * @param {Record<string, *>[]} list
+ * @param {number} index
+ * @param {string} key - Nested object key (e.g. 'sparkline').
+ * @param {string} subField
+ * @param {*} value
+ * @returns {Record<string, *>[]}
+ */
+export function updateListItemNested(list, index, key, subField, value) {
+  const next = list.map((item) => ({ ...item }));
+  const nested = { ...(next[index][key] || {}) };
+  if (value === '' || value === undefined) {
+    delete nested[subField];
+  } else {
+    nested[subField] = value;
+  }
+  if (Object.keys(nested).length === 0) {
+    delete next[index][key];
+  } else {
+    next[index][key] = nested;
+  }
+  return next;
+}
+
+/**
+ * Swap a list item with its neighbour in the given direction, returning a new
+ * list. Boundary moves (first up, last down) return the SAME list reference
+ * unchanged, so callers can skip a no-op update with `if (next !== list)`.
+ * @template {Record<string, *>} T
+ * @param {T[]} list
+ * @param {number} index
+ * @param {number} direction - -1 (up) or +1 (down).
+ * @returns {T[]}
+ */
+export function moveListItem(list, index, direction) {
+  const target = index + direction;
+  if (target < 0 || target >= list.length) return list;
+  const next = list.map((item) => ({ ...item }));
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
+/**
+ * Remove a list item by index, returning a new list.
+ * @template {Record<string, *>} T
+ * @param {T[]} list
+ * @param {number} index
+ * @returns {T[]}
+ */
+export function removeListItem(list, index) {
+  const next = list.map((item) => ({ ...item }));
+  next.splice(index, 1);
+  return next;
+}

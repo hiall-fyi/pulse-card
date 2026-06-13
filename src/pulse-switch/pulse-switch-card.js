@@ -13,6 +13,7 @@ import {
   deriveTxEntityId,
   escapeHtml,
   estimatePps,
+  isUnavailableState,
   normalizePositiveNumber,
   resolveLabel,
   resolvePortType,
@@ -173,7 +174,7 @@ class PulseSwitchCard extends HTMLElement {
       const port = cfg.ports[i];
       if (hideUnavailable && this._hass) {
         const rx = this._hass.states[port.entity];
-        if (!rx || rx.state === 'unavailable' || rx.state === 'unknown') continue;
+        if (isUnavailableState(rx)) continue;
       }
       html += this._renderPortTile(port, i);
     }
@@ -380,7 +381,7 @@ class PulseSwitchCard extends HTMLElement {
 
     /** @type {'connected'|'disconnected'|'disabled'|'unavailable'} */
     let linkState = 'connected';
-    if (!rxState || rxState.state === 'unavailable' || rxState.state === 'unknown') {
+    if (isUnavailableState(rxState)) {
       linkState = 'unavailable';
     } else {
       const disabled = rxState.attributes?.disabled;
@@ -442,8 +443,8 @@ class PulseSwitchCard extends HTMLElement {
       const rxPktEntity = port.rx_packets ? hass.states[port.rx_packets] : null;
       const txPktEntity = port.tx_packets ? hass.states[port.tx_packets] : null;
 
-      const rxPkts = rxPktEntity && rxPktEntity.state !== 'unavailable' ? parseFloat(rxPktEntity.state) : NaN;
-      const txPkts = txPktEntity && txPktEntity.state !== 'unavailable' ? parseFloat(txPktEntity.state) : NaN;
+      const rxPkts = !isUnavailableState(rxPktEntity) ? parseFloat(rxPktEntity?.state ?? '') : NaN;
+      const txPkts = !isUnavailableState(txPktEntity) ? parseFloat(txPktEntity?.state ?? '') : NaN;
 
       if (!isNaN(rxPkts) || !isNaN(txPkts)) {
         const totalPkts = (isNaN(rxPkts) ? 0 : rxPkts) + (isNaN(txPkts) ? 0 : txPkts);

@@ -124,13 +124,20 @@ ${SHARED_STYLES}
 
 /* ── Atmosphere Layer ──────────────────────────────────────────── */
 
-.pw-fx {
+.pw-fx,
+.pw-wind-streaks,
+.pw-atmos-fx,
+.pw-smog-overlay,
+.pw-haze-vignette {
   position: absolute;
   inset: 0;
-  overflow: hidden;
   pointer-events: none;
-  z-index: 1;
 }
+.pw-fx,
+.pw-wind-streaks,
+.pw-atmos-fx { overflow: hidden; }
+.pw-fx,
+.pw-wind-streaks { z-index: 1; }
 
 /* ── Hero Display ──────────────────────────────────────────────── */
 
@@ -193,14 +200,6 @@ ${SHARED_STYLES}
 .pw-hourly-strip::-webkit-scrollbar { display: none; }
 
 /* ── Wind Rose ─────────────────────────────────────────────────── */
-
-.pw-wind-streaks {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 1;
-}
 
 .pw-streak {
   position: absolute;
@@ -324,14 +323,6 @@ ${SHARED_STYLES}
   right: 0;
   border-radius: 0 0 9px 9px;
   transition: height var(--pulse-anim-fill) ease;
-}
-
-/* FX container inside CAPE fill (for thermal particles) */
-.pw-atmos-fx {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 /* Thermal particles */
@@ -598,17 +589,6 @@ ${SHARED_STYLES}
 }
 
 /* ── Air Haze FX ───────────────────────────────────────────────── */
-.pw-smog-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.pw-haze-vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
 
 .pw-dust-particle {
   position: absolute;

@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.7.0] - 2026-06-13
+
+**Climate Card visual revamp — Mercury monolith. Atmosphere drops the rotating gradient for a quiet radial wash that only shows up when something's actually heating or cooling. Hero gains per-zone breathing dots and per-zone 24h thermal strips, all synced to a single master pulse phase. Zone rows pick up a 3px state ribbon for at-a-glance scanning. Every zone-name surface across the card now shares one visual hierarchy, so an active zone reads bright and an off or sensor-only zone reads quiet wherever it appears. Plus two new optional grouped sections: a tabbed `timeline_group` (Thermal Heatmap + State Timeline) and an autodiscovered `system_health_group` (Bridge / HomeKit / API). The Thermal tab also gains a colour legend so you can read what each heatmap band means. HVAC colours converge on the existing Apple-tier palette so heating amber and cooling cyan match Weather Card and Zone Ranking.**
+
+### ⚠️ Upgrade Notes
+
+- **Climate Card heating / cooling colours shift slightly.** Internal HVAC references converge on the Apple-tier palette (`--pulse-tier-strong` / `--pulse-tier-calm`) instead of Material yellow / blue. Visually that means heating reads as `#ff9f0a` (Apple amber) and cooling as `#5ac8fa` (Apple cyan) — same hues Weather Card and Zone Ranking already use. If you've overridden `--pulse-status-yellow` or `--pulse-status-blue` for HVAC purposes via `card-mod`, switch to `--pulse-tier-strong` / `--pulse-tier-calm`. The status tokens stay defined for Bar / Switch / Weather, which still consume them in their non-HVAC semantics.
+
+- **Sensors in an `error` state now read as unavailable everywhere.** Both cards already treated `unavailable` and `unknown` as "no value to show". A sensor reporting `error` is now handled the same way across the board — a Bar with an errored entity reads as Unavailable, and an errored Climate zone chip or power reading is skipped rather than printing the literal word `error`. If you were relying on the old Climate behaviour where an `error` state slipped through as a value, it now hides like the other dead states.
+
+- **Atmosphere idle and off states render nothing.** The previous rotating conic gradient quietly tinted the card backdrop even when no zone was active. The new wash only shows for `heating`, `cooling`, or `mixed` home state; `idle` and `off` produce no markup. The card now reads as quiet when nothing's happening, which is the point.
+
+- **Hero markup restructured.** If you depended on the legacy `pc-hero-dot` / `pc-hero-breakdown` / `pc-hero-strip` classes via `card-mod`, the new structure uses `pc-hero-dots` (cluster), `pc-hero-zone-dot` (one per zone, with `pc-hero-dot-{state}` modifier), and `pc-hero-strips` / `pc-hero-zone-strip` (per-zone 24h strips). Home-average single strip and the breakdown line are gone — the dot cluster expresses both visually.
+
+- **Two new section types are opt-in.** `timeline_group` and `system_health_group` are additive — existing `thermal_strip`, `bridge`, `homekit`, and `api` keep working with their current markup. Add the new types to your `sections:` list when you want the tabbed view.
+
+### Features
+
+- **`timeline_group` section — tabbed 24h Thermal + State views** ([docs](CLIMATE_CARD_GUIDE.md)) — single section that hosts both the existing thermal heatmap and a new state timeline behind tabs. Click "Thermal" to see the rainbow heatmap with a 24h average per zone; click "State" to see when each zone was actually heating or cooling, with cell opacity reflecting power level. Both views share the same row grid (zone name on the left, cells in the middle, stat on the right) so zones stay vertically aligned across the tab switch. Add `type: timeline_group` to your `sections:` list; default tab is Thermal.
+
+- **`system_health_group` section — autodiscovered tabbed Bridge / HomeKit / API** ([docs](CLIMATE_CARD_GUIDE.md)) — single section that hosts the three Tado CE health surfaces behind tabs. The group renders only the views that are actually discoverable: 0 of 3 present hides the whole group, 1 of 3 drops the tab strip and uses the view's domain as the section header, 2 or 3 show a tab strip in priority order Bridge → HomeKit → API. Saves vertical space when you have all three configured; for users without HomeKit or running cloud-only Tado, the group adapts to whatever is available.
+
+- **Thermal tab gains a colour legend and a home-average footer** — the heatmap previously left you to guess what each colour band meant. The Thermal tab footer now shows a row of legend pills, one per temperature band, each labelled with the range it covers (not just a single anchor temperature), plus the home-average temperature for the window. The pip colours adapt to your actual data range so the legend matches the cells you're looking at, rather than a fixed scale that might not line up.
+
+- **Hero per-zone breathing dot cluster** — the legacy single state pill becomes a row of dots, one per zone. Heating and cooling dots breathe at the master 4-second pulse phase; idle dots stay static at half opacity; off / unavailable dots fade further. Hover a dot to see the zone name and state. Replaces the breakdown line — the dot cluster shows the same information faster.
+
+- **Hero per-zone 24h thermal strips** — under the dot cluster, one strip per zone showing the last 24 hours of temperature. Cells use the new state-aware gradient (dark cold-end fading to the zone's state accent — amber for heating, cyan for cooling, grey for idle). Strips have a 2px left ribbon coloured by HVAC state so each zone's strip flags its current state without needing to read the dot above. Capped at 6 rows; 7+ zones render the visible 6 plus a `+N more` mini-row so hero height stays predictable. Toggle off with `hero_show_thermal_strip: false` if you prefer the compact hero.
+
+- **Zone row leading state ribbon** — every zone row picks up a 3px ribbon on its left edge, coloured by HVAC state (amber heating / cyan cooling / muted grey idle / faint off). Lets you scan zone state across a long zone list without reading text or icons.
+
+- **Per-zone settings in the visual editor** — each zone in the editor now has its own Name, Icon, Colour, and Sparkline mode, plus Default / On / Off dropdowns for the temperature bar, power bar, and slider, and a collapsible Sensor overrides panel for pointing a zone at specific temperature / humidity / window / battery / mold-risk / heating-power entities. Everything that previously needed hand-written YAML is now in the GUI. A new `heating_power_entity` zone option drives the power bar and energy flow when auto-discovery can't find the sensor on its own.
+
+### Bug Fixes
+
+- **Hero home average displays sensor mean even when all zones are off.** Previously the legacy hero filtered to live-only zones and produced an em-dash placeholder when every zone was switched off — even though the temperature sensors were still reading and the average was meaningful. The new hero averages every zone with a finite current temperature regardless of HVAC action, so all-off setups see their actual home temperature instead of a dash.
+
+### Improvements
+
+- **Master pulse phase synchronises every motion across the card** — atmosphere wash, hero zone dots, and any future motion read from a single CSS-only animation phase (`@property --pc-pulse-phase` on `:host`, 4-second period). Everything that breathes stays in lockstep without any JavaScript timer. `prefers-reduced-motion: reduce` suspends the animation and locks the phase at its mid-state, so identity colours and ribbon edges stay visible but motion ceases.
+
+- **Atmosphere becomes a single radial wash** — the rotating conic gradient retired in favour of a quiet wash that sweeps amber from the top when heating, cyan from the bottom when cooling, or both at reduced intensity when mixed. Idle and off states render no markup at all.
+
+- **HVAC colour convergence on the existing Apple-tier palette** — climate-card-internal HVAC references (zone tag colours, power bar fill, sparkline lines, energy flow connectors, radial needle, graph, donut) now consume `--pulse-tier-strong` / `--pulse-tier-calm` / `--pulse-tier-moderate` / `--pulse-tier-gale` instead of the Material `--pulse-status-*` tokens. Visually heating shifts from `#FF9800` to `#ff9f0a` and cooling from `#2196F3` to `#5ac8fa`, so the climate card now matches Weather Card's wind tiers and Zone Ranking's power bars exactly. Zero new tokens added.
+
+- **Body renderers extracted into reusable `*-view.js` modules** — `bridge.js`, `homekit.js`, `api.js`, and `thermal-strip.js` (heatmap mode) now delegate their body markup to dedicated view modules, so the new grouped sections share the exact same renderers without duplication. Existing standalone sections render byte-identically against pre-Mercury markup snapshots; if you have a working dashboard config today, nothing changes for you.
+
+- **One visual hierarchy across every zone-name surface** — zone rows, home-status, zone ranking, thermal and comfort strips, the timeline group's Thermal and State tabs, and the radial legend now derive their emphasis from one shared rule. An active heating or cooling zone reads bright; an off, unavailable, or sensor-only zone reads quiet — consistently, wherever that zone appears on the card. Previously each surface decided emphasis on its own and they drifted apart.
+
+- **Shared colour, state, and id helpers consolidated across the family** — hex-colour parsing, the "is this entity unavailable" check, SVG gradient/filter id generation, and the smooth-line path maths each lived in three or four near-identical copies across the cards. They're now single shared helpers, so a fix or tweak lands once instead of being chased across files. No visible change on its own; it's the groundwork that keeps the cards behaving identically where they should.
+
+### Notes
+
+- **No YAML config changes required.** Every option that worked in v1.6.0 keeps working without edits. The new `timeline_group` and `system_health_group` types are additive and opt-in; existing standalone sections render exactly as they did before. Hero, atmosphere, and zone rows update visually but keep the same config keys.
+
+- **HACS upgrade is unchanged.** Filename `pulse-card.js` and HACS folder `/hacsfiles/pulse-card/` stay where they are. Existing dashboard resource URLs (`/local/pulse-card.js`) keep working without changes.
+
+
 ## [1.6.0] - 2026-05-23
 
 **Climate Card gains an opt-in home overview (home-average temperature in big numbers, status pill, 24h thermal strip, outdoor temp), plus an animated atmosphere backdrop tinted by overall heating state. Plus a sweep through the design tokens — typography, radii, durations, spacing, and tier colours all live on the family `--pulse-*` surface now, so card-mod tweaks ripple cleanly across every card.**

@@ -100,6 +100,57 @@ export function formatNumericDisplay(value, decimals = 1) {
   return String(parseFloat(value.toFixed(decimals)));
 }
 
+/**
+ * Format a Date as zero-padded "HH:MM".
+ * @param {Date} d
+ * @returns {string}
+ */
+export function formatHHMM(d) {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * Build a card-scoped warning logger. Each card binds its own LOG_PREFIX once
+ * so the per-card prefix is the only difference, not a copy of the body.
+ * @param {string} prefix - Card log prefix (e.g. 'Pulse Climate Card:').
+ * @returns {(msg: string, ...args: *[]) => void}
+ */
+export function makeWarn(prefix) {
+  return (/** @type {string} */ msg, /** @type {*[]} */ ...args) =>
+    console.warn(`${prefix} ${msg}`, ...args);
+}
+
+/** HA states that mean "no usable value" — shared O(1) lookup. */
+const UNAVAILABLE_STATES = new Set(['unavailable', 'unknown', 'error']);
+
+/**
+ * Whether an HA entity state object carries no usable value. A missing state
+ * counts as unavailable. `unavailable`, `unknown`, and `error` are all treated
+ * uniformly across the family — the same three strings every card's renderer
+ * must skip.
+ * @param {{state?: string}|null|undefined} state - hass.states[entityId].
+ * @returns {boolean}
+ */
+export function isUnavailableState(state) {
+  if (!state) return true;
+  return UNAVAILABLE_STATES.has(state.state ?? '');
+}
+
+let _domIdCounter = 0;
+
+/**
+ * Generate a process-unique DOM id for SVG <defs> (gradients / filters /
+ * clipPaths). Shadow DOM already scopes cross-card collisions; this counter
+ * only needs to be unique within a render so duplicate sections in one card
+ * don't share an id and resolve `url(#id)` to the wrong element.
+ * @param {string} [prefix='pulse-id']
+ * @returns {string}
+ */
+export function uniqueDomId(prefix = 'pulse-id') {
+  _domIdCounter = (_domIdCounter + 1) >>> 0;
+  return `${prefix}-${_domIdCounter.toString(36)}`;
+}
+
 const SPARKLINE_LOG_PREFIX = 'Pulse sparkline:';
 
 /**
@@ -153,6 +204,78 @@ export async function fetchSparklineData(hass, entityIds, hoursToShow = 24) {
     }
   } catch (e) {
     console.warn(`${SPARKLINE_LOG_PREFIX} fetch failed: %O`, e);
+    for (const eid of entityIds) results[eid] = [];
+  }
+  return results;
+}
+
+/**
+ * Batch-fetch HVAC state history for climate entities. Returns categorical
+ * state strings (mapped to heating / cooling / idle / off) plus a best-effort
+ * power value pulled from the entity attribute when available.
+ *
+ * Uses HA's `history/history_during_period` with full responses so attributes
+ * (heating_power) come through. Climate-card's state timeline view consumes
+ * the result via historyCache.stateData[entityId].
+ *
+ * @param {*} hass - Home Assistant instance with callWS.
+ * @param {string[]} entityIds - Climate entity IDs.
+ * @param {number} [hoursToShow=24]
+ * @returns {Promise<Record<string, {t: number, state: string, power: number}[]>>}
+ */
+export async function fetchClimateStateHistory(hass, entityIds, hoursToShow = 24) {
+  /** @type {Record<string, {t: number, state: string, power: number}[]>} */
+  const results = {};
+  if (!hass?.callWS || entityIds.length === 0) return results;
+
+  const now = new Date();
+  const start = new Date(now.getTime() - hoursToShow * 60 * 60 * 1000);
+  try {
+    const history = await hass.callWS({
+      type: 'history/history_during_period',
+      start_time: start.toISOString(),
+      end_time: now.toISOString(),
+      entity_ids: entityIds,
+      /* minimal_response keeps payload small and gives us the main state
+         (`heat` / `cool` / `off` etc) which is what we need for the timeline.
+         hvac_action lives in attributes — costs ~10× payload to include —
+         and most users care about the mode timeline anyway. */
+      minimal_response: true,
+      significant_changes_only: false,
+    });
+    for (const eid of entityIds) {
+      try {
+        const states = history?.[eid];
+        if (!Array.isArray(states) || states.length === 0) {
+          results[eid] = [];
+          continue;
+        }
+        /** @type {{t: number, state: string, power: number}[]} */
+        const points = [];
+        for (const s of states) {
+          const rawTime = s.lu ?? s.last_updated;
+          const t = typeof rawTime === 'number' ? rawTime * 1000 : new Date(rawTime).getTime();
+          if (!isFinite(t)) continue;
+          const raw = String(s.s ?? s.state ?? '').toLowerCase();
+          /** Climate hvac_mode → state-timeline bucket. */
+          let bucket = 'idle';
+          if (raw === 'heat' || raw === 'heating') bucket = 'heating';
+          else if (raw === 'cool' || raw === 'cooling') bucket = 'cooling';
+          else if (raw === 'off') bucket = 'off';
+          /* Power isn't in minimal-response payload; default to a non-zero
+             nominal so any heating/cooling slot lands at least in the low
+             tier, otherwise opacity stays at 0 and the cell never shows. */
+          const power = (bucket === 'heating' || bucket === 'cooling') ? 50 : 0;
+          points.push({ t, state: bucket, power });
+        }
+        results[eid] = points;
+      } catch (e) {
+        console.warn(`${SPARKLINE_LOG_PREFIX} state-history parse failed for %s: %O`, eid, e);
+        results[eid] = [];
+      }
+    }
+  } catch (e) {
+    console.warn(`${SPARKLINE_LOG_PREFIX} state-history fetch failed: %O`, e);
     for (const eid of entityIds) results[eid] = [];
   }
   return results;
@@ -252,6 +375,26 @@ export function buildSparklinePath(data, width, height, slots = 24, aggregateFun
     y: pad + drawH - ((d.v - minV) / rangeV) * drawH,
   }));
 
+  return smoothPathFromPoints(pts, smoothing);
+}
+
+/**
+ * Build an SVG path `d` string from screen-space points. With smoothing
+ * (default), uses the midpoint + quadratic Bézier technique (mini-graph-card
+ * getPath): for each pair, line to the midpoint then a Q curve through the
+ * actual point to the next midpoint. Without smoothing, or for exactly two
+ * points, emits straight line segments.
+ *
+ * This is the shared rendering core — callers (Bar sparkline auto-scale,
+ * Climate multi-series shared axis) project their data to {x,y} pixels then
+ * call this so the curve maths lives in one place.
+ * @param {{x:number, y:number}[]} pts - Points already projected to pixels.
+ * @param {boolean} [smoothing=true] - Apply Bézier smoothing.
+ * @returns {string} SVG path `d` attribute, or empty string for <2 points.
+ */
+export function smoothPathFromPoints(pts, smoothing = true) {
+  if (!pts || pts.length < 2) return '';
+
   if (pts.length === 2 || !smoothing) {
     let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
     for (let i = 1; i < pts.length; i++) {
@@ -260,12 +403,8 @@ export function buildSparklinePath(data, width, height, slots = 24, aggregateFun
     return d;
   }
 
-  // Midpoint + quadratic Bezier smoothing (mini-graph-card getPath technique).
-  // For each pair of points, draw a line to the midpoint, then a Q curve
-  // through the actual point to the next midpoint.
   let last = pts[0];
   let d = `M${last.x.toFixed(1)},${last.y.toFixed(1)}`;
-
   for (let i = 1; i < pts.length; i++) {
     const next = pts[i];
     const mx = (last.x + next.x) / 2;

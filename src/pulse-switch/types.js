@@ -9,15 +9,10 @@
 export {};
 
 /**
- * @typedef {object} ActionConfig
- * @property {string} action - 'more-info' | 'navigate' | 'call-service' | 'perform-action' | 'url' | 'toggle' | 'none'
- * @property {string} [entity]
- * @property {string} [navigation_path]
- * @property {string} [service]
- * @property {string} [perform_action]
- * @property {Record<string, *>} [service_data]
- * @property {Record<string, *>} [data]
- * @property {string} [url_path]
+ * HA-framework typedefs are shared — see src/shared/types.js.
+ * @typedef {import('../shared/types.js').ActionConfig} ActionConfig
+ * @typedef {import('../shared/types.js').Hass} Hass
+ * @typedef {import('../shared/types.js').HassEntityState} HassEntityState
  */
 
 /**
@@ -66,17 +61,3 @@ export {};
  * @property {number} utilization - 0-1 ratio (totalSpeed / linkSpeed).
  */
 
-/**
- * @typedef {object} HassEntityState
- * @property {string} entity_id
- * @property {string} state
- * @property {Record<string, *>} attributes
- * @property {string} last_updated
- * @property {string} [last_changed]
- */
-
-/**
- * @typedef {object} Hass
- * @property {Record<string, HassEntityState>} states
- * @property {function(string, string, Record<string, *>=): Promise<void>} callService
- */

@@ -8,8 +8,7 @@
 
 import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } from '../../shared/utils.js';
 import { HVAC_VISUALS } from '../constants.js';
-import { resolveZoneState, computeGlowStdDev, computeParticleCount, computeParticleDuration, computeParticleRadius } from '../utils.js';
-import { extractZoneName } from '../zone-resolver.js';
+import { resolveZoneContext, computeGlowStdDev, computeParticleCount, computeParticleDuration, computeParticleRadius } from '../utils.js';
 import { buildBloomFilter } from '../chart-primitives.js';
 
 /**
@@ -70,10 +69,7 @@ export function renderEnergyFlowSection(zones, states, discovery) {
   let hasAttribute = false;
 
   for (const zoneConfig of zones) {
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
-    const zs = resolveZoneState(entityId, zoneEntities, states, zoneConfig, /** @type {*} */ ({}));
+    const { entityId, zoneEntities, zoneState: zs } = resolveZoneContext(zoneConfig, discovery, states);
 
     if (zs.heatingPower > 0 || zoneEntities.heating_power || states[entityId]?.attributes?.heating_power !== undefined) {
       hasAttribute = true;
@@ -87,10 +83,10 @@ export function renderEnergyFlowSection(zones, states, discovery) {
     : 0;
 
   let html = `<div class="pc-section pc-section-energy-flow">`;
-  html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
+  html += `<div class="pc-section-header">`;
   html += `<div class="pulse-section-label">Energy Flow</div>`;
   if (hasAttribute) {
-    html += `<span class="pc-energy-flow-header-value" style="font-size:11px;color:${sanitizeCssValue(HVAC_VISUALS.heating.fallback)};font-weight:500">${escapeHtml(totalPower)}% avg</span>`;
+    html += `<span class="pc-energy-flow-header-value" style="color:${sanitizeCssValue(HVAC_VISUALS.heating.fallback)}">${escapeHtml(totalPower)}% avg</span>`;
   }
   html += `</div>`;
 
@@ -200,13 +196,13 @@ export function renderEnergyFlowSection(zones, states, discovery) {
     }
 
     const nameFill = active ? 'var(--pulse-text-primary)' : 'var(--pulse-text-secondary)';
-    const nameWeight = active ? ' font-weight="600"' : '';
-    html += `<text x="${destX}" y="${(destY - 1).toFixed(1)}" font-size="11" fill="${sanitizeCssValue(nameFill)}"${nameWeight}>${escapeHtml(zone.name)}</text>`;
+    const nameWeight = active ? ' font-weight="500"' : '';
+    html += `<text x="${destX}" y="${(destY - 1).toFixed(1)}" font-size="14" fill="${sanitizeCssValue(nameFill)}"${nameWeight}>${escapeHtml(zone.name)}</text>`;
     const subFill = active ? sanitizeCssValue(heatingColor) : 'var(--pulse-text-secondary)';
     const subText = active
       ? `${zone.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${Math.round(zone.power)}%${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`
       : `Idle${zone.temp !== null ? ` · ${formatNumericDisplay(zone.temp)}${zone.unit}` : ''}`;
-    html += `<text x="${destX}" y="${(destY + 12).toFixed(1)}" font-size="9" fill="${subFill}">${escapeHtml(subText)}</text>`;
+    html += `<text x="${destX}" y="${(destY + 14).toFixed(1)}" font-size="10" fill="${subFill}">${escapeHtml(subText)}</text>`;
   }
 
   html += `</svg>`;
@@ -233,10 +229,7 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
   /** @type {{name: string, power: number, temp: number|null, unit: string, hvacAction: string}[]} */
   const zoneData = [];
   for (const zoneConfig of zones) {
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
-    const zs = resolveZoneState(entityId, zoneEntities, states, zoneConfig, /** @type {*} */ ({}));
+    const { zoneState: zs } = resolveZoneContext(zoneConfig, discovery, states);
     zoneData.push({ name: zs.name, power: zs.heatingPower, temp: zs.currentTemp, unit: zs.unit, hvacAction: zs.hvacAction });
   }
 
@@ -263,7 +256,7 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
   const fanSpacing = boilerH / Math.max(zoneData.length, 1) * 0.7;
 
   const totalPower = Math.round(zoneData.reduce((s, z) => s + z.power, 0) / zoneData.length);
-  const headerSpan = sectionEl.querySelector('.energy-flow-header-value');
+  const headerSpan = sectionEl.querySelector('.pc-energy-flow-header-value');
   if (headerSpan) headerSpan.textContent = `${totalPower}% avg`;
 
   const boilerRect = svg.querySelector('rect');
@@ -325,8 +318,9 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
         for (const anim of animates) {
           anim.setAttribute('dur', `${dur}s`);
         }
-        /* If animates were absent (zone was idle previously), we can't add them
-           without re-render — gradient shows the correct colour, just static. */
+        /* When the gradient was rendered without <animate> children (idle
+           path), differential update can't add them — gradient stays static
+           with the correct colour until the next full re-render. */
         gradEl.setAttribute('gradientUnits', 'objectBoundingBox');
       } else {
         // Static idle gradient
@@ -354,7 +348,7 @@ export function updateEnergyFlowSection(sectionEl, zones, states, discovery) {
       nameEl.textContent = zone.name;
       nameEl.setAttribute('fill', active ? 'var(--pulse-text-primary)' : 'var(--pulse-text-secondary)');
       if (active) {
-        nameEl.setAttribute('font-weight', '600');
+        nameEl.setAttribute('font-weight', '500');
       } else {
         nameEl.removeAttribute('font-weight');
       }

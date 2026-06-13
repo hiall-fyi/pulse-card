@@ -4,15 +4,53 @@
  */
 
 import { HVAC_VISUALS, RISK_COLORS, DEFAULTS, DEFAULT_SECTIONS, LOG_PREFIX, SECTION_DEFAULTS } from './constants.js';
-import { clamp, formatNumericDisplay } from '../shared/utils.js';
+import { clamp, formatNumericDisplay, makeWarn, isUnavailableState } from '../shared/utils.js';
+import { extractZoneName } from './zone-resolver.js';
 
 /**
  * Log a warning with card prefix.
- * @param {string} msg
- * @param {...*} args
+ * @type {(msg: string, ...args: *[]) => void}
  */
-export function warn(msg, ...args) {
-  console.warn(`${LOG_PREFIX} ${msg}`, ...args);
+export const warn = makeWarn(LOG_PREFIX);
+
+/**
+ * Map a resolved zone state to row modifier classes. Returns leading-space
+ * concatenable string carrying both the granular state class
+ * (`pc-row-heat` / `-cool` / `-idle` / `-at-target` / `-off` / `-unavail` /
+ * `-sensor`) and an aggregator class (`pc-row-active` / `pc-row-mid` /
+ * `pc-row-quiet`) that drives visual hierarchy.
+ *
+ * @param {{ isUnavailable?: boolean, hvacAction?: string, hvacMode?: string, currentTemp?: number|null, targetTemp?: number|null }} zs
+ * @returns {string}
+ */
+export function rowStateClass(zs) {
+  if (zs?.isUnavailable) return ' pc-row-unavail pc-row-quiet';
+  if (zs?.hvacMode === 'sensor') return ' pc-row-sensor pc-row-quiet';
+  if (zs?.hvacAction === 'heating') return ' pc-row-heat pc-row-active';
+  if (zs?.hvacAction === 'cooling') return ' pc-row-cool pc-row-active';
+  if (zs?.hvacAction === 'off') return ' pc-row-off pc-row-quiet';
+  if (zs?.targetTemp === null || zs?.targetTemp === undefined) return ' pc-row-off pc-row-quiet';
+  const at = zs?.currentTemp !== null && zs?.currentTemp !== undefined
+    && Math.abs(/** @type {number} */ (zs.currentTemp) - /** @type {number} */ (zs.targetTemp)) <= 0.3;
+  return at ? ' pc-row-at-target pc-row-mid' : ' pc-row-idle pc-row-mid';
+}
+
+/**
+ * Resolve the per-zone context every section needs: zoneName, the
+ * discovery's zoneEntities map, and the fully-resolved zoneState.
+ *
+ * @param {import('./types.js').ZoneConfig} zoneConfig
+ * @param {*} discovery
+ * @param {Record<string, *>} states
+ * @param {*} [cardConfig]
+ * @returns {{ entityId: string, zoneName: string, zoneEntities: Record<string, string>, zoneState: import('./types.js').ZoneState }}
+ */
+export function resolveZoneContext(zoneConfig, discovery, states, cardConfig) {
+  const entityId = zoneConfig.entity;
+  const zoneName = extractZoneName(entityId);
+  const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
+  const zoneState = resolveZoneState(entityId, zoneEntities, states, zoneConfig, /** @type {*} */ (cardConfig || {}));
+  return { entityId, zoneName, zoneEntities, zoneState };
 }
 
 /** Dedupe set for one-shot override warnings; keyed by zone|key|entityId. */
@@ -36,12 +74,17 @@ export function warnUnresolvedOverride(zoneName, key, entityId, states) {
 }
 
 /**
- * Resolve HVAC action visual (icon, color, label).
+ * Resolve HVAC action visual (icon, color, label, glow).
+ * `glow` is the fallback hex for active states (heating/cooling), used for
+ * box-shadow on hero dots and active power bars; null for idle/off so passive
+ * states don't bloom.
  * @param {string} action - hvac_action value.
- * @returns {{icon: string, token: string|null, fallback: string, label: string}}
+ * @returns {{icon: string, token: string|null, fallback: string, label: string, glow: string|null}}
  */
 export function resolveHvacVisual(action) {
-  return /** @type {Record<string, *>} */ (HVAC_VISUALS)[action] || HVAC_VISUALS.idle;
+  const entry = /** @type {Record<string, *>} */ (HVAC_VISUALS)[action] || HVAC_VISUALS.idle;
+  const isActive = action === 'heating' || action === 'cooling';
+  return { ...entry, glow: isActive ? entry.fallback : null };
 }
 
 /**
@@ -154,7 +197,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   const pushRiskChip = (type, icon, entityKey) => {
     if (!include(type) || !discoveredEntities[entityKey]) return;
     const s = states[discoveredEntities[entityKey]];
-    if (s && !['unavailable', 'unknown', 'none'].includes(s.state.toLowerCase())) {
+    if (!isUnavailableState(s) && s.state.toLowerCase() !== 'none') {
       const riskColor = resolveRiskColor(s.state);
       chips.push({ type, icon, label: s.state, color: riskColor.token, severity: s.state, entityId: discoveredEntities[entityKey] });
     }
@@ -166,7 +209,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
       const isOpen = s.state === 'on';
       chips.push({
         type: 'open_window', icon: isOpen ? 'mdi:window-open' : 'mdi:window-closed',
-        label: isOpen ? 'Open' : 'Closed', color: isOpen ? 'var(--pulse-status-red)' : undefined,
+        label: isOpen ? 'Open' : 'Closed', color: isOpen ? 'var(--pulse-tier-gale)' : undefined,
         entityId: discoveredEntities.open_window,
       });
     }
@@ -177,7 +220,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     if (s && s.state === 'on') {
       chips.push({
         type: 'window_predicted', icon: 'mdi:window-open-variant',
-        label: 'Window predicted', color: 'var(--pulse-status-yellow)',
+        label: 'Window predicted', color: 'var(--pulse-tier-strong)',
         entityId: discoveredEntities.window_predicted,
       });
     }
@@ -188,7 +231,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
 
   if (include('comfort_level') && discoveredEntities.comfort_level) {
     const s = states[discoveredEntities.comfort_level];
-    if (s && s.state !== 'unavailable') {
+    if (!isUnavailableState(s)) {
       chips.push({ type: 'comfort_level', icon: 'mdi:emoticon-outline', label: s.state, entityId: discoveredEntities.comfort_level });
     }
   }
@@ -196,7 +239,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   if (include('preheat_now') && discoveredEntities.preheat_now) {
     const s = states[discoveredEntities.preheat_now];
     if (s && s.state === 'on') {
-      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', color: 'var(--pulse-status-yellow)', entityId: discoveredEntities.preheat_now });
+      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', color: 'var(--pulse-tier-strong)', entityId: discoveredEntities.preheat_now });
     }
   }
 
@@ -214,7 +257,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
       const eid = discoveredEntities[key];
       if (!eid) continue;
       const s = states[eid];
-      if (!s || s.state === 'unavailable') continue;
+      if (isUnavailableState(s)) continue;
       batteries.push({ eid, state: s.state, lower: s.state.toLowerCase() });
     }
 
@@ -224,7 +267,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
         for (let i = 0; i < batteries.length; i++) {
           const b = batteries[i];
           const battIcon = b.lower === 'low' || b.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-          const battColor = b.lower === 'critical' ? 'var(--pulse-status-red)' : b.lower === 'low' ? 'var(--pulse-status-yellow)' : undefined;
+          const battColor = b.lower === 'critical' ? 'var(--pulse-tier-gale)' : b.lower === 'low' ? 'var(--pulse-tier-strong)' : undefined;
           chips.push({ type: `battery${i > 0 ? `_${i + 1}` : ''}`, icon: battIcon, label: b.state, color: battColor, entityId: b.eid });
         }
       } else {
@@ -236,7 +279,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
           if ((SEVERITY[b.lower] || 0) > (SEVERITY[worst.lower] || 0)) worst = b;
         }
         const battIcon = worst.lower === 'low' || worst.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-        const battColor = worst.lower === 'critical' ? 'var(--pulse-status-red)' : worst.lower === 'low' ? 'var(--pulse-status-yellow)' : undefined;
+        const battColor = worst.lower === 'critical' ? 'var(--pulse-tier-gale)' : worst.lower === 'low' ? 'var(--pulse-tier-strong)' : undefined;
         chips.push({ type: 'battery', icon: battIcon, label: worst.state, color: battColor, entityId: worst.eid });
       }
     }
@@ -253,7 +296,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     if (backedOff === true) {
       chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Backed off', color: 'var(--pulse-disabled)' });
     } else if (valveActive === true && valveTarget !== undefined) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${formatNumericDisplay(valveTarget)}${zoneState.unit}`, color: 'var(--pulse-status-yellow)' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${formatNumericDisplay(valveTarget)}${zoneState.unit}`, color: 'var(--pulse-tier-strong)' });
     } else if (valveEnabled === true) {
       chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Idle', color: 'var(--pulse-disabled)' });
     }
@@ -284,7 +327,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
  */
 export function resolveZoneState(entityId, discoveredEntities, states, zoneConfig, cardConfig) {
   const state = states[entityId];
-  const isUnavailable = !state || state.state === 'unavailable' || state.state === 'unknown';
+  const isUnavailable = isUnavailableState(state);
   const attrs = state?.attributes || {};
 
   const isSensor = entityId.startsWith('sensor.');
@@ -301,12 +344,18 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
   const tempStep = Number(attrs.target_temp_step ?? 0.5);
   const unit = attrs.unit_of_measurement || '°C';
 
-  /* Heating power: discovered Tado CE sensor takes priority, fall back to
-     the climate entity's own attribute. */
+  /* Heating power: per-zone override → discovered Tado CE sensor → the
+     climate entity's own attribute. The override is resolved here (before the
+     mergedEntities block below) because the heating-power read happens before
+     that merge — routing it through mergedEntities would miss this read. */
   let heatingPower = 0;
-  if (discoveredEntities.heating_power) {
-    const hp = states[discoveredEntities.heating_power];
-    if (hp && hp.state !== 'unavailable') heatingPower = parseFloat(hp.state) || 0;
+  const heatingPowerEntity = zoneConfig.heating_power_entity || discoveredEntities.heating_power;
+  if (zoneConfig.heating_power_entity) {
+    warnUnresolvedOverride(zoneConfig.name || entityId, 'heating_power_entity', zoneConfig.heating_power_entity, states);
+  }
+  if (heatingPowerEntity) {
+    const hp = states[heatingPowerEntity];
+    if (!isUnavailableState(hp)) heatingPower = parseFloat(hp.state) || 0;
   } else if (attrs.heating_power !== undefined) {
     heatingPower = parseFloat(attrs.heating_power) || 0;
   }
@@ -314,13 +363,13 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
   let coolingPower = 0;
   if (discoveredEntities.ac_power) {
     const ap = states[discoveredEntities.ac_power];
-    if (ap && ap.state !== 'unavailable') coolingPower = parseFloat(ap.state) || 0;
+    if (!isUnavailableState(ap)) coolingPower = parseFloat(ap.state) || 0;
   }
 
   let overlayType = '';
   if (discoveredEntities.overlay) {
     const ov = states[discoveredEntities.overlay];
-    if (ov && ov.state !== 'unavailable') overlayType = ov.state;
+    if (!isUnavailableState(ov)) overlayType = ov.state;
   } else if (attrs.overlay_type) {
     overlayType = attrs.overlay_type;
   }
@@ -505,4 +554,34 @@ export function normalizeClimateConfig(config) {
   }
 
   return merged;
+}
+
+/**
+ * Build a per-zone history map from the cache. Empty array for zones
+ * without history; missing cache returns a map with empty arrays for each
+ * zone (no special-casing needed at call sites).
+ *
+ * History is keyed in the cache by the *resolved temperature sensor* (per
+ * sensor-resolver), not the climate entity ID, because the same climate
+ * entity can have its temperature sourced from an external sensor via
+ * `temperature_entity`. Pass `resolveSensorId` to do the lookup; without
+ * it the map keys directly off `zone.entity` and only populates for zones
+ * whose climate entity is itself the history key.
+ *
+ * Used by hero (per-zone strips), state-timeline view, heatmap-avg.
+ *
+ * @param {Array<{entity: string}>|null|undefined} zones
+ * @param {{data?: Record<string, Array<{t: number, v: number}>>}|null|undefined} historyCache
+ * @param {((entityId: string) => string)|null} [resolveSensorId] - Map climate entity → history key.
+ * @returns {Map<string, Array<{t: number, v: number}>>}
+ */
+export function buildHistoryMap(zones, historyCache, resolveSensorId) {
+  const map = new Map();
+  if (!Array.isArray(zones)) return map;
+  for (const zone of zones) {
+    if (!zone?.entity) continue;
+    const sensorId = resolveSensorId ? resolveSensorId(zone.entity) : zone.entity;
+    map.set(zone.entity, historyCache?.data?.[sensorId] || []);
+  }
+  return map;
 }

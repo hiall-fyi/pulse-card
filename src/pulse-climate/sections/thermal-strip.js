@@ -9,9 +9,10 @@
 
 import { escapeHtml } from '../../shared/utils.js';
 import { temperatureToColor, humidityToColor } from '../chart-primitives.js';
-import { extractZoneName } from '../zone-resolver.js';
+import { resolveZoneContext, rowStateClass } from '../utils.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 import { computeSlots, renderTimelineStrip, renderHeatmapStrip, renderTimeLabels } from './slot-engine.js';
+import { renderThermalHeatmapView } from './thermal-heatmap-view.js';
 
 /**
  * Render Thermal/Humidity strip section HTML.
@@ -40,28 +41,36 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
   const modeLabel = mode === 'heatmap' ? 'Heatmap' : 'Timeline';
 
   let html = `<div class="pc-section pc-section-thermal-strip">`;
-  html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
+  html += `<div class="pc-section-header">`;
   html += `<div class="pulse-section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(typeLabel)} ${escapeHtml(modeLabel)}</div>`;
-  html += `<span class="pc-card-subtitle pc-section-subtitle" style="font-size:11px;color:var(--pulse-text-secondary)">Tap a zone for details</span>`;
+  html += `<span class="pc-section-subtitle">Tap a zone for details</span>`;
   html += `</div>`;
 
-  /* Detail panel + crosshair are populated by _bindTimelineInteractions on tap. */
+  /* Temperature heatmap delegates the body to thermal-heatmap-view (same
+     renderer powers the timeline_group Thermal tab). Timeline mode and
+     humidity heatmap take the inline path below. */
+  if (mode === 'heatmap' && !isHumidity) {
+    html += `<div class="pc-zone-detail" id="timeline-detail"></div>`;
+    html += renderThermalHeatmapView(zones, states, discovery, historyCache);
+    html += `</div>`;
+    return html;
+  }
+
   html += `<div class="pc-zone-detail" id="timeline-detail"></div>`;
-  html += `<div class="pc-strip-rows" style="position:relative">`;
-  html += `<div class="pc-strip-crosshair" style="display:none"></div>`;
+  html += `<div class="pc-strip-rows">`;
+  html += `<div class="pc-strip-crosshair"></div>`;
 
   for (const zoneConfig of zones) {
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
+    const { entityId, zoneName, zoneEntities, zoneState } = resolveZoneContext(zoneConfig, discovery, states);
     const resolved = isHumidity
       ? resolveHistoryHumSensor(entityId, states, zoneEntities, zoneConfig)
       : resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig);
     const sensorId = resolved?.entityId || entityId;
     const friendlyName = zoneConfig.name || states[entityId]?.attributes?.friendly_name || zoneName;
     const data = historyCache?.data?.[sensorId] || [];
+    const rowClass = rowStateClass(zoneState);
 
-    html += `<div class="pc-timeline-row" data-zone="${escapeHtml(zoneName)}" data-entity="${escapeHtml(entityId)}">`;
+    html += `<div class="pc-timeline-row${rowClass}" data-zone="${escapeHtml(zoneName)}" data-entity="${escapeHtml(entityId)}">`;
     html += `<span class="pc-zone-label">${escapeHtml(friendlyName)}</span>`;
 
     if (data.length < 2) {
@@ -69,7 +78,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
       const entityExists = !!states[sensorId];
       const hasCacheEntry = sensorId in (historyCache?.data || {});
       const emptyMsg = (entityExists && !hasCacheEntry) ? 'Waiting for data' : 'No data';
-      html += `<div class="pc-strip-container"><div class="pc-chart-empty" style="height:14px;font-size:10px">`
+      html += `<div class="pc-strip-container"><div class="pc-chart-empty">`
         + `${escapeHtml(emptyMsg)}</div></div>`;
     } else {
       const slotData = computeSlots(data, slots, windowMs);
@@ -88,7 +97,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
 
   html += `</div>`;
 
-  html += `<div class="pc-time-axis" style="margin-left:76px">`;
+  html += `<div class="pc-time-axis">`;
   html += renderTimeLabels(windowMs);
   html += `</div>`;
 
