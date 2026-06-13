@@ -235,8 +235,10 @@ Not all sections work with every setup. Here's a quick reference:
 | `home_status` | ✅ | — |
 | `zone_ranking` | ✅ (Comfort tab needs Tado CE) | — |
 | `radial` | ✅ | — |
+| `timeline_group` | ✅ | — |
 | `donut` | ✅ (with custom `segments`) | ✅ (for `api_breakdown` / `homekit_saved`) |
 | `api` | — | ✅ |
+| `system_health_group` | — | ✅ |
 | `bridge` | — | ✅ |
 | `homekit` | — | ✅ |
 | `weather` | — | ✅ |
@@ -403,6 +405,22 @@ sections:
     outdoor_humidity_entity: sensor.outdoor_humidity
 ```
 
+### timeline_group
+
+A tabbed 24-hour history section that hosts two views behind a tab strip, so you get both without stacking two full sections. The **Thermal** tab shows the colour-coded temperature heatmap with a 24h average per zone and a colour legend along the bottom; the **State** tab shows when each zone was actually heating or cooling, with cell opacity reflecting the demand level. Both tabs share the same row grid, so zones stay vertically aligned when you switch tabs. Tap a row on either tab to reveal its detail stats.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `active_tab` | string | `thermal` | Which tab opens first — `thermal` or `state`. The card remembers your last tab while it's on screen |
+
+The 24-hour window is fixed for this section. If you need a different window or finer resolution, use the standalone `thermal_strip` section instead.
+
+```yaml
+sections:
+  - type: timeline_group
+    active_tab: state
+```
+
 ### Tado CE Sections
 
 The following sections display data from the [Tado CE](https://github.com/hiall-fyi/tado_ce) integration. They rely on auto-discovery of `sensor.tado_ce_*` entities — if these entities aren't present, the sections won't show any data. You can include them in your config regardless; they simply won't render if the required entities aren't found.
@@ -446,6 +464,20 @@ sections:
   - schedule
   - api
   - bridge
+```
+
+#### system_health_group
+
+A tabbed section that folds the `bridge`, `homekit`, and `api` views into one tab strip, so the three health surfaces share a single block instead of three. It only shows the views it can actually find: with none discovered the whole section stays hidden, with one it drops the tab strip and just shows that view, and with two or three it shows a tab strip in the order Bridge → HomeKit → API. Handy when you run all three; for a cloud-only setup with no HomeKit, it quietly adapts to whatever's there.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `active_tab` | string | first available | Which tab opens first — `bridge`, `homekit`, or `api`. Falls back to the first discovered view if the one you name isn't available |
+
+```yaml
+sections:
+  - type: system_health_group
+    active_tab: homekit
 ```
 
 ### Multi-Section Example
@@ -601,13 +633,13 @@ Pulse Climate Card has several visual features that make your climate dashboard 
 
 ### Home Overview
 
-A single-glance summary at the top of the card, anchored by the home-average temperature in big numbers. Sits above the zone list and shows the average alongside a status pill that summarises heating state across all zones (`All Good` / `Warming Up` / `Cold Start` / `Cooling`), how many zones are heating right now, a 24-hour thermal strip of the home's average, and an outdoor temperature line.
+A single-glance summary at the top of the card, anchored by the home-average temperature in big numbers. Below the number sits a cluster of dots, one per zone. Heating and cooling zones breathe in time with each other, idle zones stay dim, and off or unavailable zones fade further back. Hover a dot for the zone name and state. Under the dots, each zone gets its own 24-hour thermal strip with a coloured left ribbon flagging its current state (amber heating, cyan cooling, grey idle), so you can read the whole home's recent history at a glance. With seven or more zones, the strips cap at six rows plus a `+N more` line to keep the hero height predictable. An outdoor temperature line rounds it off.
 
-**Off by default — opt in with `show_hero: true`.** Once enabled, hide individual rows with `hero_show_thermal_strip: false` / `hero_show_outside: false`. The outdoor temperature auto-detects from a Tado CE outside sensor or any `weather.*` entity in your dashboard; override with the card-level `outdoor_temp_entity`.
+**Off by default — opt in with `show_hero: true`.** Once enabled, hide the per-zone strips with `hero_show_thermal_strip: false` or the outdoor line with `hero_show_outside: false`. The outdoor temperature auto-detects from a Tado CE outside sensor or any `weather.*` entity in your dashboard; override with the card-level `outdoor_temp_entity`.
 
 ### Atmosphere Backdrop
 
-A slow animated tint behind the card chrome that reflects overall heating state — warmer when zones are heating up, calmer when steady. Defaults to `medium` intensity and respects `prefers-reduced-motion`.
+A quiet radial wash behind the card chrome that only appears when something's actually running: amber sweeping from the top when zones are heating, cyan from the bottom when cooling, both at lower intensity when the home is mixed. When everything is idle or off, the backdrop shows nothing at all, so the card reads as calm when there's nothing to report. Every motion on the card (this wash, the hero dots) breathes on one shared 4-second pulse, and the whole thing freezes under `prefers-reduced-motion`.
 
 `atmosphere_intensity` accepts `subtle` / `medium` / `bold`. Set `show_atmosphere: false` to disable entirely.
 

@@ -5,7 +5,7 @@
  * Pure functions — no side effects, no DOM access (except tooltip factory).
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, formatHHMM } from '../../shared/utils.js';
 
 /**
  * @typedef {object} SlotData
@@ -58,10 +58,7 @@ export function computeSlots(data, slots, windowMs) {
       lastVal = Math.round((sum / count) * 10) / 10;
     }
 
-    const d = new Date(sMid);
-    const label = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
-    result.push({ value: lastVal, time: sMid, label });
+    result.push({ value: lastVal, time: sMid, label: formatHHMM(new Date(sMid)) });
   }
   return result;
 }
@@ -84,7 +81,7 @@ export function computeSlots(data, slots, windowMs) {
  */
 export function renderTimelineStrip(slotData, colorFn, options = {}) {
   const slots = slotData.length;
-  if (slots === 0) return '<div class="pc-strip-container"><div class="pc-chart-empty" style="height:14px;font-size:10px">No data</div></div>';
+  if (slots === 0) return '<div class="pc-strip-container"><div class="pc-chart-empty">No data</div></div>';
 
   const emptyColor = options.emptyColor || 'var(--pulse-disabled)';
   const emptyOpacity = options.emptyOpacity ?? 0.3;
@@ -119,7 +116,7 @@ export function renderTimelineStrip(slotData, colorFn, options = {}) {
  */
 export function renderHeatmapStrip(slotData, colorFn, _options = {}) {
   const slots = slotData.length;
-  if (slots === 0) return '<div class="pc-cells"><div class="pc-chart-empty" style="height:16px;font-size:10px">No data</div></div>';
+  if (slots === 0) return '<div class="pc-cells"><div class="pc-chart-empty">No data</div></div>';
 
   const slotsJson = JSON.stringify(slotData.map((s) => ({ v: s.value, l: s.label })));
   let html = `<div class="pc-cells" data-slots='${escapeHtml(slotsJson)}'>`;
@@ -207,9 +204,9 @@ export function renderTimeLabels(windowMs, labels = 5) {
   let html = '';
   for (let i = 0; i < labels - 1; i++) {
     const t = new Date(windowStart + (i / (labels - 1)) * windowMs);
-    html += `<span class="pc-time-label">${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}</span>`;
+    html += `<span class="pc-time-label">${formatHHMM(t)}</span>`;
   }
-  html += `<span class="pc-time-label">${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}</span>`;
+  html += `<span class="pc-time-label">${formatHHMM(now)}</span>`;
   return html;
 }
 

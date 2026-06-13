@@ -5,21 +5,20 @@
  * visual language. Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, uniqueDomId } from '../../shared/utils.js';
 import { CHART_PALETTE } from '../constants.js';
 import { buildFilledSparkline, buildMultiLinePaths, buildLegendChips, buildBloomFilter, uniqueBloomId } from '../chart-primitives.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 
 /**
- * Module-level counter for unique gradient ids. Prevents `graph-grad-${i}`
- * collision when a single card renders stacked sub-graphs (temp + humidity)
- * or multiple graph sections within the same shadow DOM.
+ * Unique gradient id for this section. Prevents `graph-grad-*` collision when
+ * a single card renders stacked sub-graphs (temp + humidity) or multiple graph
+ * sections within the same shadow DOM. Backed by the shared id counter.
+ * @returns {string}
  */
-let _graphGradCounter = 0;
 function uniqueGraphGradId() {
-  _graphGradCounter = (_graphGradCounter + 1) >>> 0;
-  return `graph-grad-${_graphGradCounter.toString(36)}`;
+  return uniqueDomId('graph-grad');
 }
 
 /**

@@ -6,8 +6,8 @@
  * Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml } from '../../shared/utils.js';
-import { extractZoneName } from '../zone-resolver.js';
+import { escapeHtml, formatHHMM } from '../../shared/utils.js';
+import { resolveZoneContext, rowStateClass } from '../utils.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slot-engine.js';
 
@@ -118,21 +118,19 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
   const modeLabel = mode === 'timeline' ? 'Comfort Timeline' : 'Comfort Heatmap';
 
   let html = `<div class="pc-section pc-section-comfort-strip">`;
-  html += `<div style="display:flex;justify-content:space-between;align-items:baseline">`;
+  html += `<div class="pc-section-header">`;
   html += `<div class="pulse-section-label">${escapeHtml(String(Number(hours)))}h ${escapeHtml(modeLabel)}</div>`;
-  html += `<span class="pc-card-subtitle" style="font-size:11px;color:var(--pulse-text-secondary)">Tap a zone for details</span>`;
+  html += `<span class="pc-section-subtitle">Tap a zone for details</span>`;
   html += `</div>`;
 
   /* Detail panel placeholder, populated by _bindHeatmapInteractions on row select. */
   html += `<div class="pc-zone-detail" id="heatmap-detail"></div>`;
 
-  html += `<div class="pc-heatmap-body" style="position:relative">`;
-  html += `<div class="pc-strip-crosshair" style="display:none"></div>`;
+  html += `<div class="pc-heatmap-body">`;
+  html += `<div class="pc-strip-crosshair"></div>`;
   for (let z = 0; z < zones.length; z++) {
     const zoneConfig = zones[z];
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
+    const { entityId, zoneName, zoneEntities, zoneState } = resolveZoneContext(zoneConfig, discovery, states);
     const friendlyName = zoneConfig.name || states[entityId]?.attributes?.friendly_name || zoneName;
     const tempResolved = resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig);
     const tempSensorId = tempResolved.entityId;
@@ -169,11 +167,12 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
       const score = computeComfortScore(temp, targetTemp, hum, comfortLevel);
       if (score !== null) lastScore = score;
       const slotDate = new Date(slotMid);
-      const hourLabel = `${String(slotDate.getHours()).padStart(2, '0')}:${String(slotDate.getMinutes()).padStart(2, '0')}`;
+      const hourLabel = formatHHMM(slotDate);
       slotData.push({ value: lastScore, time: slotMid, label: hourLabel });
     }
 
-    html += `<div class="pc-heatmap-row" data-zone="${escapeHtml(zoneName)}" data-idx="${z}">`;
+    const rowClass = rowStateClass(zoneState);
+    html += `<div class="pc-heatmap-row${rowClass}" data-zone="${escapeHtml(zoneName)}" data-idx="${z}">`;
     html += `<span class="pc-zone-label">${escapeHtml(friendlyName)}</span>`;
     const ariaLabel = `${friendlyName} comfort over ${hours}h`;
     if (mode === 'timeline') {
@@ -190,9 +189,9 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
   html += `</div>`;
 
   html += `<div class="pc-heatmap-legend">`;
-  html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(52,199,89,0.7)"></div>≥80</div>`;
-  html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(255,159,10,0.65)"></div>50–79</div>`;
-  html += `<div class="pc-legend-item"><div class="pc-legend-swatch" style="background:rgba(255,69,58,0.6)"></div>&lt;50</div>`;
+  html += `<div class="pc-legend-item"><div class="pc-legend-swatch pc-legend-swatch-good"></div>≥80</div>`;
+  html += `<div class="pc-legend-item"><div class="pc-legend-swatch pc-legend-swatch-fair"></div>50–79</div>`;
+  html += `<div class="pc-legend-item"><div class="pc-legend-swatch pc-legend-swatch-poor"></div>&lt;50</div>`;
   html += `</div>`;
 
   html += `</div>`;

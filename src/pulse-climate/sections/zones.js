@@ -5,9 +5,8 @@
  * Uses shared chart-primitives for consistent visual identity.
  */
 
-import { escapeHtml, sanitizeCssValue, formatNumericDisplay } from '../../shared/utils.js';
-import { resolveZoneState, resolveHvacVisual, tempToPosition, computeGlowStdDev } from '../utils.js';
-import { extractZoneName } from '../zone-resolver.js';
+import { escapeHtml, sanitizeCssValue, formatNumericDisplay, isUnavailableState } from '../../shared/utils.js';
+import { resolveZoneContext, resolveHvacVisual, tempToPosition, computeGlowStdDev } from '../utils.js';
 import { resolveHistoryTempSensor } from '../sensor-resolver.js';
 import { temperatureToColor, buildFilledSparkline, buildSparklineDataAttr, buildBloomFilter } from '../chart-primitives.js';
 import { buildSparklinePath } from '../../shared/utils.js';
@@ -53,7 +52,7 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
   }
 
   const tempDisplay = zs.isUnavailable
-    ? 'Unavailable'
+    ? ''
     : zs.currentTemp !== null
       ? `${formatNumericDisplay(zs.currentTemp)}${escapeHtml(zs.unit)}`
       : '--';
@@ -72,6 +71,7 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
 
   let html = `<div class="pc-zone-row${unavailableClass}${stateClass}" tabindex="0" role="button"
     aria-label="${escapeHtml(ariaLabel)}" data-entity="${escapeHtml(zs.entityId)}">`;
+  html += `<div class="pc-row-ribbon"></div>`;
   html += `<div class="pc-zone-header">`;
   html += `<span class="pc-zone-name">${zs.icon && zs.icon !== 'mdi:thermometer' ? `<ha-icon icon="${escapeHtml(zs.icon)}"></ha-icon> ` : ''}${escapeHtml(zs.name)}${humidityDisplay}</span>`;
   html += `<span class="pc-zone-temp">${tempDisplay}${targetDisplay}${stateTag}</span>`;
@@ -264,7 +264,7 @@ function renderProminentSparkline(lineColor, data, unit, entityId) {
   const gradId = `prom-grad-${gradSuffix}`;
   const safeColor = sanitizeCssValue(lineColor);
   const dataAttr = buildSparklineDataAttr(data, 24, unit);
-  let html = `<div class="pc-sparkline-filled" style="height:40px"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
+  let html = `<div class="pc-sparkline-filled pc-sparkline-prominent"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
   html += `<svg viewBox="0 0 300 40" preserveAspectRatio="none">`;
   html += `<defs><linearGradient id="${escapeHtml(gradId)}" x1="0" y1="0" x2="0" y2="1">`;
   html += `<stop offset="0%" stop-color="${safeColor}" stop-opacity="0.3"/>`;
@@ -299,12 +299,12 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
   // Section header with optional Home/Away presence badge
   const homeEntity = discovery?.hubEntities?.home_state;
   const homeState = homeEntity ? states[homeEntity] : null;
-  if (homeState && homeState.state !== 'unavailable') {
+  if (!isUnavailableState(homeState)) {
     const isHome = homeState.state === 'on';
     const homeIcon = isHome ? 'mdi:home' : 'mdi:home-export-outline';
     const homeLabel = isHome ? 'Home' : 'Away';
-    const homeColor = isHome ? 'var(--pulse-status-green)' : 'var(--pulse-text-secondary)';
-    html += `<div style="display:flex;justify-content:space-between;align-items:center">`;
+    const homeColor = isHome ? 'var(--pulse-tier-moderate)' : 'var(--pulse-text-secondary)';
+    html += `<div class="pc-section-header pc-section-header-center">`;
     html += `<div class="pulse-section-label">Zones</div>`;
     html += `<span class="pc-chip" data-entity="${escapeHtml(homeEntity)}" style="color:${sanitizeCssValue(homeColor)}">`;
     html += `<ha-icon icon="${escapeHtml(homeIcon)}"></ha-icon>${escapeHtml(homeLabel)}</span>`;
@@ -314,12 +314,9 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
   }
 
   for (const zoneConfig of zones) {
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const discoveredEntities = discovery?.zoneEntities?.[zoneName] || {};
-    const zoneState = resolveZoneState(entityId, discoveredEntities, states, zoneConfig, config);
+    const { entityId, zoneEntities, zoneState } = resolveZoneContext(zoneConfig, discovery, states, config);
     // History is keyed by sensor entity ID (not climate entity ID) — use shared resolver
-    const tempResolved = resolveHistoryTempSensor(entityId, states, discoveredEntities, zoneConfig);
+    const tempResolved = resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig);
     const sparklineData = historyCache?.data?.[tempResolved.entityId] || historyCache?.data?.[entityId] || [];
     html += renderZoneRow(zoneState, zoneConfig, config, sparklineData);
   }
@@ -345,21 +342,19 @@ export function updateZonesSection(sectionEl, zones, config, states, discovery, 
   for (let i = 0; i < zones.length; i++) {
     const zoneConfig = zones[i];
     const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const discoveredEntities = discovery?.zoneEntities?.[zoneName] || {};
 
     const currentState = states[entityId];
     const prevState = prevStates[entityId];
     if (currentState === prevState && zoneRows[i]) continue;
 
-    const zoneState = resolveZoneState(entityId, discoveredEntities, states, zoneConfig, config);
+    const { zoneState } = resolveZoneContext(zoneConfig, discovery, states, config);
     const row = zoneRows[i];
     if (!row) continue;
 
     const tempEl = row.querySelector('.pc-zone-temp');
     if (tempEl) {
       const tempDisplay = zoneState.isUnavailable
-        ? 'Unavailable'
+        ? ''
         : zoneState.currentTemp !== null
           ? `${formatNumericDisplay(zoneState.currentTemp)}${zoneState.unit}`
           : '--';

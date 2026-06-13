@@ -6,15 +6,11 @@
 export {};
 
 /**
- * @typedef {object} ActionConfig
- * @property {string} action
- * @property {string} [entity]
- * @property {string} [navigation_path]
- * @property {string} [service]
- * @property {string} [perform_action]
- * @property {Record<string, *>} [service_data]
- * @property {Record<string, *>} [data]
- * @property {string} [url_path]
+ * HA-framework typedefs are shared — see src/shared/types.js.
+ * @typedef {import('../shared/types.js').ActionConfig} ActionConfig
+ * @typedef {import('../shared/types.js').Hass} Hass
+ * @typedef {import('../shared/types.js').HassEntityState} HassEntityState
+ * @typedef {import('../shared/types.js').HassEntityRegistryEntry} HassEntityRegistryEntry
  */
 
 /**
@@ -27,6 +23,7 @@ export {};
  * @property {string} [open_window_entity] - Override open window binary sensor (e.g. binary_sensor.living_room_window). Shown as chip when window state changes.
  * @property {string} [battery_entity] - Override battery sensor (e.g. sensor.living_room_battery). Shown as chip with state icon.
  * @property {string} [mold_risk_entity] - Override mold risk sensor (e.g. sensor.living_room_mold_risk). Shown as chip when risk is detected.
+ * @property {string} [heating_power_entity] - Override heating power sensor (e.g. sensor.living_room_heating_power). Drives the power bar and energy flow when auto-discovery fails.
  * @property {string[]} [chips] - Explicit chip list (overrides auto-detect).
  * @property {string} [color] - Override bar color.
  * @property {boolean} [show_temp_bar] - Show temperature gauge bar.
@@ -43,6 +40,21 @@ export {};
  * @typedef {object} SectionConfig
  * @property {string} type - Section type name.
  * @property {Record<string, *>} [options] - Section-specific options.
+ */
+
+/**
+ * @typedef {object} TimelineGroupSection
+ * @property {'timeline_group'} type
+ * @property {'thermal'|'state'} [active_tab] - Initial / persisted active tab.
+ *   Default 'thermal'. Mutated at runtime by tab click handler.
+ */
+
+/**
+ * @typedef {object} SystemHealthGroupSection
+ * @property {'system_health_group'} type
+ * @property {'bridge'|'homekit'|'api'} [active_tab] - Initial / persisted active tab.
+ *   Default = first available view in priority order bridge → homekit → api.
+ *   Falls back silently when the requested tab's predicate returns false.
  */
 
 /**
@@ -125,33 +137,6 @@ export {};
  * @property {string[]} missingHubKeys - Hub entity keys not found during discovery.
  */
 
-/**
- * @typedef {object} Hass
- * @property {Record<string, HassEntityState>} states
- * @property {Record<string, HassEntityRegistryEntry>} [entities]
- * @property {function(string, string, Record<string, *>=): Promise<void>} callService
- * @property {function(Record<string, *>): Promise<*>} callWS
- */
-
-/**
- * @typedef {object} HassEntityState
- * @property {string} entity_id
- * @property {string} state
- * @property {Record<string, *>} attributes
- * @property {string} last_updated
- * @property {string} [last_changed]
- */
-
-/**
- * @typedef {object} HassEntityRegistryEntry
- * @property {string} entity_id
- * @property {number|null} [display_precision]
- * @property {string|null} [platform]
- * @property {string} [unique_id]
- * @property {string} [translation_key]
- * @property {string} [device_id]
- */
-
 // ── Chart Types ─────────────────────────────────────────────────────
 
 /**
@@ -178,7 +163,8 @@ export {};
 /**
  * @typedef {object} HistoryCache
  * @property {number} timestamp - Cache creation time (Date.now()).
- * @property {Record<string, {t:number, v:number}[]>} data - Entity ID → data points.
+ * @property {Record<string, {t:number, v:number}[]>} data - Entity ID → numeric data points.
+ * @property {Record<string, {t:number, state:string, power:number}[]>} [stateData] - Entity ID → HVAC state history.
  */
 
 /**

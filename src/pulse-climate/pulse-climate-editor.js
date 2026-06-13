@@ -9,6 +9,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { EDITOR_NAME } from './constants.js';
 import {
   loadEditorHelpers, renderReorderButtons, computeLabel, SHARED_EDITOR_STYLES,
+  updateListItemField, updateListItemNested, moveListItem, removeListItem,
 } from '../shared/editor-helpers.js';
 
 /** Layout options for dropdown. */
@@ -35,6 +36,7 @@ const SECTION_GROUPS = [
       { value: 'thermal_strip', label: 'Thermal strip' },
       { value: 'comfort_strip', label: 'Comfort strip' },
       { value: 'energy_flow', label: 'Energy flow' },
+      { value: 'timeline_group', label: '24h Timeline (tabbed)' },
     ],
   },
   {
@@ -44,6 +46,7 @@ const SECTION_GROUPS = [
       { value: 'api', label: 'API' },
       { value: 'bridge', label: 'Bridge' },
       { value: 'homekit', label: 'HomeKit' },
+      { value: 'system_health_group', label: 'System Health (Bridge / HomeKit / API tabs)' },
       { value: 'weather', label: 'Weather' },
       { value: 'environment', label: 'Environment' },
       { value: 'thermal', label: 'Thermal' },
@@ -84,12 +87,9 @@ class PulseClimateCardEditor extends LitElement {
   static get properties() {
     return {
       hass: { attribute: false },
-      _config: { type: Object },
+      _config: { state: true },
     };
   }
-
-  /** @type {Record<string, *>|null} */
-  _config = null;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -130,24 +130,30 @@ class PulseClimateCardEditor extends LitElement {
   }
 
   /**
-   * @param {number} index
-   * @param {CustomEvent} ev
+   * Single zone-write path: fires config-changed with the new zones list and
+   * strips the legacy single-entity key.
+   * @param {{entity: string, [key: string]: *}[]} zones
    */
-  _zoneChanged(index, ev) {
+  _updateZones(zones) {
     if (!this._config) return;
-    const zones = this._getZones();
-    zones[index] = { ...zones[index], entity: ev.detail?.value || '' };
     const cfg = /** @type {Record<string, *>} */ ({ ...this._config, zones });
     delete cfg.entity;
     this._fireConfigChanged(cfg);
   }
 
+  /**
+   * @param {number} index
+   * @param {CustomEvent} ev
+   */
+  _zoneChanged(index, ev) {
+    if (!this._config) return;
+    this._updateZones(/** @type {*} */ (updateListItemField(this._getZones(), index, 'entity', ev.detail?.value || '')));
+  }
+
   /** @param {number} index */
   _removeZone(index) {
     if (!this._config) return;
-    const zones = this._getZones();
-    zones.splice(index, 1);
-    this._fireConfigChanged({ ...this._config, zones });
+    this._updateZones(/** @type {*} */ (removeListItem(this._getZones(), index)));
   }
 
   /**
@@ -157,10 +163,8 @@ class PulseClimateCardEditor extends LitElement {
   _moveZone(index, direction) {
     if (!this._config) return;
     const zones = this._getZones();
-    const target = index + direction;
-    if (target < 0 || target >= zones.length) return;
-    [zones[index], zones[target]] = [zones[target], zones[index]];
-    this._fireConfigChanged({ ...this._config, zones });
+    const next = moveListItem(zones, index, direction);
+    if (next !== zones) this._updateZones(/** @type {*} */ (next));
   }
 
   /** @param {CustomEvent} ev */
@@ -168,10 +172,51 @@ class PulseClimateCardEditor extends LitElement {
     const entity = ev.detail?.value;
     if (!entity || !this._config) return;
     /** @type {*} */ (ev.target).value = '';
-    const zones = [...this._getZones(), { entity }];
-    const cfg = /** @type {Record<string, *>} */ ({ ...this._config, zones });
-    delete cfg.entity;
-    this._fireConfigChanged(cfg);
+    this._updateZones([...this._getZones(), { entity }]);
+  }
+
+  /**
+   * Per-zone string field (name / icon / color). Empty clears the field.
+   * @param {number} index @param {string} field @param {Event} ev
+   */
+  _zoneFieldChanged(index, field, ev) {
+    if (!this._config) return;
+    const value = /** @type {HTMLInputElement} */ (ev.target).value ?? '';
+    this._updateZones(/** @type {*} */ (updateListItemField(this._getZones(), index, field, value)));
+  }
+
+  /**
+   * Per-zone sparkline mode (nested sparkline.mode). Empty clears.
+   * @param {number} index @param {Event} ev
+   */
+  _zoneSparklineChanged(index, ev) {
+    if (!this._config) return;
+    const value = /** @type {HTMLInputElement} */ (ev.target).value ?? '';
+    this._updateZones(/** @type {*} */ (updateListItemNested(this._getZones(), index, 'sparkline', 'mode', value)));
+  }
+
+  /**
+   * Per-zone tri-state toggle. ha-select yields a string ('default'|'on'|'off');
+   * coerce to boolean (or delete for default) so the backend, which reads a
+   * boolean via ??, never sees a truthy "false" string.
+   * @param {number} index @param {string} field @param {Event} ev
+   */
+  _zoneToggleChanged(index, field, ev) {
+    if (!this._config) return;
+    const sel = /** @type {HTMLInputElement} */ (ev.target).value;
+    const value = sel === 'on' ? true : sel === 'off' ? false : '';
+    this._updateZones(/** @type {*} */ (updateListItemField(this._getZones(), index, field, value)));
+  }
+
+  /**
+   * Per-zone sensor-entity override. ha-entity-picker fires detail.value.
+   * Empty selection clears the override.
+   * @param {number} index @param {string} field @param {CustomEvent} ev
+   */
+  _zoneOverrideChanged(index, field, ev) {
+    if (!this._config) return;
+    const value = ev.detail?.value || '';
+    this._updateZones(/** @type {*} */ (updateListItemField(this._getZones(), index, field, value)));
   }
 
   // ── Sections ────────────────────────────────────────────────────
@@ -246,7 +291,7 @@ class PulseClimateCardEditor extends LitElement {
   _settingsChanged(ev) {
     const data = ev.detail?.value;
     if (!data) return;
-    const cfg = { ...this._config };
+    const cfg = /** @type {Record<string, *>} */ ({ ...this._config });
     if (data.title !== undefined) cfg.title = data.title || undefined;
     if (data.layout !== undefined) cfg.layout = data.layout;
     if (data.columns !== undefined) cfg.columns = Number(data.columns) || 1;
@@ -435,9 +480,12 @@ class PulseClimateCardEditor extends LitElement {
         <h3>Zones</h3>
         <div class="pc-editor-entities">
           ${zones.map(
-            (/** @type {*} */ z, /** @type {number} */ i) => html`
-              <div class="pc-editor-entity-row">
-                <div class="pc-editor-entity-row-main">
+            (/** @type {*} */ z, /** @type {number} */ i) => {
+              const triVal = (/** @type {string} */ field) =>
+                z[field] === undefined ? 'default' : z[field] ? 'on' : 'off';
+              return html`
+              <div class="pc-editor-zone-row">
+                <div class="pc-editor-zone-main">
                   <ha-entity-picker
                     .hass=${hass}
                     .value=${z.entity}
@@ -451,8 +499,75 @@ class PulseClimateCardEditor extends LitElement {
                     (idx) => this._removeZone(idx),
                   )}
                 </div>
+
+                <div class="pc-editor-zone-fields">
+                  <ha-textfield
+                    .label=${'Name'}
+                    .value=${z.name || ''}
+                    @input=${(/** @type {Event} */ ev) => this._zoneFieldChanged(i, 'name', ev)}
+                  ></ha-textfield>
+                  <ha-icon-picker
+                    .hass=${hass}
+                    .label=${'Icon'}
+                    .value=${z.icon || ''}
+                    @value-changed=${(/** @type {CustomEvent} */ ev) =>
+                      this._zoneFieldChanged(i, 'icon', /** @type {*} */ ({ target: { value: ev.detail?.value || '' } }))}
+                  ></ha-icon-picker>
+                  <ha-textfield
+                    .label=${'Color'}
+                    .value=${z.color || ''}
+                    @input=${(/** @type {Event} */ ev) => this._zoneFieldChanged(i, 'color', ev)}
+                  ></ha-textfield>
+                  <ha-select
+                    .label=${'Sparkline'}
+                    .value=${z.sparkline?.mode || 'overlay'}
+                    @selected=${(/** @type {Event} */ ev) => this._zoneSparklineChanged(i, ev)}
+                    @closed=${(/** @type {Event} */ ev) => ev.stopPropagation()}
+                  >
+                    <mwc-list-item value="overlay">Overlay</mwc-list-item>
+                    <mwc-list-item value="prominent">Prominent</mwc-list-item>
+                    <mwc-list-item value="pulse">Pulse</mwc-list-item>
+                  </ha-select>
+                </div>
+
+                <div class="pc-editor-zone-toggles">
+                  ${[['show_temp_bar', 'Temp bar'], ['show_power_bar', 'Power bar'], ['interactive', 'Interactive']].map(
+                    ([field, label]) => html`
+                      <ha-select
+                        .label=${label}
+                        .value=${triVal(field)}
+                        @selected=${(/** @type {Event} */ ev) => this._zoneToggleChanged(i, field, ev)}
+                        @closed=${(/** @type {Event} */ ev) => ev.stopPropagation()}
+                      >
+                        <mwc-list-item value="default">Default</mwc-list-item>
+                        <mwc-list-item value="on">On</mwc-list-item>
+                        <mwc-list-item value="off">Off</mwc-list-item>
+                      </ha-select>
+                    `,
+                  )}
+                </div>
+
+                <ha-expansion-panel .header=${'Sensor overrides'} outlined>
+                  ${[
+                    ['temperature_entity', 'Temperature'],
+                    ['humidity_entity', 'Humidity'],
+                    ['open_window_entity', 'Open window'],
+                    ['battery_entity', 'Battery'],
+                    ['mold_risk_entity', 'Mold risk'],
+                    ['heating_power_entity', 'Heating power'],
+                  ].map(([field, label]) => html`
+                    <ha-entity-picker
+                      .hass=${hass}
+                      .label=${label}
+                      .value=${z[field] || ''}
+                      allow-custom-entity
+                      @value-changed=${(/** @type {CustomEvent} */ ev) => this._zoneOverrideChanged(i, field, ev)}
+                    ></ha-entity-picker>
+                  `)}
+                </ha-expansion-panel>
               </div>
-            `,
+            `;
+            },
           )}
         </div>
         <ha-entity-picker
@@ -515,21 +630,32 @@ class PulseClimateCardEditor extends LitElement {
         flex-direction: column;
         gap: var(--pulse-space-element);
       }
-      .pc-editor-entity-row {
+      .pc-editor-zone-row {
         display: flex;
         flex-direction: column;
         gap: var(--pulse-space-tight);
         padding: var(--pulse-space-element);
         border: 1px solid var(--pulse-border-divider);
         border-radius: var(--pulse-radius-element);
+        margin-bottom: var(--pulse-space-element);
       }
-      .pc-editor-entity-row-main {
+      .pc-editor-zone-main {
         display: flex;
         align-items: center;
       }
-      .pc-editor-entity-row-main ha-entity-picker {
+      .pc-editor-zone-main ha-entity-picker {
         flex: 1;
         min-width: 0;
+      }
+      .pc-editor-zone-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--pulse-space-tight);
+      }
+      .pc-editor-zone-toggles {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: var(--pulse-space-tight);
       }
       ${SHARED_EDITOR_STYLES}
       .pc-editor-add-entity {
@@ -566,7 +692,7 @@ class PulseClimateCardEditor extends LitElement {
       }
       .pc-editor-section-hint {
         font-size: 12px;
-        color: var(--pulse-status-yellow);
+        color: var(--pulse-tier-strong);
         padding: 4px 0 8px;
       }
     `;

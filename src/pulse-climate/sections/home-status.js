@@ -5,8 +5,7 @@
  */
 
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
-import { resolveZoneState } from '../utils.js';
-import { extractZoneName } from '../zone-resolver.js';
+import { resolveZoneContext, rowStateClass } from '../utils.js';
 
 /** Maximum deviation for bar scale (±5 units). */
 const MAX_DELTA = 5;
@@ -133,7 +132,7 @@ function renderZoneRow(zs) {
       + `<span class="pc-home-status-target">Unavailable</span>`;
     deltaHtml = `<div class="pc-home-status-delta">`
       + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
-      + `<span class="pc-home-status-delta-text" style="color:var(--pulse-text-secondary)">--</span>`
+      + `<span class="pc-home-status-delta-text">--</span>`
       + `</div>`;
   } else if (!isActive) {
     const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
@@ -143,7 +142,7 @@ function renderZoneRow(zs) {
       + `<span class="pc-home-status-target">Off</span>`;
     deltaHtml = `<div class="pc-home-status-delta">`
       + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
-      + `<span class="pc-home-status-delta-text" style="color:var(--pulse-text-secondary)">Off</span>`
+      + `<span class="pc-home-status-delta-text">Off</span>`
       + `</div>`;
   } else {
     const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
@@ -173,12 +172,13 @@ function renderZoneRow(zs) {
     } else {
       deltaHtml = `<div class="pc-home-status-delta">`
         + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
-        + `<span class="pc-home-status-delta-text" style="color:var(--pulse-text-secondary)">--</span>`
+        + `<span class="pc-home-status-delta-text">--</span>`
         + `</div>`;
     }
   }
 
-  return `<div class="pc-home-status-row" role="button" tabindex="0" data-entity="${entityAttr}">`
+  const rowClass = rowStateClass(zs);
+  return `<div class="pc-home-status-row${rowClass}" role="button" tabindex="0" data-entity="${entityAttr}">`
     + `<span class="pc-home-status-zone-name">${name}</span>`
     + `<div class="pc-home-status-temps">${tempsHtml}</div>`
     + deltaHtml
@@ -198,12 +198,7 @@ function renderZoneRow(zs) {
 export function renderHomeStatusSection(zones, states, discovery, cardConfig) {
   if (!zones || zones.length === 0) return '';
 
-  const zoneStates = zones.map((zoneConfig) => {
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const discoveredEntities = discovery?.zoneEntities?.[zoneName] || {};
-    return resolveZoneState(entityId, discoveredEntities, states, zoneConfig, {});
-  });
+  const zoneStates = zones.map((zoneConfig) => resolveZoneContext(zoneConfig, discovery, states).zoneState);
 
   const activeZones = zoneStates.filter(
     (z) => !z.isUnavailable && z.hvacAction !== 'off' && z.targetTemp,

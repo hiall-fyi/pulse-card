@@ -6,10 +6,9 @@
  * Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay, isUnavailableState } from '../../shared/utils.js';
 import { temperatureToColor, humidityToColor, buildBloomFilter } from '../chart-primitives.js';
-import { resolveZoneState, computeGlowStdDev, computeShimmerScale } from '../utils.js';
-import { extractZoneName } from '../zone-resolver.js';
+import { resolveZoneContext, rowStateClass, computeGlowStdDev, computeShimmerScale } from '../utils.js';
 
 /** Humidity arc thickness in SVG units. */
 const HUMIDITY_ARC_THICKNESS = 6;
@@ -63,17 +62,15 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   const available = 360 - totalGap;
   const arcAngle = available / zones.length;
 
-  /** @type {{name: string, temp: number|null, target: number|null, power: number, humidity: number|null, hvacAction: string, entityId: string, unit: string}[]} */
+  /** @type {{name: string, temp: number|null, target: number|null, power: number, humidity: number|null, hvacAction: string, entityId: string, unit: string, rowClass: string}[]} */
   const zoneData = [];
   for (const zoneConfig of zones) {
-    const entityId = zoneConfig.entity;
-    const zoneName = extractZoneName(entityId);
-    const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
-    const zs = resolveZoneState(entityId, zoneEntities, states, zoneConfig, /** @type {*} */ ({}));
+    const { entityId, zoneState: zs } = resolveZoneContext(zoneConfig, discovery, states);
     zoneData.push({
       name: zs.name, temp: zs.currentTemp, target: zs.targetTemp,
       power: zs.heatingPower, humidity: zs.humidity,
       hvacAction: zs.hvacAction, entityId, unit: zs.unit,
+      rowClass: rowStateClass(zs),
     });
   }
 
@@ -82,7 +79,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   let outsideTemp = null;
   if (outsideTempEntity && states[outsideTempEntity]) {
     const s = states[outsideTempEntity];
-    if (s.state !== 'unavailable' && s.state !== 'unknown') {
+    if (!isUnavailableState(s)) {
       outsideTemp = s.attributes?.temperature !== undefined
         ? String(s.attributes.temperature) : s.state;
     }
@@ -93,7 +90,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   let outsideHumidity = null;
   if (outsideHumEntityConfig && states[outsideHumEntityConfig]) {
     const s = states[outsideHumEntityConfig];
-    if (s.state !== 'unavailable' && s.state !== 'unknown') {
+    if (!isUnavailableState(s)) {
       outsideHumidity = s.attributes?.humidity !== undefined
         ? String(s.attributes.humidity) : s.state;
     }
@@ -124,7 +121,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   const glowId = `radial-glow-${instanceId}`;
   const shimmerId = (/** @type {number} */ i) => `heat-shimmer-${instanceId}-${i}`;
 
-  html += `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${escapeHtml(sectionLabel)}" style="display:block;margin:0 auto">`;
+  html += `<svg class="pc-radial-svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${escapeHtml(sectionLabel)}">`;
   html += `<defs>`;
   html += buildBloomFilter(glowId, computeGlowStdDev(size, 280).toFixed(1));
 
@@ -252,9 +249,9 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     if (showTemp) valueText += z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--';
     if (showTemp && showHumidity) valueText += ' · ';
     if (showHumidity) valueText += z.humidity !== null ? `${Math.round(z.humidity)}%` : '--';
-    html += `<div class="pc-legend-item" data-idx="${i}">`;
+    html += `<div class="pc-legend-item${z.rowClass}" data-idx="${i}">`;
     html += `<span class="pc-legend-dot" style="background:${sanitizeCssValue(dotColor)}"></span>`;
-    html += `${escapeHtml(z.name)} <span class="pc-legend-temp">${escapeHtml(valueText)}</span>`;
+    html += `<span class="pc-legend-name">${escapeHtml(z.name)}</span> <span class="pc-legend-temp">${escapeHtml(valueText)}</span>`;
     html += `</div>`;
   }
   html += `</div>`;

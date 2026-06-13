@@ -15,7 +15,7 @@ const SPARKLINE_INTERVAL = 5 * 60 * 1000;
 // updates the shared store; subsequent instances reuse it.
 
 /** @type {import('./types.js').HistoryCache} */
-let _sharedCache = { timestamp: 0, data: {} };
+let _sharedCache = { timestamp: 0, data: {}, stateData: {} };
 
 /**
  * Get the shared module-level history cache.
@@ -30,15 +30,23 @@ export function getSharedCache() {
  * Update the shared module-level cache with fresh data.
  * Merges into existing shared data so entities fetched by different
  * card instances accumulate in the same store.
+ *
  * @param {Record<string, {t: number, v: number}[]>} freshData
+ * @param {Record<string, {t: number, state: string, power: number}[]>} [freshStateData] - HVAC state history (used by timeline_group's State tab).
  * @returns {import('./types.js').HistoryCache} The updated shared cache.
  */
-export function updateSharedCache(freshData) {
+export function updateSharedCache(freshData, freshStateData) {
   const merged = { ..._sharedCache.data };
   for (const [key, value] of Object.entries(freshData)) {
     if (value.length > 0) merged[key] = value;
   }
-  _sharedCache = { timestamp: Date.now(), data: merged };
+  const mergedState = { ..._sharedCache.stateData };
+  if (freshStateData) {
+    for (const [key, value] of Object.entries(freshStateData)) {
+      if (Array.isArray(value) && value.length > 0) mergedState[key] = value;
+    }
+  }
+  _sharedCache = { timestamp: Date.now(), data: merged, stateData: mergedState };
   return _sharedCache;
 }
 
@@ -49,7 +57,7 @@ export function updateSharedCache(freshData) {
  * @returns {import('./types.js').HistoryCache}
  */
 export function createHistoryCache() {
-  return { timestamp: 0, data: {} };
+  return { timestamp: 0, data: {}, stateData: {} };
 }
 
 /**

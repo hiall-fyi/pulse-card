@@ -6,7 +6,8 @@
 
 import { DEFAULTS, LOG_PREFIX } from './constants.js';
 export { escapeHtml, sanitizeCssValue, clamp, cssValue, fetchSparklineData, buildSparklinePath } from '../shared/utils.js';
-import { clamp } from '../shared/utils.js';
+import { clamp, makeWarn, isUnavailableState } from '../shared/utils.js';
+import { parseHexColor, mixToRgbString } from '../shared/color.js';
 
 /** Known HA active/truthy states — O(1) Set lookup. */
 const BINARY_ACTIVE = new Set(['on', 'open', 'home', 'locked', 'playing', 'active']);
@@ -80,23 +81,20 @@ function resolveSeverity(value, severityArray) {
 }
 
 /**
- * Parse a hex color string to RGB components.
+ * Parse a hex color string to RGB components. Thin wrapper over the shared
+ * parser; returns {0,0,0} for unparseable input to preserve the prior
+ * always-returns-channels contract this card's gradient path relies on.
  * @internal
  * @param {string} hex - e.g. "#FF9800" or "#fff"
  * @returns {{r:number,g:number,b:number}}
  */
 function parseColor(hex) {
-  let h = hex.replace('#', '');
-  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
-  return {
-    r: parseInt(h.substring(0, 2), 16),
-    g: parseInt(h.substring(2, 4), 16),
-    b: parseInt(h.substring(4, 6), 16),
-  };
+  return parseHexColor(hex) ?? { r: 0, g: 0, b: 0 };
 }
 
 /**
- * Linearly interpolate between two hex colors.
+ * Linearly interpolate between two hex colors. Delegates to the shared
+ * colour core (`rgb()` output shape).
  * @internal
  * @param {string} color1 - Hex color.
  * @param {string} color2 - Hex color.
@@ -104,12 +102,7 @@ function parseColor(hex) {
  * @returns {string} CSS rgb() string.
  */
 function interpolateColor(color1, color2, t) {
-  const c1 = parseColor(color1);
-  const c2 = parseColor(color2);
-  const r = Math.round(c1.r + (c2.r - c1.r) * t);
-  const g = Math.round(c1.g + (c2.g - c1.g) * t);
-  const b = Math.round(c1.b + (c2.b - c1.b) * t);
-  return `rgb(${r}, ${g}, ${b})`;
+  return mixToRgbString(color1, color2, t);
 }
 
 /**
@@ -280,12 +273,9 @@ export function formatIndicator(direction, delta, showDelta, decimal, unit) {
 
 /**
  * Log a warning with the Pulse Card prefix.
- * @param {string} msg
- * @param {...*} args
+ * @type {(msg: string, ...args: *[]) => void}
  */
-export function warn(msg, ...args) {
-  console.warn(`${LOG_PREFIX} ${msg}`, ...args);
-}
+export const warn = makeWarn(LOG_PREFIX);
 
 /**
  * Batch-fetch previous values for multiple entities in a single WS call.
@@ -440,11 +430,7 @@ export function resolveTarget(target, hass) {
  */
 export function resolveBarState(ec, cfg, hass) {
   const state = hass?.states[ec.entity];
-  const isUnavailable =
-    !state ||
-    state.state === 'unavailable' ||
-    state.state === 'unknown' ||
-    state.state === 'error';
+  const isUnavailable = isUnavailableState(state);
 
   const { min, max } = resolveMinMax(ec, state, cfg);
   const rawValue = ec.attribute
@@ -481,7 +467,7 @@ export function resolveBarState(ec, cfg, hass) {
       // attribute_color: map attribute value → color (card-level or per-entity)
       const attrColorCfg = ec.attribute_color ?? cfg.attribute_color;
       if (attrColorCfg?.attribute && attrColorCfg?.map) {
-        const attrVal = state.attributes?.[attrColorCfg.attribute];
+        const attrVal = state?.attributes?.[attrColorCfg.attribute];
         if (attrVal !== undefined && attrVal !== null) {
           const mapped = attrColorCfg.map[String(attrVal)];
           if (mapped) severityColor = mapped;
@@ -557,7 +543,7 @@ export function evaluateVisibility(ec, hass) {
     : state.state;
 
   // Special states: hidden unless explicitly matched via state_equal
-  if (!ec.attribute && (state.state === 'unavailable' || state.state === 'unknown' || state.state === 'error')) {
+  if (!ec.attribute && isUnavailableState(state)) {
     return vis.state_equal !== undefined && String(vis.state_equal) === state.state;
   }
 

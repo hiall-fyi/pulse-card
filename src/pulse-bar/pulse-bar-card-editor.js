@@ -8,7 +8,10 @@
 
 import { LitElement, html, css, nothing } from 'lit';
 import { DEFAULTS } from './constants.js';
-import { loadEditorHelpers, renderReorderButtons, computeLabel, SHARED_EDITOR_STYLES } from '../shared/editor-helpers.js';
+import {
+  loadEditorHelpers, renderReorderButtons, computeLabel, SHARED_EDITOR_STYLES,
+  updateListItemField, updateListItemNested, moveListItem, removeListItem,
+} from '../shared/editor-helpers.js';
 
 /** Default swatch color — resolves HA theme primary text color, falls back to HA blue. */
 function getDefaultSwatch() {
@@ -321,13 +324,7 @@ class PulseBarCardEditor extends LitElement {
    */
   _entityFieldChanged(index, field, ev) {
     const value = /** @type {HTMLInputElement} */ (ev.target).value ?? '';
-    const entities = this._getEntities();
-    if (value === '' || value === undefined) {
-      delete entities[index][field];
-    } else {
-      entities[index] = { ...entities[index], [field]: value };
-    }
-    this._updateEntities(entities);
+    this._updateEntities(/** @type {*} */ (updateListItemField(this._getEntities(), index, field, value)));
   }
 
   /**
@@ -338,23 +335,7 @@ class PulseBarCardEditor extends LitElement {
    */
   _entitySecondaryChanged(index, subField, ev) {
     const value = /** @type {HTMLInputElement} */ (ev.target).value ?? '';
-    const entities = this._getEntities();
-    const existing = entities[index].secondary_info || {};
-    if (value === '' || value === undefined) {
-      const updated = { ...existing };
-      delete updated[subField];
-      if (Object.keys(updated).length === 0) {
-        delete entities[index].secondary_info;
-      } else {
-        entities[index] = { ...entities[index], secondary_info: updated };
-      }
-    } else {
-      entities[index] = {
-        ...entities[index],
-        secondary_info: { ...existing, [subField]: value },
-      };
-    }
-    this._updateEntities(entities);
+    this._updateEntities(/** @type {*} */ (updateListItemNested(this._getEntities(), index, 'secondary_info', subField, value)));
   }
 
   /**
@@ -362,9 +343,7 @@ class PulseBarCardEditor extends LitElement {
    * @param {number} index
    */
   _removeEntity(index) {
-    const entities = this._getEntities();
-    entities.splice(index, 1);
-    this._updateEntities(entities);
+    this._updateEntities(/** @type {*} */ (removeListItem(this._getEntities(), index)));
   }
 
   /**
@@ -375,10 +354,8 @@ class PulseBarCardEditor extends LitElement {
    */
   _moveEntity(index, direction) {
     const entities = this._getEntities();
-    const target = index + direction;
-    if (target < 0 || target >= entities.length) return;
-    [entities[index], entities[target]] = [entities[target], entities[index]];
-    this._updateEntities(entities);
+    const next = moveListItem(entities, index, direction);
+    if (next !== entities) this._updateEntities(/** @type {*} */ (next));
   }
 
   /**

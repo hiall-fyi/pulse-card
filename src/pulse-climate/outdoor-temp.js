@@ -9,6 +9,8 @@
  *      attributes.temperature)
  */
 
+import { isUnavailableState } from '../shared/utils.js';
+
 /**
  * @typedef {object} ResolvedOutdoor
  * @property {number|null} value - Numeric temperature, or null if unavailable.
@@ -42,7 +44,7 @@ export function resolveOutdoorTemp(config, discovery, states) {
   if (!entityId || !states[entityId]) return empty;
 
   const s = states[entityId];
-  if (s.state === 'unavailable' || s.state === 'unknown') {
+  if (isUnavailableState(s)) {
     return { value: null, unit: '°C', entityId };
   }
 

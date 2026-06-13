@@ -5,7 +5,7 @@
  */
 
 /** Pulse Climate Card version string. */
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 
 /** Custom element tag name. */
 export const CARD_NAME = 'pulse-climate-card';
@@ -22,8 +22,8 @@ export const LOG_PREFIX = 'Pulse Climate Card:';
  * Fallback hex values chosen for ≥4.5:1 contrast on both light (#fff) and dark (#1c1c1c) backgrounds.
  */
 export const HVAC_VISUALS = {
-  heating: { icon: 'mdi:fire', token: 'var(--pulse-status-yellow)', fallback: '#FF9800', label: 'Heating' },
-  cooling: { icon: 'mdi:snowflake', token: 'var(--pulse-status-blue)', fallback: '#2196F3', label: 'Cooling' },
+  heating: { icon: 'mdi:fire', token: 'var(--pulse-tier-strong)', fallback: '#ff9f0a', label: 'Heating' },
+  cooling: { icon: 'mdi:snowflake', token: 'var(--pulse-tier-calm)', fallback: '#5ac8fa', label: 'Cooling' },
   drying:  { icon: 'mdi:water-off', token: null, fallback: '#9C27B0', label: 'Drying' },
   fan:     { icon: 'mdi:fan', token: null, fallback: '#607D8B', label: 'Fan' },
   idle:    { icon: 'mdi:clock-outline', token: 'var(--pulse-text-secondary)', fallback: '#9E9E9E', label: 'Idle' },
@@ -36,11 +36,11 @@ export const HVAC_VISUALS = {
  * All fallback colors tested for ≥4.5:1 contrast on both light and dark backgrounds.
  */
 export const RISK_COLORS = {
-  None: { token: 'var(--pulse-status-green)', fallback: '#4CAF50' },
-  Low:  { token: 'var(--pulse-status-green)', fallback: '#8BC34A' },
-  Medium: { token: 'var(--pulse-status-yellow)', fallback: '#FF9800' },
-  High: { token: 'var(--pulse-status-red)', fallback: '#F44336' },
-  Critical: { token: 'var(--pulse-status-red)', fallback: '#B71C1C' },
+  None: { token: 'var(--pulse-tier-moderate)', fallback: '#30d158' },
+  Low:  { token: 'var(--pulse-tier-moderate)', fallback: '#30d158' },
+  Medium: { token: 'var(--pulse-tier-strong)', fallback: '#ff9f0a' },
+  High: { token: 'var(--pulse-tier-gale)', fallback: '#ff453a' },
+  Critical: { token: 'var(--pulse-tier-gale)', fallback: '#ff453a' },
 };
 
 /** Default section order. */
@@ -53,6 +53,8 @@ export const SECTION_TYPES = [
   'graph', 'donut',
   'thermal_strip', 'comfort_strip', 'energy_flow', 'radial',
   'home_status', 'zone_ranking',
+  'timeline_group',
+  'system_health_group',
 ];
 
 /**
@@ -61,13 +63,13 @@ export const SECTION_TYPES = [
  * Tested for ≥3:1 contrast on both light (#fff) and dark (#1c1c1c) backgrounds.
  */
 export const CHART_PALETTE = [
-  'var(--pulse-status-blue)',
-  'var(--pulse-status-red)',
-  'var(--pulse-status-green)',
-  'var(--pulse-status-yellow)',
+  'var(--pulse-tier-calm)',
+  'var(--pulse-tier-gale)',
+  'var(--pulse-tier-moderate)',
+  'var(--pulse-tier-strong)',
   'var(--pulse-accent)',
   'var(--pulse-info-color)',
-  'var(--pulse-status-yellow)',
+  'var(--pulse-tier-strong)',
   'var(--success-color, #8BC34A)',
 ];
 
