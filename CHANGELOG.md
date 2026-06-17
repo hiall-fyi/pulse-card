@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.8.0] - 2026-06-17
+
+**Pulse Weather Card ships as the third card in the family.** Works with any `weather.*` entity out of the box — point it at your entity and you get the current conditions hero, a 7-day forecast, and a meteogram on first load. Pair it with [Atmos CE](https://github.com/hiall-fyi/atmos_ce) for atmospheric stability, air quality, astronomy detail, weather alerts, and the extended 22-field hourly forecast that feeds cloud cover layers and CAPE data into the chart. Eight sections, each behind a section-shell with a brand-mark corner that toggles between a default and a pro view at runtime without touching YAML.
+
+### Features
+
+- **`overview` section** — current temperature in large type with a day/night progress arc (sunrise to sunset in amber, sunset to tomorrow's sunrise in blue), a contextual weather narrative sentence, precipitation probability bars for the next 12 hours, and a 4-column stats grid covering wind/gust, UV, and cloud cover. Brand-mark corner swaps to a pro view with a 7-day temperature sparkline and a second row of humidity, dew point, pressure trend, and visibility category stats. Atmos CE adds a CAPE storm-risk sparkline, wind chill and heat index context on the condition line, pressure trend symbol and direction, and labelled visibility category.
+
+- **`forecast` section** — 7-day list with day label, condition icon, precipitation probability (shown when 50% or above), and a temperature range bar normalised across the full week so taller bars read as relatively warmer days. A dot marks today's current temperature on its bar so you can see where you sit in today's range at a glance.
+
+- **`meteogram` section** — yr.no-style time-series chart on a single SVG: temperature curve with gradient fill, precipitation bars growing up from the baseline (blue for rain, white for snow), cloud cover as a translucent background wash, and NWS-standard wind barbs rotating through the staggered label cluster every three hours. Min and max temperature hours always show their value. Defaults to 12 hours; brand-mark corner toggles to 24 hours. Cloud cover layer requires Atmos CE extended forecast.
+
+- **`wind` section** — animated compass rose with a direction arrow, gust cone, and animated wind streaks through the background. Centre display shows speed, unit, bearing in degrees, compass direction, and Beaufort scale name and description. Brand-mark corner toggles the rose centre between sustained speed and gust speed; the kicker updates to confirm which is shown.
+
+- **`astro` section** — 24-hour sky-phase ribbon from midnight to midnight, coloured across night, civil twilight, blue hour, golden hour, and solar noon. Moon phase hero shows an SVG phase glyph, illumination percentage, age in days, and days to full. Stat tiles below show civil dawn/dusk, golden hour start/end, blue hour start/end, moonrise, and moonset. Requires `sun.sun`. Twilight times populated from Atmos CE sensors when available; ribbon renders with offset estimates otherwise.
+
+- **`air_quality` section** — AQI gauge with a 5-tier colour band and a current-value marker, category label, and pollutant breakdown for PM2.5, PM10, NO₂, O₃, SO₂, and CO. Brand-mark corner toggles between EU scale (0–100) and US EPA scale (0–300); the kicker updates to confirm which is active. Requires Atmos CE.
+
+- **`alerts` section** — radar-style display with active Meteoalarm weather alerts from Atmos CE. Radar sweep speed and colour shift with severity; alert blips appear inside the radar at positions keyed by severity and timing. Brand-mark corner toggles between a compressed ticker view (type, time window, location, headline) and full detail cards with prose description and locations. Shows a green all-clear radar when no alerts are active. Requires Atmos CE.
+
+- **`atmosphere` section** — vertical atmospheric stability column showing a CAPE fill growing up from the surface, a cyan freezing-level marker, and a dashed LCL (cloud base) marker. The column scale extends automatically when either marker would exceed 80% of the default 5 km range. Storm-risk narrative in the header adapts to forecast CAPE peak time, whether the peak is past or upcoming, and whether sunset has passed. Tapping the column expands a detail panel with CAPE, Lifted Index, wind shear, lapse rate, freeze level, LCL, and cloud cover breakdown by layer. Requires Atmos CE sensors (at minimum `cape`, `lifted_index`, or `freezing_level_height`).
+
+- **Atmos CE auto-discovery** — the card derives a source slug from the weather entity ID (strips `weather.` prefix and `_weather` suffix) and scans for `sensor.<slug>_*` entities across around 50 known keys. Set `atmos_source` explicitly when the slug derivation fails after a weather entity rename. When Atmos CE is present, the card fetches the extended hourly forecast via `atmos_ce.get_extended_forecast` before falling back to the standard `weather.get_forecasts`; the extended response adds dew point, CAPE, cloud cover by layer, and precipitation type per slot.
+
+### Notes
+
+- **Bar Card and Climate Card are unchanged in this release.** All existing configs keep working without edits.
+
+- **No extra resource entry needed.** All three cards bundle into `pulse-card.js`, so your existing `/local/pulse-card.js` resource covers the Weather Card too. HACS installs everything automatically.
+
+
 ## [1.7.0] - 2026-06-13
 
 **Climate Card visual revamp — Mercury monolith. Atmosphere drops the rotating gradient for a quiet radial wash that only shows up when something's actually heating or cooling. Hero gains per-zone breathing dots and per-zone 24h thermal strips, all synced to a single master pulse phase. Zone rows pick up a 3px state ribbon for at-a-glance scanning. Every zone-name surface across the card now shares one visual hierarchy, so an active zone reads bright and an off or sensor-only zone reads quiet wherever it appears. Plus two new optional grouped sections: a tabbed `timeline_group` (Thermal Heatmap + State Timeline) and an autodiscovered `system_health_group` (Bridge / HomeKit / API). The Thermal tab also gains a colour legend so you can read what each heatmap band means. HVAC colours converge on the existing Apple-tier palette so heating amber and cooling cyan match Weather Card and Zone Ranking.**

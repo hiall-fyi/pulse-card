@@ -24,9 +24,15 @@ Pulse Bar Card is stable at 1.x. Focus is on compatibility and polish — bug fi
 
 ---
 
-## Pulse Family — In Development
+## Pulse Weather Card
 
-- **Pulse Weather Card** — outdoor conditions at a glance with [Atmos CE](https://github.com/hiall-fyi/atmos_ce) auto-discovery. Air quality, pollen, UV index, wind, and forecast, with the same strip charts and visual identity as Pulse Climate. The card itself is mature and in daily use; we're getting the docs and install steps ready for a first public release.
+Shipped in v1.8.0. See [WEATHER_CARD_GUIDE.md](WEATHER_CARD_GUIDE.md) for the full configuration reference.
+
+### Exploring
+
+- Hourly precipitation type breakdown in the meteogram (freezing rain, sleet)
+- Tide data section for coastal setups
+- Community feedback — section ideas and Atmos CE feature requests
 
 ---
 

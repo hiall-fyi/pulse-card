@@ -15,7 +15,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-1.7.0-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.8.0-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 
@@ -27,9 +27,9 @@
 <!-- Support -->
 [![Buy Me A Coffee](https://img.shields.io/badge/Support-Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hiallfyi)
 
-**Two cards, one install — compact bar charts and a full climate dashboard.**
+**Three cards, one install — compact bar charts, a full climate dashboard, and a weather visualisation card.**
 
-[Bar Card Guide](BAR_CARD_GUIDE.md) • [Climate Card Guide](CLIMATE_CARD_GUIDE.md) • [Contributing](CONTRIBUTING.md) • [Discussions](https://github.com/hiall-fyi/pulse-card/discussions)
+[Bar Card Guide](BAR_CARD_GUIDE.md) • [Climate Card Guide](CLIMATE_CARD_GUIDE.md) • [Weather Card Guide](WEATHER_CARD_GUIDE.md) • [Contributing](CONTRIBUTING.md) • [Discussions](https://github.com/hiall-fyi/pulse-card/discussions)
 
 </div>
 
@@ -57,6 +57,16 @@ A climate dashboard card that gives you a visual overview of your heating and co
 
 📖 **[Full Configuration Guide →](CLIMATE_CARD_GUIDE.md)**
 
+### Pulse Weather Card
+
+A weather visualisation card with atmospheric effects, astronomy, and air quality. Works with any `weather.*` entity, and pairs with the [Atmos CE](https://github.com/hiall-fyi/atmos_ce) integration for atmospheric stability, wind rose, weather alerts, and extended forecasts.
+
+<img src="images/pulse-weather-dark.png" alt="Pulse Weather Card" width="500">
+
+**Highlights:** overview hero · 7-day forecast · yr.no-style meteogram · wind compass rose · astronomy ribbon · air quality gauge · weather alerts radar · atmospheric stability column
+
+📖 **[Full Configuration Guide →](WEATHER_CARD_GUIDE.md)**
+
 ---
 
 ## Installation
@@ -69,13 +79,13 @@ A climate dashboard card that gives you a visual overview of your heating and co
 2. Click **Download**
 3. Restart Home Assistant
 
-Both cards are included in a single install — no separate downloads needed.
+All three cards are bundled in `pulse-card.js` — one resource entry covers all of them. HACS installs everything automatically.
 
 <details>
 <summary>Manual Installation</summary>
 
-1. Download `pulse-card.js`, `pulse-card-editor.js`, and `pulse-climate-editor.js` from the [latest release](https://github.com/hiall-fyi/pulse-card/releases)
-2. Copy all three to `config/www/`
+1. Download `pulse-card.js`, `pulse-card-editor.js`, `pulse-climate-editor.js`, and `pulse-weather-card-editor.js` from the [latest release](https://github.com/hiall-fyi/pulse-card/releases)
+2. Copy all files to `config/www/`
 3. Add resource in **Settings → Dashboards → Resources**:
    - URL: `/local/pulse-card.js`
    - Type: JavaScript Module
@@ -122,6 +132,26 @@ sections:
   - radial
 ```
 
+### Pulse Weather Card
+
+```yaml
+type: custom:pulse-weather-card
+weather_entity: weather.home
+sections:
+  - type: overview
+```
+
+```yaml
+type: custom:pulse-weather-card
+weather_entity: weather.home
+sections:
+  - type: overview
+  - type: forecast
+  - type: meteogram
+  - type: wind
+  - type: astro
+```
+
 ---
 
 ## Guides
@@ -130,6 +160,7 @@ sections:
 |---|---|---|
 | **Pulse Bar Card** | [BAR_CARD_GUIDE.md](BAR_CARD_GUIDE.md) | Configuration reference, style presets, bar-card migration, CSS custom properties, known limitations |
 | **Pulse Climate Card** | [CLIMATE_CARD_GUIDE.md](CLIMATE_CARD_GUIDE.md) | Zone setup, section types, sparkline modes, Tado CE auto-discovery, visual identity, actions & interactivity |
+| **Pulse Weather Card** | [WEATHER_CARD_GUIDE.md](WEATHER_CARD_GUIDE.md) | Section types, Atmos CE auto-discovery, brand-mark toggles, CSS custom properties, known limitations |
 
 ---
 

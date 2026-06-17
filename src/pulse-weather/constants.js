@@ -6,7 +6,7 @@
  */
 
 /** Pulse Weather Card version string. */
-export const VERSION = '0.1.1';
+export const VERSION = '1.8.0';
 
 /** Card custom element name. */
 export const CARD_NAME = 'pulse-weather-card';

@@ -26,3 +26,4 @@ jobs:
             dist/pulse-card.js
             dist/pulse-card-editor.js
             dist/pulse-climate-editor.js
+            dist/pulse-weather-card-editor.js

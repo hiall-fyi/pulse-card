@@ -1,6 +1,6 @@
 {
   "name": "pulse-card",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "description": "Compact horizontal bar chart card for Home Assistant sensor data visualization",
   "author": "hiall-fyi",
@@ -13,7 +13,7 @@
   "scripts": {
     "prebuild": "node scripts/inline-fonts.mjs",
     "build": "npm run build:pulse-card && npm run build:pulse-switch && npm run build:pulse-weather",
-    "build:pulse-card": "esbuild src/pulse-bar/pulse-bar-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify --external:./pulse-bar-card-editor.js --external:./pulse-climate-editor.js && node -e \"const f='dist/pulse-card.js';require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace('./pulse-bar-card-editor.js','./pulse-card-editor.js'))\" && esbuild src/pulse-bar/pulse-bar-card-editor.js --bundle --outfile=dist/pulse-card-editor.js --format=esm --minify && esbuild src/pulse-climate/pulse-climate-editor.js --bundle --outfile=dist/pulse-climate-editor.js --format=esm --minify",
+    "build:pulse-card": "esbuild src/pulse-bar/pulse-bar-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify --external:./pulse-bar-card-editor.js --external:./pulse-climate-editor.js --external:./pulse-weather-card-editor.js && node -e \"const f='dist/pulse-card.js';require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace('./pulse-bar-card-editor.js','./pulse-card-editor.js'))\" && esbuild src/pulse-bar/pulse-bar-card-editor.js --bundle --outfile=dist/pulse-card-editor.js --format=esm --minify && esbuild src/pulse-climate/pulse-climate-editor.js --bundle --outfile=dist/pulse-climate-editor.js --format=esm --minify && esbuild src/pulse-weather/pulse-weather-card-editor.js --bundle --outfile=dist/pulse-weather-card-editor.js --format=esm --minify",
     "build:pulse-switch": "esbuild src/pulse-switch/pulse-switch-card.js --bundle --outfile=dist/pulse-switch-card.js --format=esm --minify --external:./pulse-switch-card-editor.js && node -e \"const f='dist/pulse-switch-card.js';require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace('./pulse-switch-card-editor.js','./pulse-switch-editor.js'))\" && esbuild src/pulse-switch/pulse-switch-card-editor.js --bundle --outfile=dist/pulse-switch-editor.js --format=esm --minify",
     "build:pulse-weather": "esbuild src/pulse-weather/pulse-weather-card.js --bundle --outfile=dist/pulse-weather-card.js --format=esm --minify --external:./pulse-weather-card-editor.js && esbuild src/pulse-weather/pulse-weather-card-editor.js --bundle --outfile=dist/pulse-weather-card-editor.js --format=esm --minify",
     "dev": "esbuild src/pulse-bar/pulse-bar-card.js --bundle --outfile=dist/pulse-card.js --format=esm --watch --external:./pulse-bar-card-editor.js",

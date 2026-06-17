@@ -811,7 +811,8 @@ console.info(
   'background:#333;color:white',
 );
 
-// Bundle Pulse Climate Card into the same file
+// Bundle Pulse Climate Card and Pulse Weather Card into the same file
 import '../pulse-climate/pulse-climate-card.js';
+import '../pulse-weather/pulse-weather-card.js';
 
 export default PulseBarCard;
