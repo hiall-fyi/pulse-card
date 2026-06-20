@@ -6,7 +6,7 @@
  */
 
 /** Pulse Weather Card version string. */
-export const VERSION = '1.8.0';
+export const VERSION = '1.8.1';
 
 /** Card custom element name. */
 export const CARD_NAME = 'pulse-weather-card';
@@ -204,14 +204,25 @@ export const ALERT_ICON_MAP = /** @type {const} */ ({
 });
 
 /**
- * Alert severity color map (hex). Matches Atmos CE COLOR_MAP.
+ * Alert severity color map (hex) keyed by numeric level.
  * @type {Readonly<Record<number, string>>}
  */
 export const ALERT_COLOR_MAP = /** @type {const} */ ({
   1: '#FFFF00',
   2: '#FFA500',
-  3: '#FF0000',
-  4: '#8B0000',
+  3: '#FF9F0A',
+  4: '#FF0000',
+});
+
+/**
+ * Alert severity color map keyed by Atmos CE string severity.
+ * Takes priority over attrs.color (which some sources set incorrectly).
+ * @type {Readonly<Record<string, string>>}
+ */
+export const ALERT_SEVERITY_STRING_COLOR_MAP = /** @type {const} */ ({
+  yellow: '#FFFF00',
+  amber: '#FF9F0A',
+  red: '#FF0000',
 });
 
 /**

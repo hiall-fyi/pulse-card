@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.8.1] - 2026-06-20
+
+### Bug fixes
+
+- **Weather Card sections all showing overview content** ([#49](https://github.com/hiall-fyi/pulse-card/issues/49) - @wrowlands3) — any section without custom options configured (scale, speed mode, horizon, etc.) was stored as a plain type string rather than an object. The config loader treated plain strings as invalid and fell back to `overview`, so every unconfigured section rendered as overview instead of its own content. Fixed in config normalisation; all section types now resolve correctly regardless of whether options are set.
+
+- **Alerts radar showing red for Amber warnings** — Atmos CE sets `color: "#FF0000"` on level-3 alerts regardless of the severity name. The radar sweep, ring, and blip colours were derived from that field directly, so an Amber warning produced a red radar. Fixed by resolving the radar colour from the `severity` string attribute (`amber`, `yellow`, `red`) rather than the integration-supplied hex. The `ALERT_COLOR_MAP` numeric fallback for level 3 was also corrected from red to amber.
+
+
 ## [1.8.0] - 2026-06-17
 
 **Pulse Weather Card ships as the third card in the family.** Works with any `weather.*` entity out of the box — point it at your entity and you get the current conditions hero, a 7-day forecast, and a meteogram on first load. Pair it with [Atmos CE](https://github.com/hiall-fyi/atmos_ce) for atmospheric stability, air quality, astronomy detail, weather alerts, and the extended 22-field hourly forecast that feeds cloud cover layers and CAPE data into the chart. Eight sections, each behind a section-shell with a brand-mark corner that toggles between a default and a pro view at runtime without touching YAML.

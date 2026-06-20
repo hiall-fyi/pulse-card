@@ -33,7 +33,9 @@ const SECTION_DEFAULTS = {
  * @returns {SectionConfig} Normalized section config.
  */
 function normalizeSection(section) {
-  if (!section || typeof section !== 'object') return { type: 'overview' };
+  if (!section) return { type: 'overview' };
+  if (typeof section === 'string') return normalizeSection({ type: section });
+  if (typeof section !== 'object') return { type: 'overview' };
   const type = SECTION_TYPES.includes(/** @type {any} */ (section.type))
     ? section.type
     : 'overview';

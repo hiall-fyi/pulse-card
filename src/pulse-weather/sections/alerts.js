@@ -5,7 +5,7 @@
 
 import { escapeHtml, sanitizeCssValue, hexToRgba } from '../weather-primitives.js';
 import { intensityRatio, tensionWash, breatheDuration, sweepDuration } from '../../shared/visual-tension.js';
-import { ALERT_ICON_MAP, ALERT_COLOR_MAP, ALERT_FAR_FUTURE_DAYS } from '../constants.js';
+import { ALERT_ICON_MAP, ALERT_COLOR_MAP, ALERT_SEVERITY_STRING_COLOR_MAP, ALERT_FAR_FUTURE_DAYS } from '../constants.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 
@@ -36,7 +36,12 @@ function parseAlerts(entity, isActive) {
   // finite check so the fallback path is auditable.
   const rawLevel = Number(attrs.level);
   const severity = Number.isFinite(rawLevel) && rawLevel > 0 ? rawLevel : 1;
-  const color = /** @type {string} */ (attrs.color || ALERT_COLOR_MAP[/** @type {keyof typeof ALERT_COLOR_MAP} */ (severity)] || ALERT_COLOR_MAP[1]);
+  const severityStr = typeof attrs.severity === 'string' ? attrs.severity.toLowerCase() : '';
+  const color = /** @type {string} */ (
+    ALERT_SEVERITY_STRING_COLOR_MAP[/** @type {keyof typeof ALERT_SEVERITY_STRING_COLOR_MAP} */ (severityStr)]
+    || ALERT_COLOR_MAP[/** @type {keyof typeof ALERT_COLOR_MAP} */ (severity)]
+    || ALERT_COLOR_MAP[1]
+  );
   const icon = /** @type {string} */ (ALERT_ICON_MAP[type] || 'mdi:alert');
   const progress = Number(attrs.progress) || 0;
   const locations = /** @type {Array<string>} */ (Array.isArray(attrs.locations) ? attrs.locations : []);
