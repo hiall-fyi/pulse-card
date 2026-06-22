@@ -1,6 +1,6 @@
 {
   "name": "pulse-card",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "private": true,
   "description": "Compact horizontal bar chart card for Home Assistant sensor data visualization",
   "author": "hiall-fyi",

@@ -9,31 +9,65 @@ import { ALERT_ICON_MAP, ALERT_COLOR_MAP, ALERT_SEVERITY_STRING_COLOR_MAP, ALERT
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 
+// Radar blip geometry. Distance from centre maps an alert's time-away to a
+// radius; angle is a stable hash so blips never stack. See blipDistance /
+// blipAngle.
+const BLIP_MIN_RADIUS = 18;   // active / imminent alerts sit here
+const BLIP_MAX_RADIUS = 62;   // radar is r=70; leave margin so blips don't touch the edge
+const BLIP_TIME_CAP_H = 168;  // 7 days: alerts starting this far out (or more) sit at the edge
+
 /**
- * Parse alert data from Atmos CE sensor attributes.
- * @param {HassEntity} entity - Alert sensor entity state.
- * @param {boolean} isActive - Whether this is an active alert sensor.
- * @returns {Array<import('../types.js').AlertData>}
+ * Hours until an alert is the "current concern":
+ * 0 for active alerts (they're happening now), else hours until it starts.
+ * @param {import('../types.js').AlertData} a
+ * @returns {number}
  */
-function parseAlerts(entity, isActive) {
-  // Skip entities with no active alert data
-  // Atmos CE uses "None" (capital N) when no alert is present
-  const state = (entity?.state || '').toLowerCase();
-  if (!entity || state === 'none' || state === 'no alerts' || state === 'unavailable' || state === '0' || state === 'off') return [];
+function blipHoursAway(a) {
+  if (a.active) return 0;
+  return typeof a.hoursUntil === 'number' && a.hoursUntil > 0 ? a.hoursUntil : 0;
+}
 
-  // Skip alert_count and binary_sensor entities — they don't contain alert details
-  const eid = /** @type {string} */ (entity.entity_id || '');
-  if (eid.endsWith('_alert_count') || eid.startsWith('binary_sensor.')) return [];
+/**
+ * Radial distance for an alert's blip: near the centre when active/imminent,
+ * out toward the edge the further in the future it starts (clamped at the
+ * 7-day cap so nothing flies off the radar).
+ * @param {import('../types.js').AlertData} a
+ * @returns {number}
+ */
+function blipDistance(a) {
+  const ratio = Math.min(blipHoursAway(a), BLIP_TIME_CAP_H) / BLIP_TIME_CAP_H;
+  return BLIP_MIN_RADIUS + ratio * (BLIP_MAX_RADIUS - BLIP_MIN_RADIUS);
+}
 
-  const attrs = entity.attributes;
+/**
+ * Stable angle (radians, 0–2π) hashed from an alert's identity so two blips
+ * spread across the dial instead of stacking, and the position is the same
+ * on every re-render (no Math.random jitter). Identity = summary + type +
+ * endTime, the fields that distinguish concurrent alerts.
+ * @param {import('../types.js').AlertData} a
+ * @returns {number}
+ */
+function blipAngle(a) {
+  const seed = `${a.summary || ''}|${a.type || ''}|${a.endTime || ''}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) % 360;
+  }
+  return (hash / 360) * 2 * Math.PI;
+}
 
-  // Atmos CE stores alert data in attributes
-  const alerts = [];
+/**
+ * Build one AlertData object from an alert-attribute object.
+ * Source-agnostic: `attrs` is the shape Atmos CE's _alert_attributes emits
+ * (a single alert's fields). Used for each element of the all_alerts list.
+ * @param {Record<string, any>} attrs - One alert's attribute fields.
+ * @param {boolean} isActive - Whether this alert is currently in effect.
+ * @returns {import('../types.js').AlertData}
+ */
+export function buildAlert(attrs, isActive) {
   const type = /** @type {string} */ (attrs.alert_type || attrs.type || 'wind');
-  // Level is contractually numeric (Atmos CE: 1–4). `Number(attrs.level)`
-  // alone swallows non-numeric strings as NaN and `|| 1` would silently
-  // downgrade a truthy-but-unparseable value to "low" — use explicit
-  // finite check so the fallback path is auditable.
+  // Level is contractually numeric (Atmos CE: 1–4). Explicit finite check
+  // so a non-numeric value falls back to 1 audibly rather than NaN.
   const rawLevel = Number(attrs.level);
   const severity = Number.isFinite(rawLevel) && rawLevel > 0 ? rawLevel : 1;
   const severityStr = typeof attrs.severity === 'string' ? attrs.severity.toLowerCase() : '';
@@ -72,12 +106,12 @@ function parseAlerts(entity, isActive) {
     }
   }
 
-  alerts.push({
+  return {
     type,
     icon,
     severity,
     color,
-    summary: String(attrs.headline || attrs.summary || entity.state || ''),
+    summary: String(attrs.headline || attrs.summary || ''),
     desc: String(attrs.description || ''),
     active: isActive,
     hoursLeft,
@@ -87,9 +121,7 @@ function parseAlerts(entity, isActive) {
     link: attrs.link ? String(attrs.link) : null,
     endTime: String(endTime),
     isUntilFurtherNotice,
-  });
-
-  return alerts;
+  };
 }
 
 /**
@@ -128,20 +160,25 @@ function buildTickerRow(alert) {
  * @returns {string} HTML string.
  */
 export function renderAlerts({ hass, config, discovery, proPersisted = false }) {
-  // Collect alerts from discovered entities
+  // Collect alerts from the single Atmos CE sensor that carries the full
+  // all_alerts list. Reading one list source (not per-sensor single
+  // alerts) renders every active + upcoming warning and avoids
+  // double-counting the same alert from two sensors.
+  //
+  // INVARIANT (locked by predicate audit 2026-06-22, D3): only the
+  // ActiveAlertSensor exposes `all_alerts`; the upcoming/count sensors do
+  // not. The `break` below relies on this — if Atmos CE ever adds
+  // `all_alerts` to a second sensor, this loop must switch from
+  // "first match wins" to picking the active-alert sensor explicitly.
   const alerts = [];
-  const ce = discovery.atmosCe;
-
-  // Atmos CE active/upcoming alert sensors
-  if (ce.active_alert && hass.states[discovery.atmosCe.active_alert]) {
-    // active_alert is in atmosCe map but entity ID is in alertEntityIds
-  }
-
   for (const eid of discovery.alertEntityIds) {
     const entity = hass.states[eid];
-    if (!entity) continue;
-    const isActive = eid.includes('active') || entity.state === 'on';
-    alerts.push(...parseAlerts(entity, isActive));
+    const list = entity?.attributes?.all_alerts;
+    if (!Array.isArray(list)) continue;
+    for (const element of list) {
+      alerts.push(buildAlert(element, element.active === true));
+    }
+    break; // only one sensor carries all_alerts (see INVARIANT above)
   }
 
   const hasAlerts = alerts.length > 0;
@@ -172,13 +209,16 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
     : { bgInner: '#001a00', bgOuter: '#000800',
         ring: 'rgba(80,255,0,0.15)', line: 'rgba(80,255,0,0.08)', sweep: 'rgba(80,255,0,0.35)' };
 
-  // Alert blips
-  const blipsHtml = alerts.map((a, i) => {
-    const dist = a.active ? 18 + i * 7 : 40 + i * 7;
-    const angle = (i * 137.5) * Math.PI / 180;
-    const bx = cx + Math.cos(angle) * dist;
-    const by = cy + Math.sin(angle) * dist;
-    const blipDelay = ((i * 137.5) % 360 / 360 * Number(sweepDur)).toFixed(2);
+  // Alert blips. Distance from centre encodes TIME (active alerts sit near
+  // the centre; the further in the future an upcoming alert starts, the
+  // further out it sits, clamped to the radar edge). Angle is a stable
+  // per-alert hash so blips spread across all 360° and never stack on one
+  // point or a single radial line — and, being deterministic, they don't
+  // jump position on every re-render the way Math.random() would.
+  const blipsHtml = alerts.map((a) => {
+    const bx = cx + Math.cos(blipAngle(a)) * blipDistance(a);
+    const by = cy + Math.sin(blipAngle(a)) * blipDistance(a);
+    const blipDelay = (blipAngle(a) / (2 * Math.PI) * Number(sweepDur)).toFixed(2);
     return a.active
       ? `<div class="pw-radar-blip" style="left:${bx.toFixed(1)}px;top:${by.toFixed(1)}px;--pw-blip-color:${sanitizeCssValue(a.color)};animation-delay:${blipDelay}s"></div>`
       : `<div style="position:absolute;left:${bx.toFixed(1)}px;top:${by.toFixed(1)}px;width:4px;height:4px;border-radius:var(--pulse-radius-circle);background:${sanitizeCssValue(a.color)};opacity:0.2;transform:translate(-50%,-50%)"></div>`;
@@ -186,7 +226,7 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
 
   const radarHtml = `
     <div style="display:flex;justify-content:center;padding:12px var(--pulse-space-card-wide);position:relative;z-index:2">
-      <div class="pw-radar" style="--pw-radar-bg-inner:${crtColors.bgInner};--pw-radar-bg-outer:${crtColors.bgOuter};--pw-radar-color:${crtColors.ring};--pw-radar-line:${crtColors.line};--pw-radar-sweep:${crtColors.sweep};--pw-radar-dur:${sweepDur}s" role="img" aria-label="${hasAlerts ? `${alerts.length} weather alerts` : 'No active alerts'}">
+      <div class="pw-radar" style="--pw-radar-bg-inner:${crtColors.bgInner};--pw-radar-bg-outer:${crtColors.bgOuter};--pw-radar-color:${crtColors.ring};--pw-radar-line:${crtColors.line};--pw-radar-sweep:${crtColors.sweep};--pw-radar-dur:${sweepDur}s" role="img" aria-label="${hasAlerts ? `${alerts.length} weather alerts` : 'No weather alerts'}">
         ${blipsHtml}
       </div>
     </div>`;
@@ -211,11 +251,9 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
     ? `<div class="pw-all-clear-v2"><strong>All Clear</strong>last 7 days clean</div>`
     : '';
   const timestampHtml = hasAlerts
-    ? `<div class="pw-alert-timestamp pw-alert-${worstSeverity >= 4 ? 'red' : 'amber'}">${alerts.length} active · valid through ${escapeHtml(latestExpiry)}</div>`
+    ? `<div class="pw-alert-timestamp pw-alert-${worstSeverity >= 4 ? 'red' : 'amber'}">${alerts.length} ${alerts.length === 1 ? 'alert' : 'alerts'} · valid through ${escapeHtml(latestExpiry)}</div>`
     : '';
 
-  const isRed = worstSeverity >= 4;
-  const redBorderStyle = isRed ? `border-top: 2px solid ${sanitizeCssValue(worstColor)};` : '';
   const toneClass = worstSeverity >= 4 ? 'pw-alerts-red' : worstSeverity > 0 ? 'pw-alerts-amber' : 'pw-alerts-green';
   const washHtml = `<div class="pw-tension-wash${hasAlerts ? ' breathing' : ''}" style="background: ${sanitizeCssValue(alertWash)}; --breathe-dur: ${breatheDur}s"></div>`;
 
@@ -271,11 +309,10 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
   return renderSectionShell({
     sectionClass: 'pw-alerts-v2',
     extraSectionClass: toneClass,
-    ariaLabel: 'Active weather alerts',
+    ariaLabel: 'Weather alerts',
     brandVariant: variant,
-    kicker: hasAlerts ? `active alerts (${alerts.length})` : 'no active alerts',
+    kicker: hasAlerts ? `weather alerts (${alerts.length})` : 'no weather alerts',
     preContent: washHtml,
-    sectionStyle: redBorderStyle,
     body,
     proView,
     proInitial: proPersisted,

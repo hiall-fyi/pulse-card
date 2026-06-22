@@ -6,7 +6,7 @@
  */
 
 /** Pulse Weather Card version string. */
-export const VERSION = '1.8.1';
+export const VERSION = '1.8.2';
 
 /** Card custom element name. */
 export const CARD_NAME = 'pulse-weather-card';
@@ -215,8 +215,11 @@ export const ALERT_COLOR_MAP = /** @type {const} */ ({
 });
 
 /**
- * Alert severity color map keyed by Atmos CE string severity.
- * Takes priority over attrs.color (which some sources set incorrectly).
+ * Alert severity colour map keyed by Atmos CE string severity.
+ * This 3-bucket map (yellow / amber / red) is the canonical colour source
+ * for alerts and takes priority over attrs.color. It is kept as a
+ * version-independent default so the card colours alerts correctly
+ * regardless of which integration (or integration version) supplied them.
  * @type {Readonly<Record<string, string>>}
  */
 export const ALERT_SEVERITY_STRING_COLOR_MAP = /** @type {const} */ ({

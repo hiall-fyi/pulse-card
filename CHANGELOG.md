@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.8.2] - 2026-06-22
+
+The alerts section needs **[Atmos CE](https://github.com/hiall-fyi/atmos_ce) 1.0.1 or newer** to show the full warning list. On an older Atmos CE the section is empty. Update Atmos CE first, then this card.
+
+### Bug fixes
+
+- **The alerts section now shows every warning, not just two.** When a region had several warnings at once (say two ambers and a red during a heat event), the card could only show two of them, and the most severe one would sometimes go missing entirely. It now reads the full warning list from Atmos CE 1.0.1+ and shows each one, with the warnings already in force listed first and the most severe leading.
+
+- **Section header reads "weather alerts" instead of "active alerts".** The list now includes upcoming warnings, not only those in force, so the old "active" label was misleading when an upcoming warning was on show. The count and the footer line match.
+
+### Improvements
+
+- **Radar blips spread out and sit at a distance that reflects timing.** A warning that is in force sits near the centre of the radar; the further into the future a warning starts, the further out its blip sits, up to a week away at the edge. Each blip takes a stable angle of its own, so warnings no longer pile up on the same spot or along one line, and they stay put between refreshes instead of jumping around.
+
+### Notes
+
+- The card has resolved alert colours from the severity name (yellow, amber, red) since 1.8.1, so it already showed the right colour even when the integration sent the wrong hex. Atmos CE 1.0.1 fixes that hex at the source; the card's colour handling is unchanged and stays in place as a safety net for any integration that sends a wrong colour.
+
+
 ## [1.8.1] - 2026-06-20
 
 ### Bug fixes
