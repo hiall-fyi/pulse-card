@@ -250,8 +250,9 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
   const allClearHtml = !hasAlerts
     ? `<div class="pw-all-clear-v2"><strong>All Clear</strong>last 7 days clean</div>`
     : '';
+  const alertNoun = alerts.length === 1 ? 'alert' : 'alerts';
   const timestampHtml = hasAlerts
-    ? `<div class="pw-alert-timestamp pw-alert-${worstSeverity >= 4 ? 'red' : 'amber'}">${alerts.length} ${alerts.length === 1 ? 'alert' : 'alerts'} · valid through ${escapeHtml(latestExpiry)}</div>`
+    ? `<div class="pw-alert-timestamp pw-alert-${worstSeverity >= 4 ? 'red' : 'amber'}">${alerts.length} ${alertNoun} · valid through ${escapeHtml(latestExpiry)}</div>`
     : '';
 
   const toneClass = worstSeverity >= 4 ? 'pw-alerts-red' : worstSeverity > 0 ? 'pw-alerts-amber' : 'pw-alerts-green';

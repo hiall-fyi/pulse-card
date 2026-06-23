@@ -407,7 +407,11 @@ sections:
 
 ### timeline_group
 
-A tabbed 24-hour history section that hosts two views behind a tab strip, so you get both without stacking two full sections. The **Thermal** tab shows the colour-coded temperature heatmap with a 24h average per zone and a colour legend along the bottom; the **State** tab shows when each zone was actually heating or cooling, with cell opacity reflecting the demand level. Both tabs share the same row grid, so zones stay vertically aligned when you switch tabs. Tap a row on either tab to reveal its detail stats.
+A tabbed 24-hour history section that hosts two views behind a tab strip, so you get both without stacking two full sections. The **Thermal** tab shows the colour-coded temperature heatmap; the **State** tab shows when each zone was actually heating or cooling, with cell opacity reflecting the demand level. Both tabs share the same row grid, so zones stay vertically aligned when you switch tabs. Tap a row on either tab to reveal its detail stats.
+
+The number on the right of each Thermal row is that zone's **24-hour average**, labelled `24h avg` under the time axis. It is not the live reading. For the current temperature, look at the `zones` section, which shows what each zone reads right now. The two will differ, often by a degree or more, when a zone has warmed or cooled over the day.
+
+Cell colours run on a fixed scale, so a given temperature is always the same colour across every zone and every day. The scale runs cool blue through green and yellow up to orange, red, and deep magenta for heatwave temperatures past 34°C. The legend along the bottom only lists the bands the current window actually crosses, so it shows cool colours in winter and hot ones in a heatwave without ever spilling onto a second row.
 
 | Option | Type | Default | Description |
 |---|---|---|---|

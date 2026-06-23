@@ -1566,6 +1566,14 @@ ha-card {
   display: flex; justify-content: space-between;
 }
 
+.pc-timeline-group-stat-head {
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: var(--pulse-font-micro);
+  color: var(--pulse-text-disabled);
+}
+
 .pc-timeline-group-footer {
   margin-top: 8px;
   padding-top: 8px;

@@ -284,8 +284,15 @@ export const TEMP_COLOR_BANDS = [
   { upper: 21,   color: '#FFF176' },
   { upper: 22,   color: '#FFB74D' },
   { upper: 23,   color: '#FF8A65' },
-  { upper: 24,   color: '#EF5350' },
-  { upper: null, color: '#C62828' },
+  { upper: 24,   color: '#FF7043' },
+  { upper: 25,   color: '#F4511E' },
+  { upper: 26,   color: '#EF5350' },
+  { upper: 27,   color: '#EC407A' },
+  { upper: 28,   color: '#E91E63' },
+  { upper: 30,   color: '#D81B60' },
+  { upper: 32,   color: '#C2185B' },
+  { upper: 34,   color: '#AD1457' },
+  { upper: null, color: '#880E4F' },
 ];
 
 /**

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.8.3] - 2026-06-23
+
+### Climate Card
+
+#### Improvements
+
+- **The 24h thermal heatmap now shows detail in hot weather.** The colour scale used to stop at 24°C, so once a room sat anywhere above that its whole row turned a single flat red and you could not see the temperature moving through the day. The scale now runs up through orange, red, and magenta to a deep tone past 34°C, so a warm summer home reads as a gradient again. Every temperature keeps a fixed colour across all zones, so you can still compare rooms at a glance.
+
+- **The colour legend tracks the data on show.** It now lists only the temperature bands the current 24 hours actually crosses, cool colours in winter and hot ones in a heatwave, rather than a fixed set. It no longer spills onto a second row.
+
+- **The number on each thermal row is labelled `24h avg`.** That figure has always been the zone's 24-hour average, not its current reading, but nothing said so. It is now labelled under the time axis. For the live temperature, read the zones section.
+
+
 ## [1.8.2] - 2026-06-22
 
 The alerts section needs **[Atmos CE](https://github.com/hiall-fyi/atmos_ce) 1.0.1 or newer** to show the full warning list. On an older Atmos CE the section is empty. Update Atmos CE first, then this card.
