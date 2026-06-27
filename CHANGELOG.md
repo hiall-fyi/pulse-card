@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.8.4] - 2026-06-27
+
+### Bug fixes
+
+- **Card content no longer spills past its box and overlaps the card below** ([#50](https://github.com/hiall-fyi/pulse-card/issues/50) - @BirbByte, [#43](https://github.com/hiall-fyi/pulse-card/issues/43) - @ChrisMarriott38) — in a dashboard's sections (grid) view, a tall card reserved a fixed-height slot that was often shorter than what it actually drew, so the bottom of the card painted over whatever sat beneath it. The Climate and Weather cards were hit hardest, since a single heatmap, timeline, or meteogram section can run several rows deep. Every card now tells the grid to size its slot to the real content height, so the full card shows and the next card sits clear of it. If you had switched on the card's "Auto height" toggle, or added `grid_options: rows: auto` in YAML, to work around this, you no longer need either.
+
+### Notes
+
+- **The Weather card now reports the right version in the browser console.** Each card logs its version on load (open the browser console and you'll see a line like `PULSE-WEATHER-CARD v1.8.4`). The Weather card had fallen behind and logged an older number than the release you were on. All three cards now share one version, so the console line matches the version you installed.
+
+
 ## [1.8.3] - 2026-06-23
 
 ### Climate Card

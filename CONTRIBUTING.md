@@ -30,33 +30,63 @@ npm run typecheck  # Type check via JSDoc + tsc
 
 ## Project Structure
 
+Each card lives in its own `src/pulse-{name}/` folder; family-shared
+primitives live in `src/shared/`. Every card's entry file registers its
+custom element and pushes to `window.customCards`.
+
 ```
 src/
-├── pulse-card.js              # Pulse Card — main class
-├── editor.js                  # Pulse Card — visual editor
-├── styles.js                  # Pulse Card — CSS styles
-├── utils.js                   # Pulse Card — utility functions
-├── constants.js               # Pulse Card — defaults and version
-├── slider-handler.js          # Pulse Card — interactive slider
-├── action-handler.js          # Pulse Card — tap/hold/double-tap
-├── shared/                    # Shared across all cards
-│   ├── utils.js               #   escapeHtml, sanitizeCssValue, isReducedMotion
-│   ├── action-handler.js      #   Shared action execution
-│   ├── editor-helpers.js      #   Visual editor utilities
-│   └── ripple.js              #   Tap ripple effect
-├── pulse-climate/             # Pulse Climate Card
-│   ├── pulse-climate-card.js  #   Main class
-│   ├── editor.js              #   Visual editor
-│   ├── styles.js              #   CSS styles
-│   ├── utils.js               #   Climate utilities + animation helpers
-│   ├── constants.js           #   Defaults, HVAC visuals, section types
-│   ├── chart-primitives.js    #   Shared SVG rendering (arcs, sparklines, colors)
-│   ├── zone-resolver.js       #   Tado CE entity auto-discovery
-│   ├── sensor-resolver.js     #   History sensor resolution chain (external sensor auto-detection)
-│   ├── history.js             #   History cache management
-│   └── sections/              #   One file per section type
-│       ├── zones.js, radial.js, energy-flow.js, ...
-│       └── slot-engine.js     #   Shared timeline/heatmap rendering
+├── global.d.ts                     # Ambient types for the whole bundle
+├── shared/                         # Shared across all cards
+│   ├── version.js                  #   FAMILY_VERSION — one source for Bar/Climate/Weather
+│   ├── styles.js                   #   --pulse-* design tokens + .pulse-* utility classes
+│   ├── utils.js                    #   escapeHtml, sanitizeCssValue, buildGridOptions, history fetch
+│   ├── action-handler.js           #   Shared tap/hold/double-tap execution
+│   ├── editor-helpers.js           #   Visual editor utilities + SHARED_EDITOR_STYLES
+│   ├── ripple.js                   #   Tap ripple effect
+│   ├── color.js                    #   Hex parse + RGB mixing
+│   ├── visual-tension.js           #   Layout tension helpers
+│   └── types.js                    #   Shared JSDoc typedefs
+├── pulse-bar/                      # Pulse Bar Card
+│   ├── pulse-bar-card.js           #   Main class — registers the element
+│   ├── pulse-bar-card-editor.js    #   Visual editor
+│   ├── styles.js                   #   CSS (--pb-* tokens, .pb-* classes)
+│   ├── constants.js                #   Defaults + VERSION (re-exports FAMILY_VERSION)
+│   ├── utils.js                    #   Bar fill, severity, indicators
+│   ├── slider-handler.js           #   Interactive slider
+│   ├── action-handler.js           #   Tap/hold/double-tap binding
+│   └── types.js                    #   JSDoc typedefs
+├── pulse-climate/                  # Pulse Climate Card
+│   ├── pulse-climate-card.js       #   Main class
+│   ├── pulse-climate-editor.js     #   Visual editor
+│   ├── styles.js                   #   CSS (--pc-* tokens, .pc-* classes)
+│   ├── constants.js                #   Defaults, HVAC visuals, section types + VERSION
+│   ├── chart-primitives.js         #   SVG rendering (arcs, sparklines, bloom filters)
+│   ├── zone-resolver.js            #   Tado CE entity auto-discovery
+│   ├── sensor-resolver.js          #   History sensor resolution chain
+│   ├── history.js                  #   History cache management
+│   ├── feature-availability.js     #   Per-section capability gating
+│   └── sections/                   #   One file per section type (zones, radial,
+│       └── …                       #   energy-flow, thermal, donut, slot-engine, …)
+├── pulse-weather/                  # Pulse Weather Card
+│   ├── pulse-weather-card.js       #   Main class
+│   ├── pulse-weather-card-editor.js#   Visual editor
+│   ├── styles.js                   #   CSS (--pw-* tokens, .pw-* classes)
+│   ├── constants.js                #   Section types, scales, sensor keys + VERSION
+│   ├── type-system.js              #   `t` text/layout builder (kicker, hero, stats)
+│   ├── section-shell.js            #   Section frame with brand-mark corner toggle
+│   ├── weather-fx.js               #   Atmospheric effect layers
+│   ├── weather-resolver.js         #   Atmos CE auto-discovery
+│   └── sections/                   #   overview, forecast, meteogram, wind, astro,
+│       └── …                       #   air-quality, alerts, atmosphere
+└── pulse-switch/                   # Pulse Switch Card (pre-release, staging only)
+    ├── pulse-switch-card.js        #   Main class
+    ├── pulse-switch-card-editor.js #   Visual editor
+    ├── styles.js                   #   CSS (--ps-* tokens, .ps-* classes)
+    ├── constants.js                #   Defaults + VERSION (independent of the family line)
+    ├── activity-led.js             #   Port activity LED
+    ├── utils.js                    #   Speed formatting, port type detection
+    └── types.js                    #   JSDoc typedefs
 ```
 
 ## Pull Request Guidelines

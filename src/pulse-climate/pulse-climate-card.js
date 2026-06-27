@@ -32,7 +32,7 @@ import { renderSystemHealthGroupSection } from './sections/system-health-group.j
 import { renderAtmosphere } from './sections/atmosphere.js';
 import { renderHero } from './sections/hero.js';
 import { resolveOutdoorTemp } from './outdoor-temp.js';
-import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay, isUnavailableState } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay, isUnavailableState, buildGridOptions } from '../shared/utils.js';
 import { buildFilledSparkline, temperatureToColor } from './chart-primitives.js';
 import { createStripTooltip, createFixedTooltip, pointerToSlotIndex, bindDragSelect, bindCrosshair } from './sections/slot-engine.js';
 import { executeAction as sharedExecuteAction, fireEvent, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
@@ -2448,16 +2448,14 @@ class PulseClimateCard extends HTMLElement {
   }
 
   /**
-   * Report grid options for HA layout.
-   * @returns {{columns: number, min_columns: number, rows: number, min_rows: number}}
+   * Report grid options for HA's sections (grid) view. Uses `rows: 'auto'` so
+   * the cell sizes to content — sections vary wildly in height (a heatmap or
+   * timeline is many rows tall, the API donut ~80px), so any fixed row count
+   * would clip and overlap the card below. See {@link buildGridOptions}.
+   * @returns {{columns: number, min_columns: number, rows: 'auto'}}
    */
   getGridOptions() {
-    return {
-      columns: 12,
-      min_columns: 3,
-      rows: this.getCardSize(),
-      min_rows: 1,
-    };
+    return buildGridOptions(3);
   }
 
   /**

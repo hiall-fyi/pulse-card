@@ -4,8 +4,10 @@
  * prefix constants for Pulse Card.
  */
 
-/** Pulse Card version string. */
-export const VERSION = '1.8.3';
+import { FAMILY_VERSION } from '../shared/version.js';
+
+/** Pulse Bar Card version — tracks the shared family release line. */
+export const VERSION = FAMILY_VERSION;
 
 /** Console log prefix. */
 export const LOG_PREFIX = 'Pulse Card:';

@@ -7,7 +7,7 @@ import { VERSION, CARD_NAME, EDITOR_NAME, FORECAST_REFRESH_MS, LOG_PREFIX } from
 import { STYLES } from './styles.js';
 import { normalizeWeatherConfig } from './utils.js';
 // eslint-disable-next-line no-unused-vars -- audit gate requires escapeHtml import on any file using innerHTML; escaping is delegated to section renderers
-import { escapeHtml } from '../shared/utils.js';
+import { escapeHtml, buildGridOptions } from '../shared/utils.js';
 import { discoverWeatherEntities, deriveSourceSlug } from './weather-resolver.js';
 import { deriveTodaySunBoundaries, anchorEventOn } from './weather-primitives.js';
 import { buildConditionFx, addAirHaze, addStars, addRays, addClouds } from './weather-fx.js';
@@ -669,12 +669,14 @@ class PulseWeatherCard extends HTMLElement {
   }
 
   /**
-   * Return grid options for HA dashboard.
-   * @returns {object}
+   * Return grid options for HA's sections (grid) view. Uses `rows: 'auto'` so
+   * the cell sizes to content — section heights vary (a meteogram or forecast
+   * row is far taller than overview), so any fixed row count would clip and
+   * overlap the card below. See {@link buildGridOptions}.
+   * @returns {{columns: number, min_columns: number, rows: 'auto'}}
    */
   getGridOptions() {
-    const rows = this.getCardSize();
-    return { columns: 12, min_columns: 6, rows, min_rows: 3 };
+    return buildGridOptions(6);
   }
 
   /**

@@ -4,6 +4,11 @@ Community members who shaped Pulse Card through bug reports, feature requests, t
 
 ---
 
+### v1.8.4
+
+- **[@BirbByte](https://github.com/BirbByte)** — Reported cards overflowing their slot and overlapping the card below in sections view, with annotated screenshots showing that the hitbox stayed in place while the content painted past the card's bounding box. That hitbox-versus-paint detail is what pinned the cause to the card's reported grid height ([#50](https://github.com/hiall-fyi/pulse-card/issues/50))
+- **[@ChrisMarriott38](https://github.com/ChrisMarriott38)** — First flagged the same sections-view overflow back in May and found that HA's "Auto height" toggle worked around it, which pointed straight at the card's grid height as the real cause ([#43](https://github.com/hiall-fyi/pulse-card/issues/43))
+
 ### v1.3.2
 
 - **[@Si-Hill](https://github.com/Si-Hill)** — Reported floating-point noise in the valve chip display (`18.700000000000003°C`) and identified that SVC-enabled zones in idle state showed no valve chip at all, making it impossible to tell whether Smart Valve Control was running. Provided screenshots showing the issue across multiple zones ([#45](https://github.com/hiall-fyi/pulse-card/issues/45))

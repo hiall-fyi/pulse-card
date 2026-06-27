@@ -4,8 +4,10 @@
  * mapping constants for Pulse Climate Card.
  */
 
-/** Pulse Climate Card version string. */
-export const VERSION = '1.8.3';
+import { FAMILY_VERSION } from '../shared/version.js';
+
+/** Pulse Climate Card version — tracks the shared family release line. */
+export const VERSION = FAMILY_VERSION;
 
 /** Custom element tag name. */
 export const CARD_NAME = 'pulse-climate-card';

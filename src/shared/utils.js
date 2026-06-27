@@ -45,6 +45,26 @@ export function clamp(value, min, max) {
 }
 
 /**
+ * Build the grid options every card returns from `getGridOptions()` for HA's
+ * sections (grid) view.
+ *
+ * Sets `rows: 'auto'` explicitly so the grid cell sizes to the card's real
+ * rendered height. A numeric `rows` makes HA add the `fit-rows` class and pin
+ * the cell to `rows * 64px - 8px`; any card whose content (zone rows, heatmap,
+ * timeline, donut) is taller than that estimate then paints past its cell and
+ * overlaps the card below (issue #50). `'auto'` is the value HA's YAML
+ * `grid_options: { rows: auto }` carries — verified working on HA 2026.6 — and
+ * must be passed explicitly: simply omitting `rows` is NOT equivalent at
+ * runtime, so the string is set here on purpose, not left to a default.
+ *
+ * @param {number} minColumns - Minimum columns the card stays legible at.
+ * @returns {{columns: number, min_columns: number, rows: 'auto'}}
+ */
+export function buildGridOptions(minColumns) {
+  return { columns: 12, min_columns: minColumns, rows: 'auto' };
+}
+
+/**
  * Rejects strings longer than this cap before numeric-digit inspection to
  * rule out any ReDoS risk — a CSS dimension has no legitimate use case near
  * this length, so the cap is effectively unreachable in real configs.

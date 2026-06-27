@@ -16,6 +16,7 @@ import {
   cssValue,
   escapeHtml,
   evaluateVisibility,
+  buildGridOptions,
   fetchPreviousValues,
   fetchSparklineData,
   buildSparklinePath,
@@ -750,14 +751,14 @@ class PulseBarCard extends HTMLElement {
   }
 
   /**
-   * Return grid sizing for sections view.
-   * @returns {object}
+   * Return grid sizing for HA's sections (grid) view. Uses `rows: 'auto'` so
+   * the cell sizes to content — bar rows wrap by the `columns` config and each
+   * row can carry a sparkline, so a fixed row count would clip taller layouts
+   * and overlap the card below. See {@link buildGridOptions}.
+   * @returns {{columns: number, min_columns: number, rows: 'auto'}}
    */
   getGridOptions() {
-    const entityCount = this._config?.entities?.length || 1;
-    const columns = this._config?.columns || 1;
-    const rows = Math.ceil(entityCount / columns);
-    return { columns: 12, min_columns: 3, rows: Math.max(1, rows), min_rows: 1 };
+    return buildGridOptions(3);
   }
 
   /**

@@ -5,7 +5,7 @@
  */
 
 import { DEFAULTS, LOG_PREFIX } from './constants.js';
-export { escapeHtml, sanitizeCssValue, clamp, cssValue, fetchSparklineData, buildSparklinePath } from '../shared/utils.js';
+export { escapeHtml, sanitizeCssValue, clamp, cssValue, fetchSparklineData, buildSparklinePath, buildGridOptions } from '../shared/utils.js';
 import { clamp, makeWarn, isUnavailableState } from '../shared/utils.js';
 import { parseHexColor, mixToRgbString } from '../shared/color.js';
 

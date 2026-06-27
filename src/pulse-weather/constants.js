@@ -5,8 +5,10 @@
  * Atmos CE sensor keys.
  */
 
-/** Pulse Weather Card version string. */
-export const VERSION = '1.8.2';
+import { FAMILY_VERSION } from '../shared/version.js';
+
+/** Pulse Weather Card version — tracks the shared family release line. */
+export const VERSION = FAMILY_VERSION;
 
 /** Card custom element name. */
 export const CARD_NAME = 'pulse-weather-card';
