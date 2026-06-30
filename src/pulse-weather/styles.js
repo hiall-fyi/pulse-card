@@ -1110,6 +1110,11 @@ div.pw-brand-mark-corner {
   position: absolute;
   top: 0;
   bottom: 0;
+  /* Cool-to-warm temperature range gradient. The two cool stops are this
+     bar's only consumers, so they stay raw hex rather than card tokens.
+     #827a6a coincides with --pw-sky-bot's value but is a different concept
+     (range-bar cool end, not sky), so binding to that token would couple the
+     two and let a sky-colour change bleed into the forecast bar. */
   background: linear-gradient(90deg, #5e6776 0%, #827a6a 50%, var(--pw-vermilion) 100%);
   border-radius: 2.5px;
 }
@@ -1492,7 +1497,8 @@ div.pw-brand-mark-corner {
   font-size: var(--pulse-font-body);
   animation: pw-alertBlink 1s step-end infinite;
 }
-.pw-alerts-v2 .pw-alert-amber .pw-alert-tri { color: var(--pw-warn-yellow); }
+.pw-alerts-v2 .pw-alert-yellow .pw-alert-tri { color: var(--pw-warn-yellow); }
+.pw-alerts-v2 .pw-alert-amber .pw-alert-tri { color: var(--pw-warn-amber); }
 .pw-alerts-v2 .pw-alert-red .pw-alert-tri { color: var(--pw-warn-red); }
 .pw-alerts-v2 .pw-alert-text {
   font-weight: 700;
@@ -1500,9 +1506,13 @@ div.pw-brand-mark-corner {
   letter-spacing: 0.08em;
   line-height: 1.4;
 }
-.pw-alerts-v2 .pw-alert-amber .pw-alert-text {
+.pw-alerts-v2 .pw-alert-yellow .pw-alert-text {
   color: var(--pw-warn-yellow);
   text-shadow: 0 0 6px rgba(255, 214, 10, 0.5);
+}
+.pw-alerts-v2 .pw-alert-amber .pw-alert-text {
+  color: var(--pw-warn-amber);
+  text-shadow: 0 0 6px rgba(255, 159, 10, 0.5);
 }
 .pw-alerts-v2 .pw-alert-red .pw-alert-text {
   color: var(--pw-warn-red);
@@ -1516,9 +1526,13 @@ div.pw-brand-mark-corner {
   font-size: var(--pulse-font-label);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  /* Secondary line: dim the tone token rather than baking a per-tier alpha
+     into a hardcoded rgba, so the colour stays in sync with the family token. */
+  opacity: 0.65;
 }
-.pw-alerts-v2 .pw-alert-timestamp.pw-alert-amber { color: rgba(255, 159, 10, 0.55); }
-.pw-alerts-v2 .pw-alert-timestamp.pw-alert-red { color: rgba(255, 69, 58, 0.7); }
+.pw-alerts-v2 .pw-alert-timestamp.pw-alert-yellow { color: var(--pw-warn-yellow); }
+.pw-alerts-v2 .pw-alert-timestamp.pw-alert-amber { color: var(--pw-warn-amber); }
+.pw-alerts-v2 .pw-alert-timestamp.pw-alert-red { color: var(--pw-warn-red); }
 .pw-alerts-v2 .pw-all-clear-v2 {
   text-align: center;
   font-weight: 600;
@@ -1544,13 +1558,17 @@ div.pw-brand-mark-corner {
 }
 /* Pro view: per-alert detail card. Each card stacks headline +
    meta line + description + locations vertically; the tone modifier
-   (.pw-alert-amber / .pw-alert-red) drives border + headline colour. */
+   (.pw-alert-yellow / .pw-alert-amber / .pw-alert-red) drives border +
+   headline colour. */
 .pw-alerts-v2 .pw-alert-detail {
   background: rgba(229, 217, 194, 0.04);
   border: 1px solid;
   border-radius: var(--pulse-radius-pill);
   padding: 10px 12px;
   margin-top: var(--pw-gap-tight);
+}
+.pw-alerts-v2 .pw-alert-detail.pw-alert-yellow {
+  border-color: rgba(255, 214, 10, 0.3);
 }
 .pw-alerts-v2 .pw-alert-detail.pw-alert-amber {
   border-color: rgba(255, 159, 10, 0.3);
@@ -1564,8 +1582,11 @@ div.pw-brand-mark-corner {
   line-height: 1.3;
   margin-bottom: var(--pw-gap-tight);
 }
-.pw-alerts-v2 .pw-alert-detail.pw-alert-amber .pw-alert-detail-head {
+.pw-alerts-v2 .pw-alert-detail.pw-alert-yellow .pw-alert-detail-head {
   color: var(--pw-warn-yellow);
+}
+.pw-alerts-v2 .pw-alert-detail.pw-alert-amber .pw-alert-detail-head {
+  color: var(--pw-warn-amber);
 }
 .pw-alerts-v2 .pw-alert-detail.pw-alert-red .pw-alert-detail-head {
   color: var(--pw-warn-red);

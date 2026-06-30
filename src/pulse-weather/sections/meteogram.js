@@ -249,9 +249,12 @@ function renderPrecipBars(data) {
     if (x < 0) { w += x; x = 0; }
     if (x + w > VB_WIDTH) { w = VB_WIDTH - x; }
     const y = PRECIP_BASELINE_Y - height;
+    // Rain reuses --pw-wind (the family cyan, same token as the cold-temp
+    // label below); color-mix keeps the 40% wash while tracking the token.
+    // Snow has no shared token (a single consumer), so it stays a raw hex.
     const color = precipType === 'snow'
       ? 'rgba(200,220,240,0.45)'
-      : 'rgba(90,200,250,0.4)';
+      : 'color-mix(in srgb, var(--pw-wind) 40%, transparent)';
 
     svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${height.toFixed(1)}" fill="${color}" rx="1"/>`;
   }
@@ -281,7 +284,7 @@ function renderPrecipLabels(data) {
     const label = useMm
       ? (precipMm >= 10 ? String(Math.round(precipMm)) : precipMm.toFixed(1))
       : `${Math.round(precip)}%`;
-    svg += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" fill="rgba(90,200,250,0.9)" font-size="13" font-weight="600">${escapeHtml(label)}</text>`;
+    svg += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" fill="color-mix(in srgb, var(--pw-wind) 90%, transparent)" font-size="13" font-weight="600">${escapeHtml(label)}</text>`;
   }
   return svg;
 }

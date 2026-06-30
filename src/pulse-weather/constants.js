@@ -206,25 +206,31 @@ export const ALERT_ICON_MAP = /** @type {const} */ ({
 });
 
 /**
- * Alert severity color map (hex) keyed by numeric level.
- * @type {Readonly<Record<number, string>>}
+ * The alert colour scale has three buckets: yellow, amber, red. This mirrors
+ * the global weather-warning convention and Atmos CE's upstream model, where
+ * the numeric level 1–4 collapses to three colours (minor + moderate are both
+ * yellow, severe is amber, extreme is red). `severityBucket` is the single
+ * source of truth for that level → bucket mapping; everything that colours an
+ * alert (the radar hex here, the text tone class in alerts.js) derives from it
+ * so the two can never drift apart.
+ *
+ * @param {number} level - Atmos CE numeric severity (1–4; >4 clamps to red).
+ * @returns {'yellow'|'amber'|'red'}
  */
-export const ALERT_COLOR_MAP = /** @type {const} */ ({
-  1: '#FFFF00',
-  2: '#FFA500',
-  3: '#FF9F0A',
-  4: '#FF0000',
-});
+export function severityBucket(level) {
+  if (level >= 4) return 'red';
+  if (level === 3) return 'amber';
+  return 'yellow';
+}
 
 /**
- * Alert severity colour map keyed by Atmos CE string severity.
- * This 3-bucket map (yellow / amber / red) is the canonical colour source
- * for alerts and takes priority over attrs.color. It is kept as a
- * version-independent default so the card colours alerts correctly
- * regardless of which integration (or integration version) supplied them.
- * @type {Readonly<Record<string, string>>}
+ * Bucket name → pure radar hex. These are the saturated warning colours used
+ * for the radar blips, sweep, and severity wash (they read on the dark CRT
+ * background). The text tone uses softer `--pw-warn-*` tokens for the same
+ * buckets; both are keyed by `severityBucket` so they stay in lockstep.
+ * @type {Readonly<Record<'yellow'|'amber'|'red', string>>}
  */
-export const ALERT_SEVERITY_STRING_COLOR_MAP = /** @type {const} */ ({
+export const ALERT_BUCKET_COLOR = /** @type {const} */ ({
   yellow: '#FFFF00',
   amber: '#FF9F0A',
   red: '#FF0000',

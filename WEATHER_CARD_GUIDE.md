@@ -350,13 +350,11 @@ card_mod:
 
 | Selector | What it targets |
 |---|---|
-| `.pw-alerts-green` | Alerts section when all-clear |
-| `.pw-alerts-amber` | Alerts section when severity 1–3 alerts are active |
-| `.pw-alerts-red` | Alerts section when severity 4 alerts are active |
+| `.pw-alerts-v2` | The alerts section root |
 | `.pw-radar` | The radar display |
 | `.pw-radar-blip` | An active alert blip on the radar |
 | `.pw-alert-ticker` | One compressed alert ticker row |
-| `.pw-alert-amber`, `.pw-alert-red` | Tone modifier on ticker rows |
+| `.pw-alert-yellow`, `.pw-alert-amber`, `.pw-alert-red` | Tone modifier on ticker rows, the timestamp, and detail cards (by warning level) |
 | `.pw-alert-detail` | One full detail card (pro view) |
 
 **Atmosphere:**
@@ -387,7 +385,7 @@ card_mod:
     .pw-section + .pw-section {
       border-top: 1px solid rgba(255, 255, 255, 0.05);
     }
-    .pw-alerts-v2.pw-alerts-red .pw-radar {
+    .pw-alerts-v2 .pw-radar {
       box-shadow: 0 0 20px rgba(255, 69, 58, 0.3);
     }
 ```

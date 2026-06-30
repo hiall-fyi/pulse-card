@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.8.5] - 2026-06-30
+
+### Weather Card
+
+#### Bug fixes
+
+- **Amber warnings now show in amber, not yellow.** An amber weather warning painted its headline, ticker triangle, and the line under the radar in yellow, so an amber heat warning read the same colour as a lower-level yellow one. The warning text now takes the colour that matches its level, so yellow, amber, and red warnings each read as their own colour and line up with the radar blip.
+
+- **Warnings now split into three colour levels instead of two.** The text only ever coloured warnings amber or red, so a low-level yellow advisory was drawn as amber. Warnings now follow the same yellow / amber / red scale as the radar and the source data, so each level shows its true colour.
+
+- **The "all clear" line no longer claims a seven-day history the card doesn't keep.** When nothing was active it read "last 7 days clean", but the card has no record of past warnings. It only ever sees warnings that are in force or coming up, so a warning that ended an hour ago is already gone from its view. The line now reads "no active or upcoming warnings", which is what the card can actually tell you.
+
+#### Other
+
+- **`card_mod` users:** the alerts section no longer carries the `.pw-alerts-green` / `.pw-alerts-amber` / `.pw-alerts-red` classes that changed with the overall severity. If you styled the section through one of those, switch to `.pw-alerts-v2` for the whole section, or the per-warning `.pw-alert-yellow` / `.pw-alert-amber` / `.pw-alert-red` tone classes on individual rows. The radar, ticker, and detail-card hooks are unchanged.
+
+
 ## [1.8.4] - 2026-06-27
 
 ### Bug fixes

@@ -5,7 +5,7 @@
 
 import { escapeHtml, sanitizeCssValue, hexToRgba } from '../weather-primitives.js';
 import { intensityRatio, tensionWash, breatheDuration, sweepDuration } from '../../shared/visual-tension.js';
-import { ALERT_ICON_MAP, ALERT_COLOR_MAP, ALERT_SEVERITY_STRING_COLOR_MAP, ALERT_FAR_FUTURE_DAYS } from '../constants.js';
+import { ALERT_ICON_MAP, severityBucket, ALERT_BUCKET_COLOR, ALERT_FAR_FUTURE_DAYS } from '../constants.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 
@@ -70,12 +70,10 @@ export function buildAlert(attrs, isActive) {
   // so a non-numeric value falls back to 1 audibly rather than NaN.
   const rawLevel = Number(attrs.level);
   const severity = Number.isFinite(rawLevel) && rawLevel > 0 ? rawLevel : 1;
-  const severityStr = typeof attrs.severity === 'string' ? attrs.severity.toLowerCase() : '';
-  const color = /** @type {string} */ (
-    ALERT_SEVERITY_STRING_COLOR_MAP[/** @type {keyof typeof ALERT_SEVERITY_STRING_COLOR_MAP} */ (severityStr)]
-    || ALERT_COLOR_MAP[/** @type {keyof typeof ALERT_COLOR_MAP} */ (severity)]
-    || ALERT_COLOR_MAP[1]
-  );
+  // Radar hex derives from the same bucket as the text tone, so the blip and
+  // the warning text always read as one colour. Upstream `level` already is the
+  // normalised form of the severity string, so keying off it is sufficient.
+  const color = ALERT_BUCKET_COLOR[severityBucket(severity)];
   const icon = /** @type {string} */ (ALERT_ICON_MAP[type] || 'mdi:alert');
   const progress = Number(attrs.progress) || 0;
   const locations = /** @type {Array<string>} */ (Array.isArray(attrs.locations) ? attrs.locations : []);
@@ -131,7 +129,7 @@ export function buildAlert(attrs, isActive) {
  * @returns {string}
  */
 function buildTickerRow(alert) {
-  const tone = alert.severity >= 4 ? 'red' : 'amber';
+  const tone = severityBucket(alert.severity);
   let windowSegment = '';
   if (alert.isUntilFurtherNotice) windowSegment = 'UNTIL FURTHER NOTICE';
   else if (alert.active && alert.hoursLeft !== null) windowSegment = `${Math.round(alert.hoursLeft)}H LEFT`;
@@ -248,14 +246,13 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
 
   const tickerRows = alerts.map(buildTickerRow).join('');
   const allClearHtml = !hasAlerts
-    ? `<div class="pw-all-clear-v2"><strong>All Clear</strong>last 7 days clean</div>`
+    ? `<div class="pw-all-clear-v2"><strong>All Clear</strong>no active or upcoming warnings</div>`
     : '';
   const alertNoun = alerts.length === 1 ? 'alert' : 'alerts';
   const timestampHtml = hasAlerts
-    ? `<div class="pw-alert-timestamp pw-alert-${worstSeverity >= 4 ? 'red' : 'amber'}">${alerts.length} ${alertNoun} · valid through ${escapeHtml(latestExpiry)}</div>`
+    ? `<div class="pw-alert-timestamp pw-alert-${severityBucket(worstSeverity)}">${alerts.length} ${alertNoun} · valid through ${escapeHtml(latestExpiry)}</div>`
     : '';
 
-  const toneClass = worstSeverity >= 4 ? 'pw-alerts-red' : worstSeverity > 0 ? 'pw-alerts-amber' : 'pw-alerts-green';
   const washHtml = `<div class="pw-tension-wash${hasAlerts ? ' breathing' : ''}" style="background: ${sanitizeCssValue(alertWash)}; --breathe-dur: ${breatheDur}s"></div>`;
 
   const body = `
@@ -269,7 +266,7 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
      description prose, and any reported locations. Falls back to All Clear
      when there's nothing active. */
   const proAlertCards = alerts.map((a) => {
-    const tone = a.severity >= 4 ? 'red' : 'amber';
+    const tone = severityBucket(a.severity);
     const headline = a.summary || a.desc || a.type;
     const metaParts = [];
     if (a.isUntilFurtherNotice) metaParts.push('until further notice');
@@ -309,7 +306,6 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
 
   return renderSectionShell({
     sectionClass: 'pw-alerts-v2',
-    extraSectionClass: toneClass,
     ariaLabel: 'Weather alerts',
     brandVariant: variant,
     kicker: hasAlerts ? `weather alerts (${alerts.length})` : 'no weather alerts',
