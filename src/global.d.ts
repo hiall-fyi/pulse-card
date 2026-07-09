@@ -15,16 +15,7 @@ interface Window {
   }>;
 }
 
-/** Minimal Home Assistant hass object shape for custom cards. */
-interface Hass {
-  states: Record<string, HassEntity>;
-  callService?: (domain: string, service: string, data?: Record<string, unknown>) => Promise<unknown>;
-  callWS?: (msg: Record<string, unknown>) => Promise<unknown>;
-}
-
-/** Minimal HA entity state shape. */
-interface HassEntity {
-  state: string;
-  attributes: Record<string, unknown>;
-  entity_id?: string;
-}
+// The Hass / HassEntityState shapes live in src/shared/types.js as JSDoc
+// typedefs (single source of truth, re-exported by every card's types.js).
+// They used to be duplicated here as ambient globals; that second copy is
+// removed so there is exactly one Hass definition to keep in sync.

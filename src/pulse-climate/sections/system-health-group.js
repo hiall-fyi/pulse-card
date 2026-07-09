@@ -24,7 +24,7 @@ import { isApiAvailable, renderApiView } from './api-view.js';
  * @property {string} label
  * @property {(hub: Record<string, string>, states: Record<string, *>) => string} soloHeader
  * @property {(hub: Record<string, string>|null|undefined) => boolean} predicate
- * @property {(hub: Record<string, string>, states: Record<string, *>, sectionConfig: *, hc: *) => string} render
+ * @property {(hub: Record<string, string>, states: Record<string, *>, sectionConfig: *, hc: *, timeZone?: string) => string} render
  */
 
 /**
@@ -52,7 +52,7 @@ const TAB_DEFS = [
     label: 'API',
     soloHeader: (/** @type {*} */ _hub, /** @type {*} */ _states) => 'API Usage',
     predicate: isApiAvailable,
-    render: (/** @type {*} */ hub, /** @type {*} */ states, /** @type {*} */ sectionConfig, /** @type {*} */ hc) => renderApiView(hub, states, sectionConfig, hc),
+    render: (/** @type {*} */ hub, /** @type {*} */ states, /** @type {*} */ sectionConfig, /** @type {*} */ hc, /** @type {*} */ timeZone) => renderApiView(hub, states, sectionConfig, hc, timeZone),
   },
 ];
 
@@ -61,9 +61,10 @@ const TAB_DEFS = [
  * @param {Record<string, string>} hubEntities
  * @param {Record<string, *>} states
  * @param {*} historyCache
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local (only the API tab renders times).
  * @returns {string}
  */
-export function renderSystemHealthGroupSection(sectionConfig, hubEntities, states, historyCache) {
+export function renderSystemHealthGroupSection(sectionConfig, hubEntities, states, historyCache, timeZone) {
   const available = TAB_DEFS.filter((t) => t.predicate(hubEntities));
 
   /* Rule: 0 available → omit entire group. */
@@ -75,7 +76,7 @@ export function renderSystemHealthGroupSection(sectionConfig, hubEntities, state
     let html = `<div class="pc-section pc-section-system-health-group">`;
     html += `<div class="pulse-section-label">${escapeHtml(view.soloHeader(hubEntities, states))}</div>`;
     html += `<div class="pc-system-health-group-body">`;
-    html += view.render(hubEntities, states, sectionConfig, historyCache);
+    html += view.render(hubEntities, states, sectionConfig, historyCache, timeZone);
     html += `</div>`;
     html += `</div>`;
     return html;
@@ -102,7 +103,7 @@ export function renderSystemHealthGroupSection(sectionConfig, hubEntities, state
   html += `</div>`;
 
   html += `<div class="pc-system-health-group-body">`;
-  html += activeView.render(hubEntities, states, sectionConfig, historyCache);
+  html += activeView.render(hubEntities, states, sectionConfig, historyCache, timeZone);
   html += `</div>`;
 
   html += `</div>`;

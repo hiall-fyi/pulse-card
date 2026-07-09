@@ -4,7 +4,7 @@
  * contextual weather summary, day progress arc, and tier-coloured stats.
  */
 
-import { tempToColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, cloudCoverColor, dewPointComfortColor, uniqueSvgId, futureHourly as filterFutureHourly, deriveTodaySunBoundaries, readCeOrAttr, readCeUnit, readSensorValue, deriveBrandVariant, formatHHMM } from '../weather-primitives.js';
+import { tempToColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, cloudCoverColor, dewPointComfortColor, uniqueSvgId, futureHourly as filterFutureHourly, deriveTodaySunBoundaries, readCeOrAttr, readCeUnit, readSensorValue, deriveBrandVariant, formatHHMM, resolveHassTimeZone } from '../weather-primitives.js';
 import { intensityRatio, tensionGlow, tensionVignette } from '../../shared/visual-tension.js';
 import { ATMOS_CE_TIER_MAP } from './atmosphere.js';
 import { LIFTED_INDEX_TIERS } from '../constants.js';
@@ -173,17 +173,6 @@ export function buildPrecipLabel(precipNow, precipUnit, rainNow, rainUnit, showe
 
 
 /**
- * Format a Date as HH:MM string, or empty string for null/invalid dates.
- * @param {Date|null} date - Date to format.
- * @returns {string} HH:MM string or empty string.
- */
-function fmtTime(date) {
-  if (!date || isNaN(date.getTime())) return '';
-  return formatHHMM(date);
-}
-
-
-/**
  * Render the overview section.
  * @param {import('../types.js').RenderContext} ctx - Render context.
  * @returns {string} HTML string.
@@ -192,6 +181,11 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const attrs = weatherEntity.attributes;
   const ce = discovery.atmosCe;
   const sunEntityId = discovery.sunEntityId || '';
+  // Render all clock labels in the HA-configured zone (falls back to
+  // browser zone when the user's profile prefers 'local'). Resolved once
+  // here and threaded into every formatHHMM below so a user physically
+  // abroad still sees their home wall-clock. See #timezone fix.
+  const timeZone = resolveHassTimeZone(hass);
   const { condition, isNight } = deriveBrandVariant(hass, weatherEntity, discovery);
 
   const val = (/** @type {string} */ s, /** @type {string} */ a) => readCeOrAttr(hass, ce, attrs, s, a);
@@ -462,8 +456,8 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       const ssMs = todaySunsetForPhase.getTime();
       const dur = Math.max(ssMs - srMs, 1);
       fillPct = Math.max(0, Math.min(100, ((nowMs - srMs) / dur) * 100));
-      leftLabel = fmtTime(todaySunriseForPhase);
-      rightLabel = fmtTime(todaySunsetForPhase);
+      leftLabel = formatHHMM(todaySunriseForPhase, timeZone);
+      rightLabel = formatHHMM(todaySunsetForPhase, timeZone);
       fillStyle = 'background: linear-gradient(to right, #ff9f0a, #ffd60a)';
       labelColor = '#ff9f0a';
     } else {
@@ -474,8 +468,8 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       const endMs = tomorrowSunriseForPhase.getTime();
       const dur = Math.max(endMs - startMs, 1);
       fillPct = Math.max(0, Math.min(100, ((nowMs - startMs) / dur) * 100));
-      leftLabel = fmtTime(todaySunsetForPhase);
-      rightLabel = fmtTime(tomorrowSunriseForPhase);
+      leftLabel = formatHHMM(todaySunsetForPhase, timeZone);
+      rightLabel = formatHHMM(tomorrowSunriseForPhase, timeZone);
       fillStyle = 'background: linear-gradient(to right, #1a3050, #5ac8fa)';
       labelColor = '#5ac8fa';
     }
@@ -529,6 +523,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
         windSpeed,
         uvIndex,
         stabilityState,
+        timeZone,
       });
       summaryHtml = `
       <div class="pw-weather-summary" style="position:relative; z-index:2">
@@ -579,7 +574,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       const peakDt = slots[spark.peakIndex]?.datetime
         ? new Date(/** @type {string} */ (slots[spark.peakIndex].datetime))
         : null;
-      const peakTime = peakDt ? formatHHMM(peakDt) : '';
+      const peakTime = peakDt ? formatHHMM(peakDt, timeZone) : '';
 
       const capeGradId = uniqueSvgId('pw-cape-grad');
       // eslint-disable-next-line no-unused-vars
@@ -635,10 +630,6 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   // eslint-disable-next-line no-unused-vars
   const uvValue = `${escapeHtml(Math.round(uvIndex))}${showClearSky ? ` <span style="opacity:0.5">/ ${escapeHtml(String(Math.round(uvClearSky)))}</span>` : ''}`;
 
-  function timeStamp() {
-    return formatHHMM(new Date());
-  }
-
   // \u2500\u2500 Hero first + narrative caption + 4-col stats \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const conditionLabel = formatCondition(condition);
   const variant = brandMarkVariant(condition, isNight);
@@ -651,7 +642,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const cloudPct = cloudCover ? Math.round(cloudCover.total) + '%' : '--';
 
   const heroFragment = `
-        <div class="pw-loc-stamp">${escapeHtml(locationLabel)} \u00b7 ${escapeHtml(timeStamp())}</div>
+        <div class="pw-loc-stamp">${escapeHtml(locationLabel)} \u00b7 ${escapeHtml(formatHHMM(new Date(), timeZone))}</div>
         <div class="pw-hero-block">
           ${t.display(Math.round(temp), { suffix: tempUnit })}
           ${t.gloss(`${conditionLabel}${feelsPlain ? ' \u00b7 ' + feelsPlain : ''}`)}

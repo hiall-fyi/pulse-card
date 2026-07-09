@@ -29,9 +29,10 @@ const TAB_META = {
  * @param {Record<string, *>} states
  * @param {*} discovery
  * @param {*} historyCache
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local cell labels.
  * @returns {string}
  */
-export function renderTimelineGroupSection(sectionConfig, zones, states, discovery, historyCache) {
+export function renderTimelineGroupSection(sectionConfig, zones, states, discovery, historyCache, timeZone) {
   if (!zones || zones.length === 0) return '';
 
   const requestedTab = sectionConfig?.active_tab;
@@ -60,8 +61,8 @@ export function renderTimelineGroupSection(sectionConfig, zones, states, discove
 
   html += `<div class="pc-timeline-group-body">`;
   html += activeTab === 'thermal'
-    ? renderThermalHeatmapView(zones, states, discovery, historyCache)
-    : renderStateTimelineView(zones, states, discovery, historyCache);
+    ? renderThermalHeatmapView(zones, states, discovery, historyCache, timeZone)
+    : renderStateTimelineView(zones, states, discovery, historyCache, timeZone);
   html += `</div>`;
 
   html += `</div>`;

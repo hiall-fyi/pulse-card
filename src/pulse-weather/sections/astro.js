@@ -3,7 +3,7 @@
  * @description 24h sky-phase ribbon, moon hero row, twilight stat tiles.
  */
 
-import { escapeHtml, sanitizeCssValue, anchorEventOn } from '../weather-primitives.js';
+import { escapeHtml, sanitizeCssValue, anchorEventOn, formatHHMM, resolveHassTimeZone } from '../weather-primitives.js';
 import { SYNODIC_MONTH, MOON_PHASES } from '../constants.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
@@ -64,11 +64,6 @@ export function computeMoonVisibility(now, moonrise, moonset) {
   }
 
   return { visible: false, progress: 0 };
-}
-
-function fmtTime(/** @type {Date|null} */ date) {
-  if (!date || isNaN(date.getTime())) return '--:--';
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 /**
@@ -237,6 +232,10 @@ function fmtDurationMs(/** @type {number} */ ms) {
  */
 export function renderAstro({ hass, config, discovery }) {
   const now = new Date();
+  // Every sun / moon / twilight stat below renders in the HA-configured
+  // zone (browser-local when the profile prefers 'local'), so a user abroad
+  // still sees home wall-clock times. formatHHMM self-guards null dates.
+  const timeZone = resolveHassTimeZone(hass);
   const sunEntity = discovery.sunEntityId ? hass.states[discovery.sunEntityId] : null;
   if (!sunEntity) return null;
 
@@ -283,10 +282,10 @@ export function renderAstro({ hass, config, discovery }) {
 
   const isDay = now.getTime() >= sunrise.getTime() && now.getTime() <= sunset.getTime();
 
-  const sunriseLabel = fmtTime(sunrise);
-  const sunsetLabel = fmtTime(sunset);
+  const sunriseLabel = formatHHMM(sunrise, timeZone);
+  const sunsetLabel = formatHHMM(sunset, timeZone);
   const solarNoonMs = (sunrise.getTime() + sunset.getTime()) / 2;
-  const solarNoonLabel = fmtTime(new Date(solarNoonMs));
+  const solarNoonLabel = formatHHMM(new Date(solarNoonMs), timeZone);
 
   const dayLenMs = sunset.getTime() - sunrise.getTime();
   const nightLenMs = DAY_MS - dayLenMs;
@@ -363,18 +362,18 @@ export function renderAstro({ hass, config, discovery }) {
       </div>
       ${t.narrative(heroNarrativeText)}`;
 
-  const moonriseLabel = fmtTime(moonrise);
-  const moonsetLabel = fmtTime(moonset);
+  const moonriseLabel = formatHHMM(moonrise, timeZone);
+  const moonsetLabel = formatHHMM(moonset, timeZone);
   const amRowHtml = t.statsRow([
-    t.stat(fmtTime(civilDawn), 'civil dawn'),
-    t.stat(fmtTime(goldenAmStart), 'golden start', { valueColor: 'var(--pw-warn-amber)' }),
-    t.stat(fmtTime(blueAmStart), 'blue start', { valueColor: 'var(--pw-wind)' }),
+    t.stat(formatHHMM(civilDawn, timeZone), 'civil dawn'),
+    t.stat(formatHHMM(goldenAmStart, timeZone), 'golden start', { valueColor: 'var(--pw-warn-amber)' }),
+    t.stat(formatHHMM(blueAmStart, timeZone), 'blue start', { valueColor: 'var(--pw-wind)' }),
     t.stat(moonriseLabel, 'moonrise'),
   ], { columns: 4, divided: true });
   const pmRowHtml = t.statsRow([
-    t.stat(fmtTime(civilDusk), 'civil dusk'),
-    t.stat(fmtTime(goldenPmEnd), 'golden end', { valueColor: 'var(--pw-warn-amber)' }),
-    t.stat(fmtTime(bluePmEnd), 'blue end', { valueColor: 'var(--pw-wind)' }),
+    t.stat(formatHHMM(civilDusk, timeZone), 'civil dusk'),
+    t.stat(formatHHMM(goldenPmEnd, timeZone), 'golden end', { valueColor: 'var(--pw-warn-amber)' }),
+    t.stat(formatHHMM(bluePmEnd, timeZone), 'blue end', { valueColor: 'var(--pw-wind)' }),
     t.stat(moonsetLabel, 'moonset'),
   ], { columns: 4, divided: true });
 

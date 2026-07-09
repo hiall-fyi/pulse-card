@@ -138,11 +138,12 @@ export function longestActiveStreak(slots) {
 }
 
 /**
- * Hour-of-day with the most active slots across the 24h window. Returns
- * the 0..23 hour and minutes of demand inside it. Each hour holds two
- * slots, so max possible is 60 minutes.
+ * Hour-of-day with the most active slots across the 24h window. Returns the
+ * absolute start-of-hour timestamp of that bucket (so the caller renders it
+ * with the zone-aware formatHHMM, not a browser-zone getHours) plus the
+ * minutes of demand inside it. Each hour holds two slots, so max is 60 min.
  * @param {Array<{state: string, power: number}>} slots
- * @returns {{hour: number, minutes: number} | null}
+ * @returns {{ts: number, minutes: number} | null}
  */
 export function busiestHour(slots) {
   if (slots.length === 0) return null;
@@ -165,10 +166,13 @@ export function busiestHour(slots) {
     }
   }
   if (bestHour < 0) return null;
-  /* Slot 0 = 24h ago — translate slot-index hour to wall-clock hour. */
-  const startHour = (new Date(Date.now() - 24 * 3600 * 1000)).getHours();
-  const wallHour = (startHour + bestHour) % 24;
-  return { hour: wallHour, minutes: Math.round(bestCount * 30) };
+  /* Bucket 0 = the hour starting 24h ago. Anchor the window to a clean hour
+     boundary, then add bestHour hours to get the bucket's absolute start
+     timestamp — the caller formats it in the HA-configured zone. */
+  const windowStart = new Date(Date.now() - 24 * 3600 * 1000);
+  windowStart.setMinutes(0, 0, 0);
+  const ts = windowStart.getTime() + bestHour * 3600 * 1000;
+  return { ts, minutes: Math.round(bestCount * 30) };
 }
 
 /**
@@ -202,12 +206,13 @@ function rowDurationClass(heatMin, coolMin) {
  * slot 47 = the most recent half-hour. Returns "HH:MM" so the cell tooltip
  * carries the same shape as heatmap cells (handler reads data-hour).
  * @param {number} slotIdx 0..47
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local.
  * @returns {string}
  */
-function slotTimeLabel(slotIdx) {
+function slotTimeLabel(slotIdx, timeZone) {
   const slotMs = 30 * 60 * 1000;
   const start = Date.now() - 24 * 3600 * 1000;
-  return formatHHMM(new Date(start + slotIdx * slotMs));
+  return formatHHMM(new Date(start + slotIdx * slotMs), timeZone);
 }
 
 /**
@@ -230,9 +235,10 @@ function slotScoreText(slot) {
  * @param {Record<string, *>} states
  * @param {*} discovery
  * @param {*} historyCache
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local cell labels.
  * @returns {string}
  */
-export function renderStateTimelineView(zones, states, discovery, historyCache) {
+export function renderStateTimelineView(zones, states, discovery, historyCache, timeZone) {
   let html = '<div class="pc-strip-rows">';
   html += '<div class="pc-strip-crosshair"></div>';
   let totalHeatMin = 0;
@@ -257,7 +263,7 @@ export function renderStateTimelineView(zones, states, discovery, historyCache) 
     html += `<div class="pc-state-timeline-cells pc-cells">`;
     for (let i = 0; i < slots.length; i++) {
       const slot = slots[i];
-      const label = slotTimeLabel(i);
+      const label = slotTimeLabel(i, timeZone);
       const score = slotScoreText(slot);
       html += `<span class="pc-state-cell pc-cell ${cellClassForSlot(slot)}" data-hour="${escapeHtml(label)}" data-score="${escapeHtml(score)}"></span>`;
     }

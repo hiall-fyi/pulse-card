@@ -4,6 +4,14 @@
  * objects, discovery results, and section data structures.
  */
 
+// Re-export the shared Hass shapes so the weather card uses the same
+// single-source typedefs as pulse-climate / pulse-switch / pulse-bar,
+// rather than the (now-removed) ambient globals in global.d.ts.
+/**
+ * @typedef {import('../shared/types.js').Hass} Hass
+ * @typedef {import('../shared/types.js').HassEntityState} HassEntityState
+ */
+
 // ── Config Types ────────────────────────────────────────────────────
 
 /**
@@ -169,7 +177,7 @@
  * @property {Hass} hass - Home Assistant hass object.
  * @property {SectionConfig} config - Section config.
  * @property {WeatherDiscovery} discovery - Discovery result.
- * @property {HassEntity} weatherEntity - Weather entity state object.
+ * @property {HassEntityState} weatherEntity - Weather entity state object.
  * @property {{hourly: Array<Record<string, unknown>>, daily: Array<Record<string, unknown>>}|null} [forecastData] - Forecast data.
  * @property {number} [sectionIndex] - Index of this section in the card's `_config.sections` array. Used by the click router to scope brand-mark toggles to the clicked section in multi-section-same-type configs.
  * @property {boolean} [proPersisted] - Persisted view-swap pro state for this section index. Sections with a `proView` forward this as `proInitial` to the shell so the toggle survives periodic re-renders.

@@ -32,7 +32,7 @@ import { renderSystemHealthGroupSection } from './sections/system-health-group.j
 import { renderAtmosphere } from './sections/atmosphere.js';
 import { renderHero } from './sections/hero.js';
 import { resolveOutdoorTemp } from './outdoor-temp.js';
-import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay, isUnavailableState, buildGridOptions } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay, isUnavailableState, buildGridOptions, resolveHassTimeZone, formatHHMM } from '../shared/utils.js';
 import { buildFilledSparkline, temperatureToColor } from './chart-primitives.js';
 import { createStripTooltip, createFixedTooltip, pointerToSlotIndex, bindDragSelect, bindCrosshair } from './sections/slot-engine.js';
 import { executeAction as sharedExecuteAction, fireEvent, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
@@ -267,7 +267,7 @@ class PulseClimateCard extends HTMLElement {
         render: () => {
           const config = /** @type {import('./types.js').PulseClimateConfig} */ (this._config);
           const states = this._hass?.states || {};
-          return renderZonesSection(zones, config, states, discovery, this._historyCache);
+          return renderZonesSection(zones, config, states, discovery, this._historyCache, resolveHassTimeZone(this._hass));
         },
       },
       {
@@ -277,7 +277,7 @@ class PulseClimateCard extends HTMLElement {
           const states = this._hass?.states || {};
           const sections = this._config?.sections || [{ type: 'zones' }];
           const apiSection = sections.find((/** @type {*} */ s) => (typeof s === 'string' ? s : s.type) === 'api') || {};
-          return renderApiSection(hubEntities, states, /** @type {*} */ (apiSection), this._historyCache);
+          return renderApiSection(hubEntities, states, /** @type {*} */ (apiSection), this._historyCache, resolveHassTimeZone(this._hass));
         },
       },
       {
@@ -1303,7 +1303,7 @@ class PulseClimateCard extends HTMLElement {
           let busyValue = '—';
           let busySub = '';
           if (busy && busy.minutes > 0) {
-            busyValue = `${String(busy.hour).padStart(2, '0')}:00`;
+            busyValue = formatHHMM(new Date(busy.ts), resolveHassTimeZone(this._hass));
             busySub = `${fmtDuration(busy.minutes)} demand`;
           }
 
@@ -1705,7 +1705,7 @@ class PulseClimateCard extends HTMLElement {
           this._config = { ...this._config, sections };
           const states = this._hass?.states || {};
           const hc = this._historyCache;
-          const html = renderTimelineGroupSection(/** @type {*} */ (next), zones, states, discovery, hc);
+          const html = renderTimelineGroupSection(/** @type {*} */ (next), zones, states, discovery, hc, resolveHassTimeZone(this._hass));
           if (!html) return;
           const withIndex = html.replace(
             /^<div class="pc-section([^"]*)"/,
@@ -1839,7 +1839,7 @@ class PulseClimateCard extends HTMLElement {
           this._config = { ...this._config, sections };
           const states = this._hass?.states || {};
           const hc = this._historyCache;
-          const html = renderSystemHealthGroupSection(/** @type {*} */ (next), discovery?.hubEntities || {}, states, hc);
+          const html = renderSystemHealthGroupSection(/** @type {*} */ (next), discovery?.hubEntities || {}, states, hc, resolveHassTimeZone(this._hass));
           if (!html) return;
           const withIndex = html.replace(
             /^<div class="pc-section([^"]*)"/,
@@ -1872,9 +1872,13 @@ class PulseClimateCard extends HTMLElement {
     const config = /** @type {import('./types.js').PulseClimateConfig} */ (this._config);
     const hub = discovery.hubEntities;
     const hc = this._historyCache;
+    // Render every time label in the HA-configured zone (browser-local when
+    // the user's profile prefers 'local'), so a user physically abroad sees
+    // home wall-clock times across all timeline / API / strip sections.
+    const timeZone = resolveHassTimeZone(this._hass);
     switch (type) {
-      case 'zones': return renderZonesSection(zones, config, states, discovery, hc);
-      case 'api': return renderApiSection(hub, states, /** @type {*} */ (section), hc);
+      case 'zones': return renderZonesSection(zones, config, states, discovery, hc, timeZone);
+      case 'api': return renderApiSection(hub, states, /** @type {*} */ (section), hc, timeZone);
       case 'graph': return renderGraphSection(/** @type {*} */ (section), zones, hc, states, discovery);
       case 'donut': return renderDonutSection(/** @type {*} */ (section), hub, states);
       case 'bridge': return renderBridgeSection(hub, states, hc);
@@ -1883,14 +1887,14 @@ class PulseClimateCard extends HTMLElement {
       case 'environment': return renderEnvironmentSection(zones, states, discovery);
       case 'thermal': return renderThermalSection(zones, states, discovery);
       case 'schedule': return renderScheduleSection(zones, states, discovery);
-      case 'thermal_strip': return renderThermalStripSection(zones, /** @type {*} */ (section), states, discovery, hc);
-      case 'comfort_strip': return renderComfortStripSection(zones, /** @type {*} */ (section), states, discovery, hc);
+      case 'thermal_strip': return renderThermalStripSection(zones, /** @type {*} */ (section), states, discovery, hc, timeZone);
+      case 'comfort_strip': return renderComfortStripSection(zones, /** @type {*} */ (section), states, discovery, hc, timeZone);
       case 'energy_flow': return renderEnergyFlowSection(zones, states, discovery);
       case 'radial': return renderRadialSection(zones, /** @type {*} */ (section), states, discovery, hc);
       case 'home_status': return renderHomeStatusSection(zones, states, discovery, this._config || {});
       case 'zone_ranking': return renderZoneRankingSection(zones, states, discovery);
-      case 'timeline_group': return renderTimelineGroupSection(/** @type {*} */ (section), zones, states, discovery, hc);
-      case 'system_health_group': return renderSystemHealthGroupSection(/** @type {*} */ (section), discovery?.hubEntities || {}, states, hc);
+      case 'timeline_group': return renderTimelineGroupSection(/** @type {*} */ (section), zones, states, discovery, hc, timeZone);
+      case 'system_health_group': return renderSystemHealthGroupSection(/** @type {*} */ (section), discovery?.hubEntities || {}, states, hc, timeZone);
       default: return '';
     }
   }

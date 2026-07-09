@@ -21,9 +21,10 @@ import { renderThermalHeatmapView } from './thermal-heatmap-view.js';
  * @param {Record<string, *>} states - hass.states.
  * @param {import('../types.js').TadoDiscovery} discovery - Discovered entities.
  * @param {import('../types.js').HistoryCache} historyCache - History cache.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local labels.
  * @returns {string} HTML string.
  */
-export function renderThermalStripSection(zones, sectionConfig, states, discovery, historyCache) {
+export function renderThermalStripSection(zones, sectionConfig, states, discovery, historyCache, timeZone) {
   if (!zones || zones.length === 0) return '';
 
   const hours = Number(sectionConfig?.hours_to_show) || 24;
@@ -51,7 +52,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
      humidity heatmap take the inline path below. */
   if (mode === 'heatmap' && !isHumidity) {
     html += `<div class="pc-zone-detail" id="timeline-detail"></div>`;
-    html += renderThermalHeatmapView(zones, states, discovery, historyCache);
+    html += renderThermalHeatmapView(zones, states, discovery, historyCache, timeZone);
     html += `</div>`;
     return html;
   }
@@ -81,7 +82,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
       html += `<div class="pc-strip-container"><div class="pc-chart-empty">`
         + `${escapeHtml(emptyMsg)}</div></div>`;
     } else {
-      const slotData = computeSlots(data, slots, windowMs);
+      const slotData = computeSlots(data, slots, windowMs, timeZone);
       const unitLabel = isHumidity ? 'humidity' : 'temperature';
       const ariaLabel = `${friendlyName} ${unitLabel} over ${hours}h`;
 
@@ -98,7 +99,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
   html += `</div>`;
 
   html += `<div class="pc-time-axis">`;
-  html += renderTimeLabels(windowMs);
+  html += renderTimeLabels(windowMs, timeZone);
   html += `</div>`;
 
   html += `</div>`;

@@ -20,6 +20,8 @@ import { renderAlerts } from './sections/alerts.js';
 import { renderAtmosphere, buildThermalParticles } from './sections/atmosphere.js';
 import { renderMeteogram } from './sections/meteogram.js';
 
+/** @typedef {import('./types.js').Hass} Hass */
+
 /**
  * Section renderer dispatch map.
  * @type {Readonly<Record<string, Function>>}

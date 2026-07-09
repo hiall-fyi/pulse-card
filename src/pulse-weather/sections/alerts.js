@@ -3,7 +3,7 @@
  * @description Radar display, severity wash, and alert list with countdown.
  */
 
-import { escapeHtml, sanitizeCssValue, hexToRgba } from '../weather-primitives.js';
+import { escapeHtml, sanitizeCssValue, hexToRgba, formatDateTime, resolveHassTimeZone } from '../weather-primitives.js';
 import { intensityRatio, tensionWash, breatheDuration, sweepDuration } from '../../shared/visual-tension.js';
 import { ALERT_ICON_MAP, severityBucket, ALERT_BUCKET_COLOR, ALERT_FAR_FUTURE_DAYS } from '../constants.js';
 import { brandMarkVariant } from '../brand-mark.js';
@@ -239,7 +239,7 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
         if (!isNaN(d.getTime()) && (!latest || d > latest)) latest = d;
       }
     }
-    return latest ? latest.toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : 'further notice';
+    return latest ? formatDateTime(latest, resolveHassTimeZone(hass), { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric', hourCycle: 'h23' }) : 'further notice';
   })();
 
   const variant = brandMarkVariant(hasAlerts ? 'rainy' : 'sunny', false);

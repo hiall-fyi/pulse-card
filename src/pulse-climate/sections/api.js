@@ -16,14 +16,15 @@ import { isApiAvailable, renderApiView } from './api-view.js';
  * @param {Record<string, *>} states - hass.states.
  * @param {Record<string, *>} [sectionConfig] - Section config.
  * @param {import('../types.js').HistoryCache} [historyCache] - History cache.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local.
  * @returns {string} HTML string (empty if not discoverable).
  */
-export function renderApiSection(hubEntities, states, sectionConfig, historyCache) {
+export function renderApiSection(hubEntities, states, sectionConfig, historyCache, timeZone) {
   if (!isApiAvailable(hubEntities)) return '';
 
   let html = `<div class="pc-section pc-section-api">`;
   html += `<div class="pulse-section-label">API Usage</div>`;
-  html += renderApiView(hubEntities, states, sectionConfig, historyCache);
+  html += renderApiView(hubEntities, states, sectionConfig, historyCache, timeZone);
   html += `</div>`;
   return html;
 }

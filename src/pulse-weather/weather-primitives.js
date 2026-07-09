@@ -14,9 +14,9 @@ import {
   CONDITION_ICONS,
 } from './constants.js';
 
-import { escapeHtml, sanitizeCssValue, formatHHMM, uniqueDomId } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, formatHHMM, formatDateTime, resolveHassTimeZone, uniqueDomId } from '../shared/utils.js';
 import { hexToRgba } from '../shared/color.js';
-export { escapeHtml, sanitizeCssValue, formatHHMM };
+export { escapeHtml, sanitizeCssValue, formatHHMM, formatDateTime, resolveHassTimeZone };
 export { hexToRgba };
 
 /**

@@ -4,7 +4,7 @@
  * Pure functions — no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue, uniqueDomId, smoothPathFromPoints } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, uniqueDomId, smoothPathFromPoints, formatHHMM } from '../shared/utils.js';
 import { mixToHex } from '../shared/color.js';
 
 /**
@@ -414,9 +414,10 @@ export function buildFilledSparkline(data, width, height, slots = 48) {
  * @param {{t: number, v: number}[]} data - Raw history data.
  * @param {number} [points=24] - Number of output points.
  * @param {string} [unit=''] - Unit suffix for tooltip display (e.g. '°', '%', ' calls').
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local tooltip times.
  * @returns {string} JSON string suitable for a data attribute, or empty string if insufficient data.
  */
-export function buildSparklineDataAttr(data, points = 24, unit = '') {
+export function buildSparklineDataAttr(data, points = 24, unit = '', timeZone) {
   if (!data || data.length < 2) return '';
   const clean = data.filter((pt) => isFinite(pt.v));
   if (clean.length < 2) return '';
@@ -429,8 +430,7 @@ export function buildSparklineDataAttr(data, points = 24, unit = '') {
   const result = { u: unit, d: [] };
   result.d = sampled.map((pt) => {
     const t = minT + pt.x * (maxT - minT);
-    const d = new Date(t);
-    const label = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const label = formatHHMM(new Date(t), timeZone);
     const v = isInteger ? Math.round(pt.v) : Math.round(pt.v * 10) / 10;
     return { l: label, v };
   });

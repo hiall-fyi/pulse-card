@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.8.6] - 2026-07-09
+
+### Weather Card
+
+#### Bug fixes
+
+- **Times now follow your Home Assistant time zone, not your device's.** If you were away from home in a different time zone, the overview clock, sunrise and sunset, the day arc, the meteogram's hour labels, and the storm-narrative time all read in your device's local time instead of your home's. They now follow the time zone set in your Home Assistant profile, so someone on holiday in Bangkok, checking on their London home, still sees London times. This respects the "Time zone" option in your profile: leave it on the server default and you get your home's zone; set it to your device and you get local time on purpose.
+
+### Climate Card
+
+#### Bug fixes
+
+- **Timeline, heatmap, and chart times now follow your Home Assistant time zone.** The thermal and state timeline cells, the comfort strip, the temperature-history sparkline tooltips, the API next-sync and reset times, and the busiest-hour stat all read in your device's local time, so they showed the wrong hour when you were away from home. They now follow your Home Assistant profile's time zone setting, matching the Weather Card fix above.
+
+
 ## [1.8.5] - 2026-06-30
 
 ### Weather Card

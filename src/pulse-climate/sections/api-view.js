@@ -121,9 +121,10 @@ function renderBreakdownDonut(attrs) {
  * @param {Record<string, *>} states
  * @param {*} sectionConfig
  * @param {*} historyCache
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local next/reset times.
  * @returns {string}
  */
-export function renderApiView(hubEntities, states, sectionConfig, historyCache) {
+export function renderApiView(hubEntities, states, sectionConfig, historyCache, timeZone) {
   if (!isApiAvailable(hubEntities)) return '';
 
   const usage = parseFloat(states[hubEntities.api_usage]?.state) || 0;
@@ -178,7 +179,7 @@ export function renderApiView(hubEntities, states, sectionConfig, historyCache) 
           const secs = Math.floor((diffMs % 60000) / 1000);
           nextDisplay = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
         } else {
-          nextDisplay = formatHHMM(d);
+          nextDisplay = formatHHMM(d, timeZone);
         }
       } catch { /* keep raw display */ }
     }
@@ -190,7 +191,7 @@ export function renderApiView(hubEntities, states, sectionConfig, historyCache) 
     if (resetRaw && resetRaw.includes('T')) {
       try {
         const d = new Date(resetRaw);
-        resetDisplay = formatHHMM(d);
+        resetDisplay = formatHHMM(d, timeZone);
       } catch { /* keep raw display */ }
     }
     html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.api_reset)}">Reset: ${escapeHtml(resetDisplay)}</span>`;

@@ -3,7 +3,7 @@
  * @description 7-day forecast list with week-wide range bar normalisation.
  */
 
-import { conditionIcon, escapeHtml, finiteNumber, sanitizeCssValue, deriveBrandVariant } from '../weather-primitives.js';
+import { conditionIcon, escapeHtml, finiteNumber, sanitizeCssValue, deriveBrandVariant, formatDateTime, resolveHassTimeZone } from '../weather-primitives.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 
@@ -11,9 +11,10 @@ import { renderSectionShell } from '../section-shell.js';
  * 1-line narrative for Forecast top-marg.
  * Highlights the warmest day and any wet day in the week.
  * @param {Array<{temperature?: unknown, templow?: unknown, precipitation_probability?: unknown, datetime?: unknown, condition?: unknown}>} days - daily forecast entries
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local.
  * @returns {string}
  */
-function composeForecastLine(days) {
+function composeForecastLine(days, timeZone) {
   if (!days || days.length === 0) return 'Forecast unavailable';
   let peakIdx = 0;
   for (let i = 1; i < days.length; i++) {
@@ -24,7 +25,7 @@ function composeForecastLine(days) {
    * @param {number} i - day index
    * @returns {string}
    */
-  const dayLabel = (i) => i === 0 ? 'today' : new Date(String(days[i].datetime || '')).toLocaleDateString([], { weekday: 'short' }).toLowerCase();
+  const dayLabel = (i) => i === 0 ? 'today' : formatDateTime(new Date(String(days[i].datetime || '')), timeZone, { weekday: 'short' }).toLowerCase();
   const peakLabel = dayLabel(peakIdx);
   const peakTemp = Math.round(Number(days[peakIdx].temperature));
   if (wetIdx >= 0 && wetIdx !== peakIdx) {
@@ -45,6 +46,9 @@ export function renderForecast({ hass, config, discovery, forecastData, weatherE
   const daily = forecastData?.daily || [];
   if (daily.length === 0) return null;
 
+  // Weekday labels render in the HA-configured zone (browser-local when the
+  // profile prefers 'local') so a user abroad sees home calendar days.
+  const timeZone = resolveHassTimeZone(hass);
   const ce = discovery.atmosCe;
   const tempSensor = ce.temperature ? hass.states[ce.temperature] : null;
   const tempUnit = /** @type {string} */ (tempSensor?.attributes?.unit_of_measurement || '°C');
@@ -67,7 +71,7 @@ export function renderForecast({ hass, config, discovery, forecastData, weatherE
     const isToday = i === 0;
     const dayLabel = isToday
       ? 'today'
-      : new Date(String(d.datetime || '')).toLocaleDateString([], { weekday: 'short' }).toLowerCase();
+      : formatDateTime(new Date(String(d.datetime || '')), timeZone, { weekday: 'short' }).toLowerCase();
     const icon = conditionIcon(String(d.condition || ''));
     const popHtml = pop >= 50 ? `<span class="pw-fc-pop">${escapeHtml(String(pop))}%</span>` : '<span class="pw-fc-pop"></span>';
     const barLeft = ((low - weekMin) / weekSpan) * 100;
@@ -93,7 +97,7 @@ export function renderForecast({ hass, config, discovery, forecastData, weatherE
 
   const { condition, isNight } = deriveBrandVariant(hass, weatherEntity, discovery);
   const variant = brandMarkVariant(condition, isNight);
-  const narrativeLine = composeForecastLine(days);
+  const narrativeLine = composeForecastLine(days, timeZone);
 
   const body = `
         <div class="pw-fc-list" role="list">

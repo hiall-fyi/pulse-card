@@ -35,9 +35,10 @@ export function computeAverage(history) {
  * @param {Record<string, *>} states
  * @param {*} discovery
  * @param {*} historyCache
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local slot labels.
  * @returns {string}
  */
-export function renderThermalHeatmapView(zones, states, discovery, historyCache) {
+export function renderThermalHeatmapView(zones, states, discovery, historyCache, timeZone) {
   let html = '<div class="pc-strip-rows">';
   html += '<div class="pc-strip-crosshair"></div>';
 
@@ -57,7 +58,7 @@ export function renderThermalHeatmapView(zones, states, discovery, historyCache)
 
     if (zoneState.unit) unit = zoneState.unit;
 
-    const slotData = computeSlots(tempHistory, SLOTS, HOURS * 3600 * 1000);
+    const slotData = computeSlots(tempHistory, SLOTS, HOURS * 3600 * 1000, timeZone);
     for (const slot of slotData) {
       if (slot.value !== null && Number.isFinite(slot.value)) {
         if (slot.value < obsMin) obsMin = slot.value;

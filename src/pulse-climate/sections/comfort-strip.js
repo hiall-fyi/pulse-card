@@ -102,9 +102,10 @@ function closestValue(data, targetTime, maxGap = 7200000) {
  * @param {Record<string, *>} states
  * @param {import('../types.js').TadoDiscovery} discovery
  * @param {import('../types.js').HistoryCache} historyCache
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local labels.
  * @returns {string} HTML string.
  */
-export function renderComfortStripSection(zones, sectionConfig, states, discovery, historyCache) {
+export function renderComfortStripSection(zones, sectionConfig, states, discovery, historyCache, timeZone) {
   if (!zones || zones.length === 0) return '';
 
   const slotsPerHour = Number(sectionConfig?.slots_per_hour) || 1;
@@ -167,7 +168,7 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
       const score = computeComfortScore(temp, targetTemp, hum, comfortLevel);
       if (score !== null) lastScore = score;
       const slotDate = new Date(slotMid);
-      const hourLabel = formatHHMM(slotDate);
+      const hourLabel = formatHHMM(slotDate, timeZone);
       slotData.push({ value: lastScore, time: slotMid, label: hourLabel });
     }
 
@@ -185,7 +186,7 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
   html += `</div>`;
 
   html += `<div class="pc-heatmap-time-axis">`;
-  html += renderTimeLabels(windowMs);
+  html += renderTimeLabels(windowMs, timeZone);
   html += `</div>`;
 
   html += `<div class="pc-heatmap-legend">`;

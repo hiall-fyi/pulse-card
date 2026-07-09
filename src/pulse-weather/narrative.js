@@ -8,13 +8,21 @@
  * `${initial} ${anchor}.` when no transition is detected.
  */
 
+import { formatDateTime } from './weather-primitives.js';
+
 /**
- * Map a JS Date to a casual temporal anchor used in narrative tails.
+ * Map a JS Date to a casual temporal anchor used in narrative tails. The
+ * morning/afternoon/evening bucket is decided by the hour in the HA-configured
+ * zone (browser-local when omitted), so a user abroad gets the anchor that
+ * matches home time-of-day, not their travel location's.
  * @param {Date} now
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local.
  * @returns {'this morning'|'this afternoon'|'this evening'|'tonight'}
  */
-export function temporalAnchor(now) {
-  const h = now.getHours();
+export function temporalAnchor(now, timeZone) {
+  const h = timeZone
+    ? Number(formatDateTime(now, timeZone, { hour: '2-digit', hourCycle: 'h23' }))
+    : now.getHours();
   if (h >= 6 && h < 12) return 'this morning';
   if (h >= 12 && h < 17) return 'this afternoon';
   if (h >= 17 && h < 21) return 'this evening';
@@ -39,6 +47,7 @@ export function temporalAnchor(now) {
  * @property {number} windSpeed - Current wind speed km/h.
  * @property {string} stabilityState - Atmos CE stability_assessment.
  * @property {number} uvIndex
+ * @property {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local time-of-day anchor.
  */
 
 /**
@@ -105,7 +114,7 @@ function detectTransition(input) {
 export function composeNarrative(input) {
   const initial = initialClause(input.conditionNow, Number(input.cloudCoverNow) || 0);
   const transition = detectTransition(input);
-  const anchor = transition ? temporalAnchor(input.now) : null;
+  const anchor = transition ? temporalAnchor(input.now, input.timeZone) : null;
 
   let sentence;
   if (transition) {
@@ -116,7 +125,7 @@ export function composeNarrative(input) {
       sentence = `${initial}, then ${transition} ${anchor}.`;
     }
   } else {
-    sentence = `${initial} ${temporalAnchor(input.now)}.`;
+    sentence = `${initial} ${temporalAnchor(input.now, input.timeZone)}.`;
   }
   // Capitalise sentence first letter is already enforced by initialClause.
   return { initial, transition, anchor, sentence };

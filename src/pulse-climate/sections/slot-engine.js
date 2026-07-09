@@ -20,9 +20,10 @@ import { escapeHtml, sanitizeCssValue, formatHHMM } from '../../shared/utils.js'
  * @param {{t: number, v: number}[]} data - Sorted time-value pairs.
  * @param {number} slots - Number of output slots.
  * @param {number} windowMs - Time window in milliseconds (e.g. 24 * 3600000).
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local slot labels.
  * @returns {SlotData[]}
  */
-export function computeSlots(data, slots, windowMs) {
+export function computeSlots(data, slots, windowMs, timeZone) {
   const now = Date.now();
   const windowStart = now - windowMs;
   const slotSize = windowMs / slots;
@@ -58,7 +59,7 @@ export function computeSlots(data, slots, windowMs) {
       lastVal = Math.round((sum / count) * 10) / 10;
     }
 
-    result.push({ value: lastVal, time: sMid, label: formatHHMM(new Date(sMid)) });
+    result.push({ value: lastVal, time: sMid, label: formatHHMM(new Date(sMid), timeZone) });
   }
   return result;
 }
@@ -195,18 +196,19 @@ export function createFixedTooltip() {
 /**
  * Render time axis labels for a time window.
  * @param {number} windowMs - Window duration in ms.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local labels.
  * @param {number} [labels=5] - Number of labels (last one is "now").
  * @returns {string} HTML string of time label spans.
  */
-export function renderTimeLabels(windowMs, labels = 5) {
+export function renderTimeLabels(windowMs, timeZone, labels = 5) {
   const now = new Date();
   const windowStart = Date.now() - windowMs;
   let html = '';
   for (let i = 0; i < labels - 1; i++) {
     const t = new Date(windowStart + (i / (labels - 1)) * windowMs);
-    html += `<span class="pc-time-label">${formatHHMM(t)}</span>`;
+    html += `<span class="pc-time-label">${formatHHMM(t, timeZone)}</span>`;
   }
-  html += `<span class="pc-time-label">${formatHHMM(now)}</span>`;
+  html += `<span class="pc-time-label">${formatHHMM(now, timeZone)}</span>`;
   return html;
 }
 

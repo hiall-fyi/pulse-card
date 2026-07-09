@@ -121,12 +121,66 @@ export function formatNumericDisplay(value, decimals = 1) {
 }
 
 /**
- * Format a Date as zero-padded "HH:MM".
- * @param {Date} d
+ * Resolve the IANA time zone a card should render timestamps in, mirroring
+ * Home Assistant's own `resolveTimeZone(option, serverTimeZone)`:
+ *   - locale.time_zone === 'local'  → browser zone (return undefined so
+ *     `Intl` / `Date` fall back to the runtime zone).
+ *   - locale.time_zone === 'server' or absent → the HA-configured zone
+ *     (`config.time_zone`). Server is the safe default: a user who never
+ *     touched the profile toggle expects HA's zone, not the device's.
+ *
+ * Returning a plain string (not a formatter) keeps this a one-shot decision
+ * that callers resolve once per render and thread into `formatHHMM` / any
+ * `Intl` options — the leaf formatters stay `hass`-agnostic.
+ *
+ * @param {import('./types.js').Hass|null|undefined} hass
+ * @returns {string|undefined} IANA zone name, or undefined for browser-local.
+ */
+export function resolveHassTimeZone(hass) {
+  const serverZone = hass?.config?.time_zone;
+  if (!serverZone) return undefined;
+  if (hass?.locale?.time_zone === 'local') return undefined;
+  return serverZone;
+}
+
+/**
+ * Format a Date in a given IANA time zone with arbitrary `Intl` options.
+ *
+ * The single zone-aware date formatter for the whole card family: pick the
+ * shape via `options` (weekday, date+time, …) and every caller renders in the
+ * HA-configured zone from {@link resolveHassTimeZone}, so a user physically
+ * in another zone still sees their home wall-clock. `formatHHMM` is the HH:MM
+ * shape of this; sections reference these two and never reach for raw
+ * `toLocale*`.
+ *
+ * Self-guards null / undefined / invalid dates by returning '' so call sites
+ * can pass a possibly-null Date directly without a wrapper.
+ *
+ * @param {Date|null|undefined} d
+ * @param {string|undefined} timeZone - IANA zone; undefined → browser-local.
+ * @param {Intl.DateTimeFormatOptions} options - Intl shape (weekday / date / time parts).
  * @returns {string}
  */
-export function formatHHMM(d) {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+export function formatDateTime(d, timeZone, options) {
+  if (!d || isNaN(d.getTime())) return '';
+  // 'en-GB' fixes the locale so output is stable across machines; timeZone
+  // undefined lets Intl fall back to the runtime (browser) zone.
+  return new Intl.DateTimeFormat('en-GB', { ...options, timeZone }).format(d);
+}
+
+/**
+ * Format a Date as zero-padded 24-hour "HH:MM" — the HH:MM shape of
+ * {@link formatDateTime}. Same `(d, timeZone)` contract; self-guards null
+ * dates by returning ''.
+ *
+ * @param {Date|null|undefined} d
+ * @param {string} [timeZone] - IANA zone name; undefined → browser-local.
+ * @returns {string}
+ */
+export function formatHHMM(d, timeZone) {
+  return formatDateTime(d, timeZone, {
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  });
 }
 
 /**

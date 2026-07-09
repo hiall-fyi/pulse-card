@@ -6,7 +6,7 @@
  * Single SVG, single viewBox, uniform scaling — no preserveAspectRatio="none".
  */
 
-import { tempToColor, conditionIcon, escapeHtml, sanitizeCssValue, filterFinite, futureHourly, finiteNumber, uniqueSvgId } from '../weather-primitives.js';
+import { tempToColor, conditionIcon, escapeHtml, sanitizeCssValue, filterFinite, futureHourly, finiteNumber, uniqueSvgId, formatDateTime, resolveHassTimeZone } from '../weather-primitives.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 
@@ -93,18 +93,16 @@ export function tempY(temp, min, max) {
 }
 
 /**
- * Format hour from ISO datetime string. Uses getHours() — no locale dependency.
+ * Format the hour from an ISO datetime string in the HA-configured zone
+ * (browser-local when the profile prefers 'local'), so a user abroad sees
+ * the meteogram axis in home wall-clock hours.
  * @param {string} dt - ISO datetime string.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local.
  * @returns {string} HH format (24-hour, zero-padded).
  */
-function formatHourLabel(dt) {
-  try {
-    const d = new Date(dt);
-    if (isNaN(d.getTime())) return '';
-    return String(d.getHours()).padStart(2, '0');
-  } catch {
-    return '';
-  }
+function formatHourLabel(dt, timeZone) {
+  const d = new Date(dt);
+  return formatDateTime(d, timeZone, { hour: '2-digit', hourCycle: 'h23' });
 }
 
 /** Safety cap: pathological extended-forecast arrays can carry thousands of
@@ -117,9 +115,10 @@ const MAX_RAW_FORECAST_ENTRIES = 500;
  * Build meteogram data from hourly forecast.
  * @param {Array<Record<string, *>>} hourlyData - Raw hourly forecast data.
  * @param {number} [hours] - Number of hours to display.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local axis labels.
  * @returns {MeteogramData|null} Processed data or null if insufficient data.
  */
-export function buildMeteogramData(hourlyData, hours = 24) {
+export function buildMeteogramData(hourlyData, hours = 24, timeZone) {
   if (!Array.isArray(hourlyData)) return null;
   // Cap the input array first so the filter/sort/spread below can never fan
   // tens of thousands of args into Math.min(...arr).
@@ -156,7 +155,7 @@ export function buildMeteogramData(hourlyData, hours = 24) {
       cloudHigh: hasLayeredCloud ? finiteNumber(h.cloud_cover_high, 0) : null,
       windSpeed: hasWind ? finiteNumber(h.wind_speed, 0) : null,
       windBearing: hasWind ? finiteNumber(h.wind_bearing ?? h.wind_direction, 0) : null,
-      timeLabel: formatHourLabel(String(h.datetime || '')),
+      timeLabel: formatHourLabel(String(h.datetime || ''), timeZone),
       datetime: String(h.datetime || ''),
     };
   });
@@ -436,9 +435,13 @@ function renderStaggeredCluster(data) {
  * @param {import('../types.js').RenderContext} ctx - Render context.
  * @returns {string|null} HTML string or null if no data.
  */
-export function renderMeteogram({ config, forecastData }) {
+export function renderMeteogram({ hass, config, forecastData }) {
   const hourly = forecastData?.hourly || [];
   if (hourly.length < 2) return null;
+
+  // Axis hour labels render in the HA-configured zone (browser-local when the
+  // profile prefers 'local'), so a user abroad sees home wall-clock hours.
+  const timeZone = resolveHassTimeZone(hass);
 
   // Meteogram exposes a horizon toggle (12h ↔ 24h) on the brand mark.
   // The legacy `config.hours` setting still wins when explicitly set in
@@ -449,7 +452,7 @@ export function renderMeteogram({ config, forecastData }) {
   const hoursForData = Number.isFinite(explicitHours) && explicitHours > 0
     ? Math.max(4, Math.min(48, explicitHours))
     : (horizon === 'long' ? 24 : 12);
-  const data = buildMeteogramData(/** @type {Array<Record<string, unknown>>} */ (hourly), hoursForData);
+  const data = buildMeteogramData(/** @type {Array<Record<string, unknown>>} */ (hourly), hoursForData, timeZone);
   if (!data) return null;
 
   const showCloud = config.show_cloud === 'auto' || config.show_cloud === undefined

@@ -17,9 +17,10 @@ import { buildSparklinePath } from '../../shared/utils.js';
  * @param {import('../types.js').ZoneConfig} zoneConfig - Per-zone config.
  * @param {import('../types.js').PulseClimateConfig} cardConfig - Card config.
  * @param {{t: number, v: number}[]} [sparklineData] - History data for sparkline.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local sparkline tooltip times.
  * @returns {string} HTML string.
  */
-function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
+function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData, timeZone) {
   const showTempBar = zoneConfig.show_temp_bar ?? cardConfig.show_temp_bar ?? true;
   const showPowerBar = zoneConfig.show_power_bar ?? cardConfig.show_power_bar ?? true;
   const unavailableClass = zs.isUnavailable ? ' pc-unavailable' : '';
@@ -133,7 +134,7 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
 
   // Pulse mode: completely different zone row layout — waveform as background
   if (sparklineMode === 'pulse' && !zs.isUnavailable) {
-    return renderPulseZoneRow(zs, zoneConfig, sparklineData);
+    return renderPulseZoneRow(zs, zoneConfig, sparklineData, timeZone);
   }
 
   if (!zs.isUnavailable && sparklineData && sparklineData.length >= 2) {
@@ -142,7 +143,7 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
 
     if (sparklineMode === 'prominent') {
       // Prominent mode: filled sparkline using shared primitive
-      html += renderProminentSparkline(lineColor, sparklineData, zs.unit, zs.entityId);
+      html += renderProminentSparkline(lineColor, sparklineData, zs.unit, zs.entityId, timeZone);
     }
     // overlay mode: no standalone sparkline block (rendered inside gauge if applicable)
   }
@@ -158,9 +159,10 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData) {
  * @param {import('../types.js').ZoneState} zs - Zone state.
  * @param {import('../types.js').ZoneConfig} zoneConfig - Zone config.
  * @param {{t: number, v: number}[]} [sparklineData] - Sparkline data.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local tooltip times.
  * @returns {string} HTML string for the complete zone row.
  */
-function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
+function renderPulseZoneRow(zs, zoneConfig, sparklineData, timeZone) {
   const hvacVis = resolveHvacVisual(zs.hvacAction);
   const isHeating = zs.heatingPower > 0 || zs.hvacAction === 'heating';
   const isCooling = zs.hvacAction === 'cooling';
@@ -183,7 +185,7 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
   const ariaLabel = `${escapeHtml(zs.name)}: ${tempDisplay}, ${actionText}`;
   const rowClass = `pc-zone-row pc-zone-row-pulse${isHeating ? ' pc-heating' : ''}`;
 
-  const dataAttr = buildSparklineDataAttr(sparklineData || [], 24, zs.unit);
+  const dataAttr = buildSparklineDataAttr(sparklineData || [], 24, zs.unit, timeZone);
   let html = `<div class="${rowClass}" tabindex="0" role="button"
     aria-label="${escapeHtml(ariaLabel)}" data-entity="${escapeHtml(zs.entityId)}"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
 
@@ -248,9 +250,10 @@ function renderPulseZoneRow(zs, zoneConfig, sparklineData) {
  * @param {string} unit - Temperature unit (passed through to data attribute for tooltip).
  * @param {string} [entityId] - Entity ID, hashed for the gradient id to prevent
  *   colour bleeding between zones in the same shadow root.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local tooltip times.
  * @returns {string} HTML string, empty when path build fails completely.
  */
-function renderProminentSparkline(lineColor, data, unit, entityId) {
+function renderProminentSparkline(lineColor, data, unit, entityId, timeZone) {
   const result = buildFilledSparkline(data, 300, 40, 48);
   if (!result) {
     /* Fallback: filled-area build failed (insufficient data) — degrade to line-only. */
@@ -263,7 +266,7 @@ function renderProminentSparkline(lineColor, data, unit, entityId) {
   const gradSuffix = entityId ? entityId.replace(/[^a-z0-9]/gi, '-') : String(Math.random()).slice(2, 8);
   const gradId = `prom-grad-${gradSuffix}`;
   const safeColor = sanitizeCssValue(lineColor);
-  const dataAttr = buildSparklineDataAttr(data, 24, unit);
+  const dataAttr = buildSparklineDataAttr(data, 24, unit, timeZone);
   let html = `<div class="pc-sparkline-filled pc-sparkline-prominent"${dataAttr ? ` data-sparkline='${escapeHtml(dataAttr)}'` : ''}>`;
   html += `<svg viewBox="0 0 300 40" preserveAspectRatio="none">`;
   html += `<defs><linearGradient id="${escapeHtml(gradId)}" x1="0" y1="0" x2="0" y2="1">`;
@@ -283,9 +286,10 @@ function renderProminentSparkline(lineColor, data, unit, entityId) {
  * @param {Record<string, *>} states - hass.states.
  * @param {import('../types.js').TadoDiscovery} discovery - Discovered entities.
  * @param {import('../types.js').HistoryCache} [historyCache] - History cache for sparklines.
+ * @param {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local sparkline tooltip times.
  * @returns {string} HTML string.
  */
-export function renderZonesSection(zones, config, states, discovery, historyCache) {
+export function renderZonesSection(zones, config, states, discovery, historyCache, timeZone) {
   if (!zones || zones.length === 0) return '';
 
   const columns = Number(config.columns) || 1;
@@ -318,7 +322,7 @@ export function renderZonesSection(zones, config, states, discovery, historyCach
     // History is keyed by sensor entity ID (not climate entity ID) — use shared resolver
     const tempResolved = resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig);
     const sparklineData = historyCache?.data?.[tempResolved.entityId] || historyCache?.data?.[entityId] || [];
-    html += renderZoneRow(zoneState, zoneConfig, config, sparklineData);
+    html += renderZoneRow(zoneState, zoneConfig, config, sparklineData, timeZone);
   }
 
   html += `</div>`;

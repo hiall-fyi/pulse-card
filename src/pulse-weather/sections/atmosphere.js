@@ -13,7 +13,7 @@
  * - buildThermalParticles — score + color → DOM fragment
  */
 
-import { capeColor, escapeHtml, sanitizeCssValue, deriveTodaySunBoundaries } from '../weather-primitives.js';
+import { capeColor, escapeHtml, sanitizeCssValue, deriveTodaySunBoundaries, formatHHMM, resolveHassTimeZone } from '../weather-primitives.js';
 import { LIFTED_INDEX_TIERS, LOG_PREFIX } from '../constants.js';
 import { renderSectionShell } from '../section-shell.js';
 import { t } from '../type-system.js';
@@ -284,9 +284,10 @@ function classifyAtmosDriver(attrs) {
  * @param {Date} input.now - Reference "now".
  * @param {Date|null} input.todaySunset - Today's sunset, or null if unavailable.
  * @param {Record<string, unknown>|null|undefined} [input.attrs] - Composite sensor extra_state_attributes (drives shear-only detection).
+ * @param {string} [input.timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local peak-time label.
  * @returns {string}
  */
-export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySunset, attrs }) {
+export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySunset, attrs, timeZone }) {
   if (tierKey === 'none' || tierKey === 'unknown') {
     return 'Atmosphere settled · no convective signals';
   }
@@ -319,7 +320,7 @@ export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySun
       const peakDt = peakSlot ? /** @type {Record<string, unknown>} */ (peakSlot).datetime : null;
       const peakDate = peakDt ? new Date(String(peakDt)) : null;
       if (peakDate && !isNaN(peakDate.getTime())) {
-        peakLabel = peakDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        peakLabel = formatHHMM(peakDate, timeZone);
         peakMs = peakDate.getTime();
       }
     }
@@ -673,6 +674,7 @@ export function renderAtmosphere({ hass, config, discovery, forecastData }) {
     now,
     todaySunset,
     attrs: resolved.attrs,
+    timeZone: resolveHassTimeZone(hass),
   });
 
   /* Vertical column visualisation — 5 km (or auto-scaled) atmospheric profile
