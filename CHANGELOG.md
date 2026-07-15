@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.9.0] - 2026-07-16
+
+### Climate Card
+
+#### Features
+
+- **New heating-circuit chip.** If your boiler has more than one heating circuit and you run Tado CE, you can now add a `heating_circuit` chip to a zone to see which circuit that room is assigned to. It only shows when you list it in the zone's `chips`, and it stays hidden for rooms with no circuit assigned, so single-circuit homes see nothing extra. Tapping it opens the entity so you can reassign the circuit. To see it, upgrade [Tado CE](https://github.com/hiall-fyi/tado_ce) to 4.2.0 or later, which is the version that adds the heating-circuit entities.
+
+#### Bug fixes
+
+- **Comfort strip now reads the full range of comfort levels.** The strip's colour tint only recognised a few of the comfort states Tado CE actually reports, so rooms reading "Cold", "Hot", or anything with a "Dry" or "Humid" note fell back to a flat neutral tint instead of their real warmth. It now maps every comfort band, so a cold or overheated room reads true on the strip. The tint also no longer drifts toward neutral when a room's comfort sensor is briefly unavailable.
+
+
 ## [1.8.6] - 2026-07-09
 
 ### Weather Card

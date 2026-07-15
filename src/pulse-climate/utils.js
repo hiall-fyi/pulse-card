@@ -313,6 +313,19 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     }
   }
 
+  // Heating circuit (Tado CE select) — opt-in only, like temp_source.
+  // Reads the RAW current_option; hidden when unassigned or not loaded.
+  if (chipFilter && include('heating_circuit') && discoveredEntities.heating_circuit) {
+    const s = states[discoveredEntities.heating_circuit];
+    if (s && !isUnavailableState(s) && s.state !== 'no_heating_circuit') {
+      const raw = s.state;
+      const label = raw.startsWith('circuit_')
+        ? `Circuit ${raw.slice('circuit_'.length)}`
+        : `Circuit: ${raw.length >= 8 ? `${raw.slice(0, 4)}…${raw.slice(-3)}` : raw}`;
+      chips.push({ type: 'heating_circuit', icon: 'mdi:radiator', label, entityId: discoveredEntities.heating_circuit });
+    }
+  }
+
   return chips;
 }
 

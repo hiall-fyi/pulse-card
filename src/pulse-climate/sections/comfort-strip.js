@@ -6,7 +6,7 @@
  * Pure renderer — no side effects, no DOM access.
  */
 
-import { escapeHtml, formatHHMM } from '../../shared/utils.js';
+import { escapeHtml, formatHHMM, isUnavailableState } from '../../shared/utils.js';
 import { resolveZoneContext, rowStateClass } from '../utils.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slot-engine.js';
@@ -16,11 +16,10 @@ import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slo
  * @type {Record<string, number>}
  */
 const COMFORT_LEVEL_MAP = {
-  Comfortable: 100,
-  Warm: 70,
-  Cool: 70,
-  'Too Warm': 40,
-  'Too Cool': 40,
+  Comfortable: 100,              // green
+  Warm: 70, Cool: 70,           // amber — one band off ideal
+  Hot: 35, Cold: 35,            // red — two bands off
+  Sweltering: 10, Freezing: 10, // deep red — extreme
 };
 
 /**
@@ -43,7 +42,11 @@ export function computeComfortScore(actualTemp, targetTemp, humidity, comfortLev
     score -= Math.min(25, Math.abs(humidity - 45) * 0.5);
   }
   if (comfortLevel !== null && comfortLevel !== undefined) {
-    const mapped = COMFORT_LEVEL_MAP[comfortLevel] ?? 50;
+    // tado_ce emits "<band> <humidity-suffix>" (e.g. "Comfortable Dry"); the
+    // base band is always the first word. ?? 50 is a forward-compat NaN guard
+    // for a future band not in the map — keep it.
+    const band = comfortLevel.split(' ')[0];
+    const mapped = COMFORT_LEVEL_MAP[band] ?? 50;
     score = score * 0.7 + mapped * 0.3;
   }
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -141,7 +144,9 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     const humData = humSensorId ? (historyCache?.data?.[humSensorId] || []) : [];
     const targetTemp = states[entityId]?.attributes?.temperature ?? null;
     const comfortEntity = zoneEntities.comfort_level;
-    const comfortLevel = comfortEntity ? (states[comfortEntity]?.state || null) : null;
+    const comfortLevel = (comfortEntity && !isUnavailableState(states[comfortEntity]))
+      ? states[comfortEntity].state
+      : null;
 
     /** @type {import('./slot-engine.js').SlotData[]} */
     const slotData = [];

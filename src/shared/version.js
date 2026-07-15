@@ -13,4 +13,4 @@
  */
 
 /** Family release version shared by Bar, Climate, and Weather. */
-export const FAMILY_VERSION = '1.8.6';
+export const FAMILY_VERSION = '1.9.0';

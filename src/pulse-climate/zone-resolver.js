@@ -79,6 +79,7 @@ const ZONE_TRANSLATION_KEYS = {
   battery: 'battery',
   connection: 'connection',
   insights: 'insights',
+  heating_circuit: 'heating_circuit',
 };
 
 
@@ -130,6 +131,7 @@ const TADO_ZONE_PATTERNS = {
   battery:            { platform: 'sensor', suffixes: ['_ce_battery', '_battery'] },
   connection:         { platform: 'binary_sensor', suffixes: ['_ce_connection', '_connection'] },
   insights:           { platform: 'sensor', suffixes: ['_ce_insights', '_insights'] },
+  heating_circuit:    { platform: 'select', suffixes: ['_heating_circuit'] },
 };
 
 /**
