@@ -146,6 +146,18 @@ export const SHARED_STYLES = `
  * Utility Classes
  * ══════════════════════════════════════════════════════════════════ */
 
+/* Keyboard focus ring for every focusable element in the family. Keyed off
+   [tabindex] so anything focusable is covered, whether the attribute comes from
+   markup or from makeActivatable at runtime.
+
+   No border-radius: an outline already follows the element's own radius, so
+   declaring one here would reshape the element while focused. */
+:host [tabindex]:focus-visible,
+:host([tabindex]):focus-visible {
+  outline: 2px solid var(--pulse-accent);
+  outline-offset: 2px;
+}
+
 /* Card title — 16px medium weight */
 .pulse-title {
   font-size: var(--pulse-font-title);
@@ -189,28 +201,5 @@ export const SHARED_STYLES = `
 .pulse-stats-row[data-divided="true"] {
   padding-top: var(--pulse-space-section);
   border-top: 1px solid var(--pulse-border-subtle);
-}
-
-/* Precipitation bar — Dark Sky signature element */
-.pulse-precip-bar {
-  height: 32px;
-  background: var(--pulse-bg-elevated);
-  border-radius: var(--pulse-radius-pill);
-  display: flex;
-  overflow: hidden;
-}
-
-.pulse-precip-slot {
-  flex: 1;
-  position: relative;
-}
-
-.pulse-precip-fill {
-  position: absolute;
-  bottom: 0;
-  left: 1px;
-  right: 1px;
-  border-radius: var(--pulse-radius-bar) var(--pulse-radius-bar) 0 0;
-  background: var(--pulse-info-color);
 }
 `;

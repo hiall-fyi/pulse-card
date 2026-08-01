@@ -52,7 +52,7 @@ export function clamp(value, min, max) {
  * rendered height. A numeric `rows` makes HA add the `fit-rows` class and pin
  * the cell to `rows * 64px - 8px`; any card whose content (zone rows, heatmap,
  * timeline, donut) is taller than that estimate then paints past its cell and
- * overlaps the card below (issue #50). `'auto'` is the value HA's YAML
+ * overlaps the card below. `'auto'` is the value HA's YAML
  * `grid_options: { rows: auto }` carries — verified working on HA 2026.6 — and
  * must be passed explicitly: simply omitting `rows` is NOT equivalent at
  * runtime, so the string is set here on purpose, not left to a default.

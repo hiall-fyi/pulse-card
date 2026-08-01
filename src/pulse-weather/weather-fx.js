@@ -6,6 +6,7 @@
  */
 
 import { MAX_RAIN_DROPS, MAX_SNOWFLAKES, MAX_STARS, MAX_CLOUDS, LOG_PREFIX } from './constants.js';
+import { isReducedMotion } from '../shared/utils.js';
 
 /**
  * Create a DOM element with class, styles, and optional animation properties.
@@ -323,6 +324,10 @@ export function addAirHaze(frag, pm25, pm10) {
   vignette.style.background = `radial-gradient(ellipse at center, transparent 40%, rgba(80,70,50,${severity * 0.3}) 100%)`;
   frag.appendChild(vignette);
 
+  /* The overlay and vignette above are static and their opacity carries the PM
+     reading, so they render regardless. Only what follows is motion. */
+  if (isReducedMotion()) return;
+
   // Dust particles
   const dustCount = Math.floor(severity * 20);
   for (let i = 0; i < dustCount; i++) {
@@ -369,6 +374,10 @@ export function addAirHaze(frag, pm25, pm10) {
  */
 export function buildConditionFx(condition, isNight, cloudCover) {
   const frag = document.createDocumentFragment();
+
+  /* Every element here exists purely to animate, so there is nothing worth
+     rendering statically under reduced motion. */
+  if (isReducedMotion()) return frag;
 
   try {
     // Night stars for all night conditions

@@ -225,13 +225,6 @@ export const STYLES = `${SHARED_STYLES}
     }
   }
 
-  /* Keyboard focus indicator */
-  .pb-row:focus-visible {
-    outline: 2px solid var(--pulse-accent);
-    outline-offset: 2px;
-    border-radius: var(--pulse-radius-small);
-  }
-
   /* Secondary info group — wraps name + secondary line */
   .pb-name-group {
     display: flex;
@@ -347,9 +340,15 @@ export const STYLES = `${SHARED_STYLES}
     font-size: var(--pulse-font-caption);
   }
 
-  /* Reduced motion — respect prefers-reduced-motion */
+  /* !important: .pb-fill's width transition is driven by an inline
+     --pb-animation-speed, which outranks a plain declaration. */
   @media (prefers-reduced-motion: reduce) {
-    .pb-fill.charge { animation: none; }
-    .pb-fill, .pb-row { transition: none; }
+    :host,
+    :host *,
+    :host *::before,
+    :host *::after {
+      animation: none !important;
+      transition: none !important;
+    }
   }
 `;

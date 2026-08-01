@@ -5,7 +5,7 @@
  */
 
 import { warn } from './utils.js';
-import { executeAction, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
+import { executeAction, makeActivatable, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
 
 /**
  * Resolve action config with fallback chain: entity → card → default.
@@ -80,16 +80,10 @@ export function bindActionListeners(rowEl, cardEl, _hass, cardConfig, entityConf
     delete /** @type {*} */ (rowEl).__pulseCleanup;
   };
 
-  // Make bar rows keyboard-focusable and accessible
-  rowEl.setAttribute('tabindex', '0');
-
-  // Keyboard activation — Enter/Space triggers tap action
-  rowEl.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter' || ev.key === ' ') {
-      ev.preventDefault();
-      if (cardEl._hass) handleAction(/** @type {*} */ (cardEl), cardEl._hass, cardConfig, entityConfig, 'tap_action');
-    }
-  }, { signal });
+  // Preserve the rendered role (slider / progressbar) so aria-valuenow stays coherent.
+  makeActivatable(rowEl, () => {
+    if (cardEl._hass) handleAction(/** @type {*} */ (cardEl), cardEl._hass, cardConfig, entityConfig, 'tap_action');
+  }, { signal, role: rowEl.getAttribute('role') || 'button' });
 
   // Tap / double-tap via click
   rowEl.addEventListener('click', (ev) => {

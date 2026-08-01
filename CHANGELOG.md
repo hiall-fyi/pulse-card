@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [1.9.1] - 2026-08-01
+
+### All cards
+
+#### Bug fixes
+
+- **Everything you can tap is now reachable with a keyboard.** Chips, zone rows, ranking rows, the metric and timeline tab strips, the Weather Card's atmosphere panel, and the hourly forecast strip all responded to a mouse but ignored Enter and Space, so keyboard and switch-access users could see them and not use them. They now activate the same way a click does. Bar Card step buttons could also be reached but not focused.
+- **Focused elements now show a focus ring.** Newly keyboard-reachable elements took focus without any visible indicator, so tabbing through a card gave you no idea where you were. Focus now draws a ring in your Home Assistant accent colour on everything focusable.
+- **"Reduce motion" is now respected properly.** Only a fraction of each card's animation was covered, and the Weather Card's rain, snow, clouds, stars, fog, sun rays, and lightning were not covered at all, so a system set to reduce motion still got around 200 animated particles. The Weather Card now skips building those effects entirely rather than freezing them mid-frame. The air-quality haze is the one exception: its tint still darkens with the PM reading, since that carries the reading itself, and only the drifting dust is dropped.
+- **Small text on the Weather Card is readable in a light theme.** Wind units, the atmosphere labels, and the sunrise/sunset times drew in a colour picked for your Home Assistant theme while sitting on the card's own dark backdrop, so in a light theme they came out dark-on-dark. They now use the card's cream palette. The bottom of the sky gradient was also too light for any text to read against, so it has been deepened, keeping the warm tone.
+- **Chips and tabs are easier to hit.** Zone chips were about 15px tall, and the ranking tabs, radial legend, and detail close button were all a little under the 24px minimum, which made them fiddly on a phone. All four are now at least 24px.
+
+#### Improvements
+
+- **Storm-risk sparkline on the Weather Card overview.** The code that draws this has been in the card since 1.3.2 but was never placed on the page, so it has never appeared for anyone. It now shows below the stats when the next 12 hours carry meaningful instability, captioned with the peak value and the hour it lands.
+
+
 ## [1.9.0] - 2026-07-16
 
 ### Climate Card

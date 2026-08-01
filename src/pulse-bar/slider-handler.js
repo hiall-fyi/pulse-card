@@ -16,6 +16,7 @@ import {
   resolveUnit,
   warn,
 } from './utils.js';
+import { makeActivatable } from '../shared/action-handler.js';
 
 /** Delay (ms) before clearing __pulseSliding flag after commit. */
 const SLIDING_FLAG_DELAY = 50;
@@ -238,6 +239,12 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
   const stepBtns = rowEl.querySelectorAll('.pb-step-btn');
   for (const btn of stepBtns) {
     const dir = Number(/** @type {HTMLElement} */ (btn).dataset.step);
+
+    // stopPropagation: the parent row is activatable too.
+    makeActivatable(/** @type {HTMLElement} */ (btn), (ev) => {
+      ev.stopPropagation();
+      adjustByStep(dir);
+    }, { signal });
 
     btn.addEventListener('click', (ev) => {
       ev.stopPropagation();

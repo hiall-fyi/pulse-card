@@ -35,7 +35,7 @@ import { resolveOutdoorTemp } from './outdoor-temp.js';
 import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay, isUnavailableState, buildGridOptions, resolveHassTimeZone, formatHHMM } from '../shared/utils.js';
 import { buildFilledSparkline, temperatureToColor } from './chart-primitives.js';
 import { createStripTooltip, createFixedTooltip, pointerToSlotIndex, bindDragSelect, bindCrosshair } from './sections/slot-engine.js';
-import { executeAction as sharedExecuteAction, fireEvent, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
+import { executeAction as sharedExecuteAction, fireEvent, makeActivatable, DOUBLE_TAP_WINDOW, HOLD_THRESHOLD } from '../shared/action-handler.js';
 import { attachRipple } from '../shared/ripple.js';
 import { fetchSparklineData, fetchClimateStateHistory } from '../shared/utils.js';
 
@@ -520,12 +520,8 @@ class PulseClimateCard extends HTMLElement {
         delete /** @type {*} */ (row).__pulseCleanup;
       };
 
-      row.addEventListener('keydown', (ev) => {
-        const kev = /** @type {KeyboardEvent} */ (ev);
-        if (kev.key === 'Enter' || kev.key === ' ') {
-          kev.preventDefault();
-          this._fireAction(entityId, zoneConfig, 'tap_action');
-        }
+      makeActivatable(/** @type {HTMLElement} */ (row), () => {
+        this._fireAction(entityId, zoneConfig, 'tap_action');
       }, { signal });
 
       row.addEventListener('click', (ev) => {
@@ -609,6 +605,13 @@ class PulseClimateCard extends HTMLElement {
         chipEl.style.cursor = 'pointer';
         attachRipple(chipEl);
 
+        // stopPropagation: the parent zone row is activatable too.
+        makeActivatable(chipEl, (ev) => {
+          ev.stopPropagation();
+          if (!this._hass) return;
+          sharedExecuteAction(this, this._hass, tapAction, chipEntityId, warn);
+        }, { signal: chipSignal });
+
         chipEl.addEventListener('click', (ev) => {
           ev.stopPropagation();
           if (!this._hass) return;
@@ -647,12 +650,21 @@ class PulseClimateCard extends HTMLElement {
 
       tappable.style.cursor = 'pointer';
       attachRipple(tappable);
+
+      const openMoreInfo = () => {
+        const entityId = tappable.dataset.entity;
+        if (entityId) fireEvent(this, 'hass-more-info', { entityId });
+      };
+
+      // stopPropagation: these can nest inside another activatable row.
+      makeActivatable(tappable, (ev) => {
+        ev.stopPropagation();
+        openMoreInfo();
+      }, { signal: sectionChipSignal });
+
       tappable.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        const entityId = tappable.dataset.entity;
-        if (entityId) {
-          fireEvent(this, 'hass-more-info', { entityId });
-        }
+        openMoreInfo();
       }, { signal: sectionChipSignal });
     }
   }
@@ -1657,7 +1669,7 @@ class PulseClimateCard extends HTMLElement {
     if (!discovery) return;
 
     for (const tab of tabs) {
-      tab.addEventListener('click', () => {
+      const selectMetric = () => {
         const newMetric = /** @type {string} */ (/** @type {HTMLElement} */ (tab).dataset.metric);
         if (!newMetric) return;
         const states = this._hass?.states || {};
@@ -1672,7 +1684,10 @@ class PulseClimateCard extends HTMLElement {
           this._bindZoneRankingTabs();
           this._bindSectionChipActions();
         }
-      }, { signal });
+      };
+
+      makeActivatable(/** @type {HTMLElement} */ (tab), selectMetric, { signal, role: 'tab' });
+      tab.addEventListener('click', selectMetric, { signal });
     }
   }
 
@@ -1694,7 +1709,7 @@ class PulseClimateCard extends HTMLElement {
       if (Number.isNaN(sectionIndex)) continue;
       const tabs = groupEl.querySelectorAll('.pc-timeline-group-tab');
       for (const tab of tabs) {
-        tab.addEventListener('click', () => {
+        const selectTab = () => {
           const newTab = /** @type {string} */ (/** @type {HTMLElement} */ (tab).dataset.tab);
           if (!newTab || !['thermal', 'state'].includes(newTab)) return;
           const sections = [...((this._config?.sections) || [])];
@@ -1722,7 +1737,10 @@ class PulseClimateCard extends HTMLElement {
             this._bindTimelineInteractions();
             this._bindStateTimelineInteractions();
           }
-        }, { signal });
+        };
+
+        makeActivatable(/** @type {HTMLElement} */ (tab), selectTab, { signal, role: 'tab' });
+        tab.addEventListener('click', selectTab, { signal });
       }
     }
   }
@@ -1828,7 +1846,7 @@ class PulseClimateCard extends HTMLElement {
       if (Number.isNaN(sectionIndex)) continue;
       const tabs = groupEl.querySelectorAll('.pc-system-health-group-tab');
       for (const tab of tabs) {
-        tab.addEventListener('click', () => {
+        const selectTab = () => {
           const newTab = /** @type {string} */ (/** @type {HTMLElement} */ (tab).dataset.tab);
           if (!newTab || !['bridge', 'homekit', 'api'].includes(newTab)) return;
           const sections = [...((this._config?.sections) || [])];
@@ -1854,7 +1872,10 @@ class PulseClimateCard extends HTMLElement {
             this._bindSystemHealthGroupTabs();
             this._startCountdownTimer();
           }
-        }, { signal });
+        };
+
+        makeActivatable(/** @type {HTMLElement} */ (tab), selectTab, { signal, role: 'tab' });
+        tab.addEventListener('click', selectTab, { signal });
       }
     }
   }

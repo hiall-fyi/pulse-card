@@ -130,11 +130,6 @@ ha-card {
 .pc-zone-row.pc-row-at-target { --pc-row-ribbon: rgba(255, 255, 255, 0.15); }
 .pc-zone-row.pc-row-off,
 .pc-zone-row.pc-row-unavail   { --pc-row-ribbon: rgba(255, 255, 255, 0.06); }
-.pc-zone-row:focus-visible {
-  outline: 2px solid var(--pulse-accent);
-  outline-offset: 2px;
-  border-radius: var(--pulse-radius-small);
-}
 .pc-zone-row.pc-unavailable { opacity: 0.5; }
 .pc-zone-row.pc-unavailable .pc-power-bar-fill {
   background: var(--pulse-disabled) !important;
@@ -344,6 +339,10 @@ ha-card {
   position: relative;
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
+  /* Padding stays horizontal so chip width tracks its label. */
+  min-height: 24px;
+  padding: 0 2px;
+  box-sizing: border-box;
 }
 .pc-chip ha-icon { --mdc-icon-size: 14px; }
 .pc-chip.pc-severity-high { color: var(--pulse-tier-gale); }
@@ -532,10 +531,6 @@ ha-card {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: pan-y;
-}
-.pc-zone-row-pulse:focus-visible {
-  outline: 2px solid var(--pulse-accent);
-  outline-offset: 2px;
 }
 .pc-zone-row-pulse .pc-pulse-bg {
   position: absolute;
@@ -876,7 +871,9 @@ ha-card {
   font-size: var(--pulse-font-label);
   color: var(--pulse-text-secondary);
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 4px 4px;
+  min-height: 24px;
+  box-sizing: border-box;
   border-radius: var(--pulse-radius-small);
   position: relative;
   overflow: hidden;
@@ -925,7 +922,11 @@ ha-card {
   font-size: var(--pulse-font-label);
   color: var(--pulse-text-secondary);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
   padding: 4px 8px;
+  min-height: 24px;
+  box-sizing: border-box;
   border-radius: var(--pulse-radius-pill);
   transition: background var(--pulse-anim-fast);
 }
@@ -1073,11 +1074,6 @@ ha-card {
 .pc-home-status-row:hover {
   background: var(--pulse-bg-hover);
 }
-.pc-home-status-row:focus-visible {
-  outline: 2px solid var(--pulse-accent);
-  outline-offset: 2px;
-  border-radius: var(--pulse-radius-small);
-}
 .pc-home-status-zone-name {
   width: 72px;
   flex-shrink: 0;
@@ -1188,7 +1184,9 @@ ha-card {
   letter-spacing: 0.6px;
   font-weight: var(--pulse-weight-semibold);
   color: var(--pulse-text-secondary);
-  padding: 6px 8px;
+  padding: 7px 8px;
+  min-height: 24px;
+  box-sizing: border-box;
   border: none;
   border-bottom: 1px solid transparent;
   background: none;
@@ -1214,10 +1212,6 @@ ha-card {
 }
 .pc-rank-row:hover {
   background: var(--pulse-border-subtle);
-}
-.pc-rank-row:focus-visible {
-  outline: 2px solid var(--pulse-accent);
-  outline-offset: 2px;
 }
 .pc-rank-num {
   width: 24px;
@@ -1478,14 +1472,19 @@ ha-card {
   z-index: 1;
 }
 
-/* Reduced motion — respect prefers-reduced-motion for users sensitive to animation */
+/* Scoped to :host, not .pc-card-content — the atmosphere wash is a sibling of
+   that wrapper and the master pulse animates the host itself. Pinning the phase
+   to 0.5 rests pulsing elements at their neutral size. */
 @media (prefers-reduced-motion: reduce) {
-  :host { animation: none; }
-  .pc-power-bar-fill.pc-bar-active { animation: none; }
-  .pc-heating-glow { animation: none; }
-  .pc-zone-row-pulse.pc-heating { animation: none; }
-  .pc-pulse-dot.pc-connected { animation: none; }
-  .pc-temp-transitioning { filter: none; transition: none; }
+  :host,
+  :host *,
+  :host *::before,
+  :host *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  :host { --pc-pulse-phase: 0.5; }
+  .pc-temp-transitioning { filter: none; }
   .pc-atmosphere-wash { --pc-atmosphere-opacity: 0.3; }
 }
 

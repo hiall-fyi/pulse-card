@@ -132,12 +132,14 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
 
   html += `<div class="pc-ranking-header">`;
   html += `<div class="pulse-section-label">Zone Ranking</div>`;
-  html += `<div class="pc-ranking-tabs">`;
+  html += `<div class="pc-ranking-tabs" role="tablist">`;
   for (const key of available) {
     const d = METRIC_DEFS[key];
     if (!d) continue;
     const activeClass = key === metric ? ' pc-active' : '';
-    html += `<div class="pc-ranking-tab${activeClass}" data-metric="${escapeHtml(key)}">${escapeHtml(d.label)}</div>`;
+    html += `<div class="pc-ranking-tab${activeClass}" role="tab" tabindex="0" `
+          + `aria-selected="${key === metric}" `
+          + `data-metric="${escapeHtml(key)}">${escapeHtml(d.label)}</div>`;
   }
   html += `</div></div>`;
 

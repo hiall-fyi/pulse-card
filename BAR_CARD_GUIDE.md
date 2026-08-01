@@ -17,7 +17,7 @@ This guide covers every configuration option, style presets, migration from bar-
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `entity` | string | **required** | The sensor to display (e.g. `sensor.battery_level`) |
-| `entities` | list | — | Show multiple sensors in one card (see [examples below](#multiple-entities)) |
+| `entities` | list | — | Show multiple sensors in one card (see [Style Presets](#style-presets) for worked examples) |
 | `name` | string | auto | Custom label — defaults to the entity's friendly name |
 | `icon` | string | auto | Custom icon (e.g. `mdi:battery`) — defaults to the entity's icon |
 | `title` | string | — | Card title shown above the bars |

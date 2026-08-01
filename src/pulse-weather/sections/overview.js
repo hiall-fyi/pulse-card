@@ -4,49 +4,12 @@
  * contextual weather summary, day progress arc, and tier-coloured stats.
  */
 
-import { tempToColor, windTierColor, beaufort, compassLabel, escapeHtml, sanitizeCssValue, formatCondition, cloudCoverColor, dewPointComfortColor, uniqueSvgId, futureHourly as filterFutureHourly, deriveTodaySunBoundaries, readCeOrAttr, readCeUnit, readSensorValue, deriveBrandVariant, formatHHMM, resolveHassTimeZone } from '../weather-primitives.js';
-import { intensityRatio, tensionGlow, tensionVignette } from '../../shared/visual-tension.js';
-import { ATMOS_CE_TIER_MAP } from './atmosphere.js';
-import { LIFTED_INDEX_TIERS } from '../constants.js';
+import { compassLabel, escapeHtml, sanitizeCssValue, formatCondition, uniqueSvgId, futureHourly as filterFutureHourly, deriveTodaySunBoundaries, readCeOrAttr, readCeUnit, readSensorValue, deriveBrandVariant, formatHHMM, resolveHassTimeZone } from '../weather-primitives.js';
+import { intensityRatio, tensionVignette } from '../../shared/visual-tension.js';
 import { composeNarrative } from '../narrative.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 import { t } from '../type-system.js';
-
-/**
- * Condition-to-gradient mapping for atmospheric backgrounds.
- * @type {Readonly<Record<string, string>>}
- */
-const CONDITION_GRADIENTS = {
-  'sunny': 'linear-gradient(180deg, #1a4a7a 0%, #2a6aaa 40%, transparent 100%)',
-  'clear-night': 'linear-gradient(180deg, #050510 0%, #0a0a1a 50%, transparent 100%)',
-  'partlycloudy': 'linear-gradient(180deg, #1a2a4a 0%, #2c4a6e 50%, transparent 100%)',
-  'cloudy': 'linear-gradient(180deg, #2a2a3a 0%, #3a3a4a 50%, transparent 100%)',
-  'rainy': 'linear-gradient(180deg, #1a2a3a 0%, #2a3a4a 50%, transparent 100%)',
-  'pouring': 'linear-gradient(180deg, #0a1a2a 0%, #1a2a3a 50%, transparent 100%)',
-  'snowy': 'linear-gradient(180deg, #2a3040 0%, #3a4050 50%, transparent 100%)',
-  'snowy-rainy': 'linear-gradient(180deg, #1a2a3a 0%, #2a3a48 50%, transparent 100%)',
-  'hail': 'linear-gradient(180deg, #1a2a3a 0%, #2a3a48 50%, transparent 100%)',
-  'lightning': 'linear-gradient(180deg, #0a0a1a 0%, #1a1a2a 50%, transparent 100%)',
-  'lightning-rainy': 'linear-gradient(180deg, #0a0a1a 0%, #1a1a2a 50%, transparent 100%)',
-  'fog': 'linear-gradient(180deg, #2a2a2e 0%, #3a3a3e 50%, transparent 100%)',
-  'windy': 'linear-gradient(180deg, #1a2a4a 0%, #2c4a6e 50%, transparent 100%)',
-  'windy-variant': 'linear-gradient(180deg, #1a2a4a 0%, #2c4a6e 50%, transparent 100%)',
-  'exceptional': 'linear-gradient(180deg, #4a2a1a 0%, #6a3a1a 40%, transparent 100%)',
-};
-
-const DEFAULT_GRADIENT = 'linear-gradient(180deg, #1a2a3a 0%, #2a3a4a 50%, transparent 100%)';
-
-/**
- * Insight tier colour map for visibility and dew-point comfort labels.
- * @type {Readonly<Record<string, string>>}
- */
-const INSIGHT_TIER_COLORS = /** @type {const} */ ({
-  dry: '#30d158', comfortable: '#30d158',
-  slightly_humid: '#ffd60a', humid: '#ff9f0a', oppressive: '#ff453a',
-  clear: '#30d158', good: '#30d158',
-  moderate: '#ffd60a', poor: '#ff9f0a', fog: '#ff453a',
-});
 
 /**
  * Map relative humidity to NWS-aligned comfort tier colour.
@@ -184,7 +147,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   // Render all clock labels in the HA-configured zone (falls back to
   // browser zone when the user's profile prefers 'local'). Resolved once
   // here and threaded into every formatHHMM below so a user physically
-  // abroad still sees their home wall-clock. See #timezone fix.
+  // abroad still sees their home wall-clock.
   const timeZone = resolveHassTimeZone(hass);
   const { condition, isNight } = deriveBrandVariant(hass, weatherEntity, discovery);
 
@@ -192,7 +155,6 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const unit = (/** @type {string} */ s, /** @type {string} */ f) => readCeUnit(hass, ce, s, f);
 
   const temp = val('temperature', 'temperature');
-  const feelsLike = val('apparent_temperature', 'apparent_temperature') || temp;
   const humidity = val('humidity', 'humidity');
   const windSpeed = val('wind_speed', 'wind_speed');
   const windBearing = val('wind_direction', 'wind_bearing');
@@ -283,7 +245,6 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const showersUnit = /** @type {string} */ (showersUnitRaw || 'mm');
   const snowfallUnit = /** @type {string} */ (snowfallUnitRaw || 'cm');
 
-  const { value: uvClearSky, entity: uvClearSkySensor } = readSensorValue(hass, ce.uv_index_clear_sky);
 
   const dewComfortSensor = ce.dew_point_comfort ? hass.states[ce.dew_point_comfort] : null;
   const visibilityCatSensor = ce.visibility_category ? hass.states[ce.visibility_category] : null;
@@ -310,21 +271,8 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
     };
   }
 
-  const freezeSensor = ce.freezing_level_height ? hass.states[ce.freezing_level_height] : null;
-  const freezeLevel = freezeSensor ? Number(freezeSensor.state) || 0 : 0;
-
   const stabilitySensor = ce.stability_assessment ? hass.states[ce.stability_assessment] : null;
   const stabilityState = stabilitySensor?.state || '';
-
-  const liSensor = ce.lifted_index ? hass.states[ce.lifted_index] : null;
-  const liValue = liSensor ? Number(liSensor.state) || 0 : 0;
-
-  // eslint-disable-next-line no-unused-vars
-  const gradient = sanitizeCssValue(CONDITION_GRADIENTS[condition] || DEFAULT_GRADIENT);
-
-  const range = Math.max(tempHigh - tempLow, 1);
-  // eslint-disable-next-line no-unused-vars
-  const arcPct = Math.max(0, Math.min(100, ((temp - tempLow) / range) * 100));
 
   // Compass direction (16-point via compassLabel, 8-point fallback)
   const dirLabel = compassLabel(windBearing);
@@ -334,107 +282,22 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const hotIntensity = intensityRatio(temp, 20, 42);
   const coldIntensity = intensityRatio(temp, 15, -10);
   const tempIntensity = Math.max(hotIntensity, coldIntensity);
-  const tempColor = tempToColor(temp);
-  // eslint-disable-next-line no-unused-vars
-  const heroGlow = tempIntensity > 0.05 ? `text-shadow: 0 2px 20px rgba(0,0,0,0.3), ${tensionGlow(tempColor, tempIntensity)}` : 'text-shadow: 0 2px 20px rgba(0,0,0,0.3)';
   const vignetteGrad = tensionVignette(tempIntensity);
   const vignetteHtml = vignetteGrad ? `<div class="pw-tension-vignette" style="background: ${sanitizeCssValue(vignetteGrad)}"></div>` : '';
 
-  // eslint-disable-next-line no-unused-vars
-  const snowBadgeHtml = snowfallNow > 0
-    ? `<div class="pw-snow-badge" style="color:var(--pw-color-freeze, #5ac8fa)">\u2744 ${escapeHtml(snowfallNow.toFixed(1))} ${escapeHtml(snowfallUnit)}</div>`
-    : '';
-
+  /* Plain text — the hero renders this through t.gloss, which takes a string. */
   const feelsContext = feelsContextSensor?.state || '';
   const feelsDiff = feelsContextSensor?.attributes?.difference;
-  let feelsContextHtml = '';
-  if (feelsContext === 'wind_chill' && feelsDiff !== null && feelsDiff !== undefined) {
-    feelsContextHtml = `<div class="pw-feels-context">Wind chill ${escapeHtml(String(Math.round(Number(feelsDiff))))}\u00b0</div>`;
-  } else if (feelsContext === 'heat_index' && feelsDiff !== null && feelsDiff !== undefined) {
-    feelsContextHtml = `<div class="pw-feels-context">Heat index +${escapeHtml(String(Math.round(Number(feelsDiff))))}\u00b0</div>`;
+  let feelsPlain = '';
+  if (feelsDiff !== null && feelsDiff !== undefined) {
+    const rounded = Math.round(Number(feelsDiff));
+    if (feelsContext === 'wind_chill') feelsPlain = `Wind chill ${rounded}\u00b0`;
+    else if (feelsContext === 'heat_index') feelsPlain = `Heat index +${rounded}\u00b0`;
   }
-
-  const badgeTiers = ['marginal', 'slight', 'enhanced', 'moderate', 'high'];
-  let stabilityBadgeHtml = '';
-  if (stabilityState && badgeTiers.includes(stabilityState)) {
-    const tierInfo = ATMOS_CE_TIER_MAP[stabilityState];
-    if (tierInfo) {
-      const badgeColor = sanitizeCssValue(tierInfo.color);
-      let badgeText = `\u26A1 ${escapeHtml(tierInfo.label)}`;
-      // LI value in badge — only when LI itself indicates instability (negative = unstable)
-      if (liSensor && liValue < 0) {
-        const liTier = LIFTED_INDEX_TIERS.find((tier) => liValue >= tier.min) || LIFTED_INDEX_TIERS[LIFTED_INDEX_TIERS.length - 1];
-        badgeText += ` \u00b7 <span style="color:${sanitizeCssValue(liTier.color)}">LI ${escapeHtml(String(liValue))}</span>`;
-      }
-      // eslint-disable-next-line no-unused-vars
-      stabilityBadgeHtml = ` <span class="pw-stability-badge" style="background:${badgeColor}33; color:${badgeColor}">${badgeText}</span>`;
-    }
-  }
-
-  const visCat = visibilityCatSensor?.state || '';
-  // eslint-disable-next-line no-unused-vars
-  const visCatColor = visCat && !['unavailable', 'unknown'].includes(visCat)
-    ? INSIGHT_TIER_COLORS[visCat] || ''
-    : '';
 
   const dewComfort = dewComfortSensor?.state || '';
-  // eslint-disable-next-line no-unused-vars
-  const dewColor = dewComfort && !['unavailable', 'unknown'].includes(dewComfort)
-    ? INSIGHT_TIER_COLORS[dewComfort] || ''
-    : '';
 
-  const trendSymbol = pressureTrendSensor?.attributes?.trend_symbol || '';
-  const trendColor = pressureTrendSensor?.state === 'rising' ? '#30d158'
-    : pressureTrendSensor?.state === 'falling' ? '#ff9f0a'
-    : pressureTrendSensor?.state === 'steady' ? '#5ac8fa' : '';
-  const showClearSky = uvClearSkySensor && Math.abs(uvClearSky - uvIndex) >= 0.5;
-
-  const change3h = pressureTrendSensor?.attributes?.change_3h;
-  let pressLabel = pressureTendencyLabel(
-    change3h !== null && change3h !== undefined ? Number(change3h) : null,
-    pressureTrendSensor?.state || '',
-  );
-  // Fallback: if change_3h unavailable but sensor state is valid, use state directly
-  if (pressLabel === 'Press' && pressureTrendSensor?.state) {
-    const st = pressureTrendSensor.state;
-    // eslint-disable-next-line no-useless-assignment
-    if (st === 'rising') pressLabel = 'Rising';
-    // eslint-disable-next-line no-useless-assignment
-    else if (st === 'falling') pressLabel = 'Falling';
-  }
-
-  // Pressure stat colour — trend-based with neutral fallback
-  // eslint-disable-next-line no-unused-vars
-  const pressColor = trendColor || (pressureTrendSensor ? '#5ac8fa' : '');
-
-  const windColor = windTierColor(windSpeed);
-  // eslint-disable-next-line no-unused-vars
-  const bft = beaufort(windSpeed);
   const showGust = windGusts > windSpeed + 5;
-  const gustBold = windSpeed > 0 && windGusts / windSpeed > 1.5;
-  const gustStr = showGust
-    ? (gustBold ? ` / <b>${escapeHtml(Math.round(windGusts))}</b>` : ` / ${escapeHtml(Math.round(windGusts))}`)
-    : '';
-  // Number(undefined) === NaN makes CSS drop the whole transform; use the
-  // || 0 fallback so the compass still renders as N rather than unrotated.
-  const compassSvg = `<svg width="10" height="10" viewBox="0 0 10 10" style="vertical-align:middle;transform:rotate(${Number(windBearing) || 0}deg)"><polygon points="5,0 3,8 5,6 7,8" fill="${sanitizeCssValue(windColor)}" opacity="0.8"/></svg>`;
-  // eslint-disable-next-line no-unused-vars
-  const windValue = `${escapeHtml(Math.round(windSpeed))}${gustStr} ${compassSvg}${escapeHtml(dirLabel)}`;
-
-  // eslint-disable-next-line no-unused-vars
-  const arcGradient = `linear-gradient(to right, ${sanitizeCssValue(tempToColor(tempLow))}, ${sanitizeCssValue(tempToColor(tempHigh))})`;
-
-  /* Freezing level marker on the temperature arc — anchored at 0 °C. */
-  let freezeMarkerHtml = '';
-  if (freezeSensor && freezeLevel < 5000 && tempLow <= 0) {
-    const freezePct = Math.max(0, Math.min(100, ((0 - tempLow) / range) * 100));
-    const frzUnit = /** @type {string} */ (freezeSensor?.attributes?.unit_of_measurement || 'm');
-    // eslint-disable-next-line no-unused-vars
-    freezeMarkerHtml = `<div class="pw-arc-freeze" style="left:${Number(freezePct)}%">
-            <div class="pw-arc-freeze-label">\u2744 ${escapeHtml(String(Math.round(freezeLevel)))}${escapeHtml(frzUnit)}</div>
-            <div class="pw-arc-freeze-line"></div>
-          </div>`;
-  }
 
   // Two phases only — no golden / blue split. sun.sun is the single
   // source of truth: above_horizon → Day (sunrise → sunset, amber
@@ -475,11 +338,13 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
     }
     const markerStyle = `left:${Number(fillPct)}%; background:${sanitizeCssValue(labelColor)}; box-shadow: 0 0 6px ${sanitizeCssValue(labelColor)}66`;
     const labelStyle = ` style="color:${sanitizeCssValue(labelColor)}"`;
-    const arcOpacity = isDaytime ? '1' : '0.85';
     const markerIcon = isDaytime ? '' : '\u{1F319}';
 
+    /* No container opacity — it would multiply against the labels and drop the
+       night cyan under the contrast floor. The cyan fill and moon marker already
+       signal night. */
     dayArcHtml = `
-      <div class="pw-day-arc" style="opacity:${arcOpacity}">
+      <div class="pw-day-arc">
         <span class="pw-day-arc-label"${labelStyle}>${escapeHtml(leftLabel)}</span>
         <div class="pw-day-arc-bar">
           <div class="pw-day-arc-fill" style="width:${Number(fillPct)}%; ${fillStyle}"></div>
@@ -489,10 +354,8 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       </div>`;
   }
 
-  let precipBarHtml = '';
-  let capeBarHtml = '';
-  let comfortBarHtml = '';
-  let summaryHtml = '';
+  let narrativeText = '';
+  let stormBlock = '';
   const hourly = forecastData?.hourly || [];
   if (hourly.length > 0) {
     const now = new Date();
@@ -504,16 +367,12 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       now,
     );
     const slots = futureHourly.slice(0, 12);
-    const hasAnyPrecip = slots.some((h) => Number(h.precipitation_probability) > 0);
 
     const precipLabel = buildPrecipLabel(precipNow, precipUnit, rainNow, rainUnit, showersNow, showersUnit, snowfallNow, snowfallUnit);
-    // Real-time precip overrides narrative so users get an actionable
-    // first line during active rain instead of a forecast-shaped sentence.
+    /* Live precip outranks the forecast narrative during active rain. Plain
+       text: t.narrative takes a string, and buildPrecipLabel already escapes. */
     if (precipNow > 0) {
-      summaryHtml = `
-      <div class="pw-weather-summary" style="position:relative; z-index:2">
-        <span style="font-size:14px">\u{1F327}</span> ${precipLabel}
-      </div>`;
+      narrativeText = precipLabel;
     } else {
       const narrative = composeNarrative({
         now: new Date(),
@@ -525,120 +384,47 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
         stabilityState,
         timeZone,
       });
-      summaryHtml = `
-      <div class="pw-weather-summary" style="position:relative; z-index:2">
-        ${escapeHtml(narrative.sentence)}
-      </div>`;
+      narrativeText = narrative.sentence;
     }
 
-    if (hasAnyPrecip) {
-      const slotHtml = slots.map((h) => {
-        const prob = Math.min(100, Math.max(0, Number(h.precipitation_probability) || 0));
-        const hourSnow = Number(h.snowfall) || 0;
-        const hourRain = (Number(h.rain) || 0) + (Number(h.showers) || 0);
-        const isSnow = hourSnow > 0;
-        const isMixed = isSnow && hourRain > 0;
-        if (isMixed) {
-          const total = hourSnow + hourRain;
-          const snowPct = Math.round(prob * hourSnow / total);
-          const rainPct = prob - snowPct;
-          return `<div class="pulse-precip-slot"><div class="pulse-precip-fill" style="height:${Number(rainPct)}%"></div><div class="pulse-precip-fill pw-precip-snow" style="height:${Number(snowPct)}%"></div></div>`;
-        }
-        const fillClass = isSnow ? 'pulse-precip-fill pw-precip-snow' : 'pulse-precip-fill';
-        return `<div class="pulse-precip-slot"><div class="${fillClass}" style="height: ${prob}%"></div></div>`;
-      }).join('');
-
-
-
-      const midSlot = slots[Math.floor(slots.length / 2)];
-      const midHours = midSlot ? `+${Math.floor(slots.length / 2)}h` : '';
-
-      // eslint-disable-next-line no-unused-vars
-      precipBarHtml = `
-      <div style="position: relative; z-index: 2; margin: 16px var(--pulse-space-card-wide) 0;">
-        <div class="pw-precip-label">${precipLabel}</div>
-        <div class="pulse-precip-bar" role="img" aria-label="Precipitation probability" style="position:relative">${slotHtml}</div>
-        <div class="pw-precip-times"><span>Now</span><span>${escapeHtml(midHours)}</span><span>+${escapeHtml(String(slots.length))}h</span></div>
-      </div>`;
-    }
-
-    const hasCapeData = slots.some((h) => Number(h.cape) > 300);
-    if (hasCapeData) {
-      const sparkW = 200;
-      const sparkH = 24;
-      const spark = buildCapeSparklineSvg(slots, sparkW, sparkH);
-      const peakX = (spark.peakIndex / Math.max(slots.length - 1, 1)) * sparkW;
-      const peakLabel = spark.peakValue >= 1000
-        ? `${(spark.peakValue / 1000).toFixed(1)}k`
-        : String(Math.round(spark.peakValue));
+    /* 300 J/kg is the floor buildCapeSparklineSvg scales against — below it the
+       curve is flat at the baseline, so there is nothing to show. */
+    if (slots.some((h) => Number(h.cape) > 300)) {
+      const w = 320;
+      const h = 24;
+      const spark = buildCapeSparklineSvg(slots, w, h);
       const peakDt = slots[spark.peakIndex]?.datetime
         ? new Date(/** @type {string} */ (slots[spark.peakIndex].datetime))
         : null;
-      const peakTime = peakDt ? formatHHMM(peakDt, timeZone) : '';
-
-      const capeGradId = uniqueSvgId('pw-cape-grad');
-      // eslint-disable-next-line no-unused-vars
-      capeBarHtml = `
-      <div style="position: relative; z-index: 2; margin: 4px var(--pulse-space-card-wide) 0;">
-        <div class="pw-precip-label" style="font-size:10px">Storm risk</div>
-        <div style="position:relative">
-          <svg class="pw-cape-sparkline" width="100%" height="${sparkH}" viewBox="0 0 ${sparkW} ${sparkH}" preserveAspectRatio="none">
+      const peakLabel = spark.peakValue >= 1000
+        ? `${(spark.peakValue / 1000).toFixed(1)}k`
+        : String(Math.round(spark.peakValue));
+      const caption = peakDt
+        ? `storm risk · peak ${peakLabel} J/kg at ${formatHHMM(peakDt, timeZone)}`
+        : `storm risk · peak ${peakLabel} J/kg`;
+      const gradId = uniqueSvgId('pw-cape-grad');
+      stormBlock = `<div class="pw-overview-spark-block">
+        ${t.chartCaption(caption)}
+        <div class="pw-overview-storm">
+          <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(caption)}">
             <defs>
-              <linearGradient id="${capeGradId}" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#ff453a" stop-opacity="0.6"/>
-                <stop offset="33%" stop-color="#ff9f0a" stop-opacity="0.4"/>
-                <stop offset="66%" stop-color="#ffd60a" stop-opacity="0.3"/>
-                <stop offset="100%" stop-color="#30d158" stop-opacity="0.2"/>
+              <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--pw-warn-amber)" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="var(--pw-warn-amber)" stop-opacity="0.04"/>
               </linearGradient>
             </defs>
-            <path d="${spark.areaPath}" fill="url(#${capeGradId})"/>
-            <path d="${spark.svgPath}" fill="none" stroke="#ff9f0a" stroke-width="1.5"/>
+            <path d="${spark.areaPath}" fill="url(#${gradId})"/>
+            <path d="${spark.svgPath}" fill="none" stroke="var(--pw-warn-amber)" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          ${spark.peakValue > 0 ? `<div class="pw-cape-peak" style="left:${Number(peakX)}px">${escapeHtml(peakLabel)} ${escapeHtml(peakTime)}</div>` : ''}
         </div>
       </div>`;
     }
-
-    const hasDewData = slots.some((h) => h.dew_point !== undefined && h.dew_point !== null);
-    if (hasDewData) {
-      const comfortSlots = slots.map((h) => {
-        const dp = Number(h.dew_point) || 0;
-        return `<div class="pw-comfort-slot" style="background:${sanitizeCssValue(dewPointComfortColor(dp))}"></div>`;
-      }).join('');
-      // eslint-disable-next-line no-unused-vars
-      comfortBarHtml = `
-      <div style="position: relative; z-index: 2; margin: 2px var(--pulse-space-card-wide) 0;">
-        <div class="pw-precip-label" style="font-size:10px">Comfort</div>
-        <div class="pw-comfort-bar">${comfortSlots}</div>
-      </div>`;
-    }
   }
-
-  // Row 1: Wind (combined), Feels, Vis, Dew
-  // eslint-disable-next-line no-unused-vars
-  const feelsColor = tempToColor(feelsLike);
-  // eslint-disable-next-line no-unused-vars
-  const cloudColor = cloudCover !== null ? cloudCoverColor(cloudCover.total) : '';
-  // eslint-disable-next-line no-unused-vars
-  const humidColor = humidityColor(humidity);
-
-  // Pressure value — number + unit + trend symbol
-  // eslint-disable-next-line no-unused-vars
-  const pressValue = `${escapeHtml(Math.round(pressure))} ${escapeHtml(pressUnit)}${trendSymbol ? ` <span style="color:${sanitizeCssValue(trendColor)}">${escapeHtml(trendSymbol)}</span>` : ''}`;
-
-  // UV value with clear-sky comparison
-  // eslint-disable-next-line no-unused-vars
-  const uvValue = `${escapeHtml(Math.round(uvIndex))}${showClearSky ? ` <span style="opacity:0.5">/ ${escapeHtml(String(Math.round(uvClearSky)))}</span>` : ''}`;
 
   // \u2500\u2500 Hero first + narrative caption + 4-col stats \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const conditionLabel = formatCondition(condition);
   const variant = brandMarkVariant(condition, isNight);
   const locationLabel = config?.location_label || 'Now';
-  // Strip HTML tags from feels-context block \u2014 we want plain text in the
-  // hero condition line, not the existing pill markup.
-  const feelsPlain = feelsContextHtml ? feelsContextHtml.replace(/<[^>]*>/g, '').trim() : '';
-  // Strip the pre-built summary div wrapper to extract the narrative text.
-  const narrativeText = summaryHtml ? summaryHtml.replace(/<[^>]*>/g, '').trim() : '';
   const cloudPct = cloudCover ? Math.round(cloudCover.total) + '%' : '--';
 
   const heroFragment = `
@@ -720,6 +506,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
         ${t.narrative(narrativeText)}
         ${dayArcHtml}
         ${sparkBlock}
+        ${stormBlock}
         ${statsFragment}
         ${extendedStatsRow}`;
 

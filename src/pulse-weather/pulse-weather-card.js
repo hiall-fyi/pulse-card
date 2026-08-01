@@ -6,8 +6,9 @@
 import { VERSION, CARD_NAME, EDITOR_NAME, FORECAST_REFRESH_MS, LOG_PREFIX } from './constants.js';
 import { STYLES } from './styles.js';
 import { normalizeWeatherConfig } from './utils.js';
-// eslint-disable-next-line no-unused-vars -- audit gate requires escapeHtml import on any file using innerHTML; escaping is delegated to section renderers
-import { escapeHtml, buildGridOptions } from '../shared/utils.js';
+// eslint-disable-next-line no-unused-vars -- kept so any file assigning innerHTML has escapeHtml in scope; escaping itself is delegated to the section renderers
+import { escapeHtml, buildGridOptions, isReducedMotion } from '../shared/utils.js';
+import { makeActivatable } from '../shared/action-handler.js';
 import { discoverWeatherEntities, deriveSourceSlug } from './weather-resolver.js';
 import { deriveTodaySunBoundaries, anchorEventOn } from './weather-primitives.js';
 import { buildConditionFx, addAirHaze, addStars, addRays, addClouds } from './weather-fx.js';
@@ -482,7 +483,14 @@ class PulseWeatherCard extends HTMLElement {
   _postRender(_discovery) {
     if (!this.shadowRoot || !this._hass) return;
 
-    const fxContainers = this.shadowRoot.querySelectorAll('.pw-fx[data-condition]');
+    /* Skip generating purely decorative FX rather than painting hundreds of
+       nodes for CSS to freeze. Air haze is excluded — it gates itself, because
+       part of its output is static and data-bearing. */
+    const skipMotionFx = isReducedMotion();
+
+    const fxContainers = skipMotionFx
+      ? []
+      : this.shadowRoot.querySelectorAll('.pw-fx[data-condition]');
     for (const container of fxContainers) {
       const condition = container.getAttribute('data-condition') || '';
       const isNight = container.getAttribute('data-night') === 'true';
@@ -513,7 +521,9 @@ class PulseWeatherCard extends HTMLElement {
       }
     }
 
-    const astroFx = this.shadowRoot.querySelectorAll('.pw-fx[data-astro-stars]');
+    const astroFx = skipMotionFx
+      ? []
+      : this.shadowRoot.querySelectorAll('.pw-fx[data-astro-stars]');
     for (const container of astroFx) {
       const wantStars = container.getAttribute('data-astro-stars') === 'true';
       const isDay = container.getAttribute('data-astro-day') === 'true';
@@ -528,7 +538,9 @@ class PulseWeatherCard extends HTMLElement {
       container.replaceChildren(frag);
     }
 
-    const atmosFx = this.shadowRoot.querySelectorAll('.pw-atmos-fx[data-atmos-score]');
+    const atmosFx = skipMotionFx
+      ? []
+      : this.shadowRoot.querySelectorAll('.pw-atmos-fx[data-atmos-score]');
     for (const container of atmosFx) {
       const score = Number(container.getAttribute('data-atmos-score')) || 0;
       const color = container.getAttribute('data-atmos-color') || '#30d158';
@@ -610,6 +622,15 @@ class PulseWeatherCard extends HTMLElement {
       let startX = 0;
       let scrollLeft = 0;
 
+      /* Focusable scroll container — the browser's native arrow-key scrolling
+         covers keyboard access, so no key handler is needed. */
+      const stripEl = /** @type {HTMLElement} */ (strip);
+      stripEl.setAttribute('tabindex', '0');
+      stripEl.setAttribute('role', 'group');
+      if (!stripEl.hasAttribute('aria-label')) {
+        stripEl.setAttribute('aria-label', 'Hourly forecast, scrollable');
+      }
+
       strip.addEventListener('mousedown', (e) => {
         isDown = true;
         startX = /** @type {MouseEvent} */ (e).pageX - /** @type {HTMLElement} */ (strip).offsetLeft;
@@ -647,7 +668,7 @@ class PulseWeatherCard extends HTMLElement {
           atmosWrap.setAttribute('aria-expanded', 'true');
         }
 
-        atmosWrap.addEventListener('click', () => {
+        const toggleDetail = () => {
           this._atmosExpanded = !this._atmosExpanded;
           if (this._atmosExpanded) {
             /** @type {HTMLElement} */ (detailPanel).style.maxHeight = `${detailPanel.scrollHeight}px`;
@@ -656,7 +677,13 @@ class PulseWeatherCard extends HTMLElement {
             /** @type {HTMLElement} */ (detailPanel).style.maxHeight = '0';
             atmosWrap.setAttribute('aria-expanded', 'false');
           }
-        });
+        };
+
+        makeActivatable(/** @type {HTMLElement} */ (atmosWrap), toggleDetail);
+        if (!atmosWrap.hasAttribute('aria-expanded')) {
+          atmosWrap.setAttribute('aria-expanded', 'false');
+        }
+        atmosWrap.addEventListener('click', toggleDetail);
       }
     }
   }

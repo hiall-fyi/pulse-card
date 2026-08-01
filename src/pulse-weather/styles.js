@@ -35,10 +35,14 @@ ${SHARED_STYLES}
   /* ── Wabi palette (sumi / nezumi / senmai / shu) ────────────── */
   --pw-sky-top: #1d2530;
   --pw-sky-mid: #384452;
-  --pw-sky-bot: #827a6a;
+  /* The bottom stop is the lightest point of the sky and therefore the contrast
+     floor for all cream text. Do not lighten without re-running
+     tests/pulse-weather/styles-tokens.test.js. */
+  --pw-sky-bot: #413d35;
   --pw-ink-cream: #fdf6e3;
   --pw-ink-cream-muted: rgba(229, 217, 194, 0.85);
-  --pw-ink-cream-dim: rgba(229, 217, 194, 0.55);
+  /* 0.72 is the lowest alpha that clears 4.5:1 against --pw-sky-bot. */
+  --pw-ink-cream-dim: rgba(229, 217, 194, 0.72);
   --pw-vermilion: #a83d2a;
   --pw-wind: #5ac8fa;
   --pw-warn-amber: #ff9f0a;
@@ -145,43 +149,6 @@ ${SHARED_STYLES}
 
 /* ── Bottom Cards ──────────────────────────────────────────────── */
 
-/* Precipitation bar label */
-.pw-precip-label {
-  font-size: 12px;
-  color: var(--pulse-text-secondary);
-  margin-bottom: 6px;
-}
-
-/* Snow badge */
-.pw-snow-badge {
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  margin-top: 4px;
-  position: relative;
-  z-index: 2;
-  text-shadow: var(--pw-shadow-overlay);
-}
-
-/* Feels like context */
-.pw-feels-context {
-  font-size: 10px;
-  color: var(--pulse-text-secondary);
-  text-align: center;
-  position: relative;
-  z-index: 2;
-}
-
-/* Snow precip fill — white gradient (bottom opaque → top transparent) */
-.pw-precip-snow {
-  background: linear-gradient(to top, var(--pw-text-overlay, #d0d0d0), transparent) !important;
-}
-
-/* Rain precip fill — gradient (bottom opaque → top fade) */
-.pulse-precip-fill {
-  background: linear-gradient(to top, #5ac8fa, rgba(90,200,250,0.15));
-}
-
 /* CAPE storm risk bar */
 
 /* ── Forecast ──────────────────────────────────────────────────── */
@@ -240,7 +207,7 @@ ${SHARED_STYLES}
 
 .pw-wind-unit {
   font-size: 12px;
-  color: var(--pulse-text-secondary);
+  color: var(--pw-ink-cream-dim);
   margin-top: 2px;
 }
 
@@ -252,7 +219,7 @@ ${SHARED_STYLES}
 
 .pw-wind-beaufort-desc {
   font-size: 12px;
-  color: var(--pulse-text-secondary);
+  color: var(--pw-ink-cream-dim);
 }
 
 /* ── AQI Gauge ─────────────────────────────────────────────────── */
@@ -269,13 +236,6 @@ ${SHARED_STYLES}
   background: var(--pulse-bg-elevated);
   border-radius: var(--pulse-radius-row);
   border-left: 3px solid;
-}
-
-.pw-alert-locations {
-  font-size: 10px;
-  color: var(--pulse-text-secondary);
-  opacity: 0.85;
-  margin-top: 3px;
 }
 
 /* ── Atmosphere Column ──────────────────────────────────────────── */
@@ -301,8 +261,8 @@ ${SHARED_STYLES}
 
 .pw-atmos-scale-label {
   font-size: 9px;
-  color: var(--pulse-text-secondary);
-  opacity: 0.7;
+  /* No opacity here — the parent .pw-atmos-scale already sets 0.5. */
+  color: var(--pw-ink-cream-dim);
   font-variant-numeric: tabular-nums;
 }
 
@@ -436,7 +396,7 @@ ${SHARED_STYLES}
 
 .pw-atmos-detail-label {
   font-size: 10px;
-  color: var(--pulse-text-secondary);
+  color: var(--pw-ink-cream-dim);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -449,8 +409,7 @@ ${SHARED_STYLES}
 
 .pw-atmos-detail-desc {
   font-size: 9px;
-  color: var(--pulse-text-secondary);
-  opacity: 0.6;
+  color: var(--pw-ink-cream-dim);
 }
 
 /* ── Severity Dot ──────────────────────────────────────────────── */
@@ -686,54 +645,23 @@ ${SHARED_STYLES}
 }
 .pw-alert-row:last-child { border-bottom: none; }
 
-.pw-alert-locations {
-  font-size: 10px;
-  color: var(--pulse-text-secondary);
-  opacity: 0.5;
-  margin-top: 3px;
-}
-
-/* ── Weather Summary ────────────────────────────────────────────── */
-.pw-weather-summary { font-size: 13px; font-weight: 400; text-align: center; padding: 4px var(--pulse-space-card-wide) 8px; color: var(--pulse-text-primary); position: relative; z-index: 2; opacity: 0.85; }
-
 /* ── Day Progress Arc ──────────────────────────────────────────── */
 .pw-day-arc { display: flex; align-items: center; gap: var(--pulse-space-element); padding: 4px var(--pulse-space-card-wide) 8px; position: relative; z-index: 2; }
-.pw-day-arc-label { font-size: 10px; color: var(--pulse-text-secondary); font-variant-numeric: tabular-nums; opacity: 0.6; }
+.pw-day-arc-label { font-size: 10px; color: var(--pw-ink-cream-dim); font-variant-numeric: tabular-nums; }
 .pw-day-arc-bar { flex: 1; height: 2px; border-radius: var(--pulse-radius-hairline); background: var(--pulse-bg-elevated); position: relative; }
 .pw-day-arc-fill { height: 100%; border-radius: var(--pulse-radius-hairline); background: linear-gradient(to right, #ff9f0a, #ffd60a); }
 .pw-day-arc-marker { position: absolute; top: -3px; width: 8px; height: 8px; background: #ffd60a; border-radius: var(--pulse-radius-circle); border: 1px solid rgba(0,0,0,0.2); transform: translateX(-50%); box-shadow: 0 0 6px rgba(255,214,10,0.4); }
 
-/* ── Stability Badge ───────────────────────────────────────────── */
-.pw-stability-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: var(--pulse-radius-element); margin-left: 6px; vertical-align: middle; }
-
-/* ── Precip Time Markers ───────────────────────────────────────── */
-.pw-precip-times { display: flex; justify-content: space-between; font-size: 9px; color: var(--pulse-text-secondary); opacity: 0.6; margin-top: 2px; }
-
-/* ── Freezing Level Marker (Temp Arc) ──────────────────────────── */
-.pw-arc-freeze { position: absolute; top: -6px; bottom: -6px; width: 1px; transform: translateX(-50%); }
-.pw-arc-freeze-line { width: 1px; height: 100%; background: var(--pw-color-freeze); opacity: 0.5; }
-.pw-arc-freeze-label { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--pw-color-freeze); white-space: nowrap; }
-
-/* ── CAPE Sparkline ────────────────────────────────────────────── */
-.pw-cape-sparkline { display: block; border-radius: var(--pulse-radius-bar); overflow: hidden; }
-.pw-cape-peak { position: absolute; top: -12px; transform: translateX(-50%); font-size: 8px; color: var(--pulse-tier-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-/* ── Comfort Bar (Dew Point) ───────────────────────────────────── */
-.pw-comfort-bar { display: flex; gap: var(--pulse-space-hairline); height: 4px; border-radius: var(--pulse-radius-bar); overflow: hidden; }
-.pw-comfort-slot { flex: 1; border-radius: var(--pulse-radius-hairline); }
-
+/* Backstop for animation declared in markup. weather-fx.js and wind.js set
+   animation as an inline style, which outranks a plain declaration — hence
+   !important. The primary gate skips generating FX entirely, in
+   pulse-weather-card.js _postRender. */
 @media (prefers-reduced-motion: reduce) {
-  .pw-streak,
-  .pw-dust-particle,
-  .pw-haze-blob,
-  .pw-tension-wash.breathing,
-  .pw-tension-vignette,
-  .pw-radar::after,
-  .pw-radar-blip,
-  .pw-thermal-particle {
+  :host,
+  :host *,
+  :host *::before,
+  :host *::after {
     animation: none !important;
-  }
-  .pw-atmos-detail {
     transition: none !important;
   }
 }
@@ -1032,7 +960,11 @@ div.pw-brand-mark-corner {
 .pw-overview-v2 .pw-overview-spark {
   height: 38px;
 }
-.pw-overview-v2 .pw-overview-spark svg {
+.pw-overview-v2 .pw-overview-storm {
+  height: 24px;
+}
+.pw-overview-v2 .pw-overview-spark svg,
+.pw-overview-v2 .pw-overview-storm svg {
   width: 100%;
   height: 100%;
   display: block;

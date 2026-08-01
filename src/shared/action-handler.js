@@ -12,6 +12,32 @@ export const DOUBLE_TAP_WINDOW = 250;
 export const HOLD_THRESHOLD = 500;
 
 /**
+ * Make a non-semantic element (`div` / `span`) keyboard-operable: sets `role` +
+ * `tabindex` and binds Enter/Space to `onActivate`.
+ *
+ * `role` and `tabindex` are set unconditionally, so a wrong pre-existing role is
+ * corrected. `preventDefault` is already called; nested activatables must
+ * `stopPropagation` themselves or the ancestor also fires. Ripple is not
+ * attached — call `attachRipple` separately where tap feedback is wanted.
+ *
+ * @param {HTMLElement} el - Element to make operable.
+ * @param {(ev: KeyboardEvent) => void} onActivate - Invoked on Enter/Space.
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal] - Ties the listener to the caller's AbortController.
+ * @param {string} [options.role='button'] - ARIA role ('button', 'tab', ...).
+ */
+export function makeActivatable(el, onActivate, { signal, role = 'button' } = {}) {
+  el.setAttribute('role', role);
+  el.setAttribute('tabindex', '0');
+  el.addEventListener('keydown', (ev) => {
+    const kev = /** @type {KeyboardEvent} */ (ev);
+    if (kev.key !== 'Enter' && kev.key !== ' ') return;
+    kev.preventDefault();
+    onActivate(kev);
+  }, signal ? { signal } : undefined);
+}
+
+/**
  * Dispatch a CustomEvent that bubbles through Shadow DOM.
  * @param {HTMLElement} element - Element to dispatch from.
  * @param {string} type - Event type.

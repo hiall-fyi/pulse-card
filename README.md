@@ -15,7 +15,7 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)
 
 <!-- Status Badges -->
-![Version](https://img.shields.io/badge/Version-1.9.0-purple?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.1-purple?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
 ![Maintained](https://img.shields.io/badge/Maintained-Yes-green.svg?style=for-the-badge)
 
@@ -164,6 +164,16 @@ sections:
 
 ---
 
+## Accessibility
+
+Every tappable thing on a card is also reachable with a keyboard. Tab moves between rows, chips, and tab strips; Enter or Space activates whatever has focus; the focus ring follows your Home Assistant accent colour. Bar rows you can drag also respond to the arrow keys.
+
+If your system is set to reduce motion, the cards honour it: the Weather Card skips its rain, snow, cloud, and lightning effects entirely rather than freezing them mid-frame. The air-quality haze is the exception, since its tint carries the pollution reading, so that stays and only the drifting dust is dropped.
+
+Two gaps worth knowing about. The Climate Card's timeline, heatmap, and radial charts are still pointer-only for drill-down, though the same room data is reachable through the zone rows above them. And the Weather Card's sections paint their own dark backdrop by design, so they stay dark in a light Home Assistant theme.
+
+---
+
 ## Development
 
 ```bash
@@ -196,8 +206,6 @@ See [LICENSE](LICENSE) for full details.
 **Built with ❤️ for the Home Assistant community.**
 
 [Report Bug](https://github.com/hiall-fyi/pulse-card/issues) • [Request Feature](https://github.com/hiall-fyi/pulse-card/discussions)
-
-[![Star History Chart](https://api.star-history.com/svg?repos=hiall-fyi/pulse-card&type=Date)](https://star-history.com/#hiall-fyi/pulse-card&Date)
 
 </div>
 

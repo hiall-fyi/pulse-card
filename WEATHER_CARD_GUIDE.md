@@ -66,7 +66,7 @@ Sections marked "Needs Atmos CE" require entities from the [Atmos CE](https://gi
 
 ### overview
 
-The hero section: current temperature in large type, a contextual weather summary, a day/night progress arc, a 7-day temperature sparkline, and a stats grid. It reads the Beaufort wind scale, dew-point comfort, visibility category, pressure trend, UV index, and cloud cover when Atmos CE sensors are available, and falls back gracefully to standard weather entity attributes.
+The hero section: current temperature in large type, a contextual weather summary, a day/night progress arc, a 7-day temperature sparkline, and a stats grid. It reads dew-point comfort, visibility category, pressure trend, UV index, and cloud cover when Atmos CE sensors are available, and falls back gracefully to standard weather entity attributes. The Beaufort scale reading lives in the `wind` section.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
@@ -79,7 +79,7 @@ sections:
     location_label: Home
 ```
 
-The day/night arc shows progress from sunrise to sunset (daytime, amber) or from sunset to tomorrow's sunrise (night, blue). Colour-coded precipitation probability bars appear below the summary when rain is in the next 12 hours. A storm-risk sparkline appears when CAPE data is available from Atmos CE.
+The day/night arc shows progress from sunrise to sunset (daytime, amber) or from sunset to tomorrow's sunrise (night, blue). A storm-risk sparkline appears below the stats when the next 12 hours carry meaningful CAPE from Atmos CE, captioned with the peak value and the hour it lands. For hour-by-hour precipitation, add the `meteogram` section.
 
 ### forecast
 
@@ -300,6 +300,7 @@ card_mod:
 | `.pw-hero-block` | Hero temperature and condition line |
 | `.pw-day-arc` | The sunrise/sunset progress arc |
 | `.pw-overview-spark` | The 7-day sparkline container (pro view) |
+| `.pw-overview-storm` | The storm-risk sparkline container |
 
 **Forecast:**
 
