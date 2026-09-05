@@ -579,7 +579,7 @@ export function particleConfig(score) {
  * Build thermal particle DOM elements for atmosphere column.
  * @param {number} score - Instability score 0–100.
  * @param {string} tierColor - Tier hex color (e.g. '#ff453a').
- * @param {function(): number} [rng=Math.random] - Random number generator (DI for testing).
+ * @param {() => number} [rng=Math.random] - Random number generator (DI for testing).
  * @returns {DocumentFragment} Fragment containing particle elements.
  */
 export function buildThermalParticles(score, tierColor, rng = Math.random) {

@@ -90,10 +90,10 @@ function isSafeNavigationPath(path) {
 /**
  * Execute an action based on the resolved action config.
  * @param {HTMLElement} element - Element to dispatch events from.
- * @param {{callService: function(string, string, Record<string, *>=): Promise<*>}} hass - Home Assistant instance with callService method.
+ * @param {{callService: (domain: string, service: string, serviceData?: Record<string, *>) => Promise<*>}} hass - Home Assistant instance with callService method.
  * @param {Record<string, *>} actionConfig - Action config object.
  * @param {string} entityId - Default entity ID for more-info / toggle.
- * @param {function(string, ...*): void} warnFn - Warning logger function (card-specific prefix).
+ * @param {(message: string, ...args: *[]) => void} warnFn - Warning logger function (card-specific prefix).
  */
 export function executeAction(element, hass, actionConfig, entityId, warnFn) {
   if (!actionConfig || actionConfig.action === 'none') return;

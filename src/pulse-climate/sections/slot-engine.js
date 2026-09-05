@@ -76,7 +76,7 @@ export function computeSlots(data, slots, windowMs, timeZone) {
 /**
  * Render a continuous SVG strip from slot data (timeline mode).
  * @param {SlotData[]} slotData
- * @param {function(number): string} colorFn - Maps value → CSS color string.
+ * @param {(value: number) => string} colorFn - Maps value → CSS color string.
  * @param {StripOptions} [options]
  * @returns {string} HTML string for the strip container.
  */
@@ -111,7 +111,7 @@ export function renderTimelineStrip(slotData, colorFn, options = {}) {
 /**
  * Render a grid of HTML div cells from slot data (heatmap mode).
  * @param {SlotData[]} slotData
- * @param {function(number): string} colorFn - Maps value → CSS color string.
+ * @param {(value: number) => string} colorFn - Maps value → CSS color string.
  * @param {StripOptions} [_options]
  * @returns {string} HTML string for the cells container.
  */
