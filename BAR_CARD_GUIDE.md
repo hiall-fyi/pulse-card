@@ -141,10 +141,10 @@ severity:
     to: 20
     color: "#F44336"           # red
     icon: "mdi:battery-alert"  # optional: change icon too
-  - from: 21
+  - from: 20
     to: 50
     color: "#FF9800"           # orange
-  - from: 51
+  - from: 50
     to: 100
     color: "#4CAF50"           # green
 ```
@@ -454,11 +454,11 @@ severity:
     to: 20
     color: "#F44336"
     icon: "mdi:battery-alert"
-  - from: 21
+  - from: 20
     to: 50
     color: "#FF9800"
     icon: "mdi:battery-50"
-  - from: 51
+  - from: 50
     to: 100
     color: "#4CAF50"
     icon: "mdi:battery"
@@ -570,15 +570,15 @@ severity:
     to: 20
     color: "#F44336"
     icon: "mdi:battery-alert"
-  - from: 21
+  - from: 20
     to: 50
     color: "#FF9800"
     icon: "mdi:battery-50"
-  - from: 51
+  - from: 50
     to: 80
     color: "#8BC34A"
     icon: "mdi:battery-70"
-  - from: 81
+  - from: 80
     to: 100
     color: "#4CAF50"
     icon: "mdi:battery"

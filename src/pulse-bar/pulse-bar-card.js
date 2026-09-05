@@ -25,6 +25,7 @@ import {
   resolveDecimal,
   resolveUnit,
   resolveTarget,
+  resolveTargetEntityId,
   resolveSecondaryInfo,
   normalizeConfig,
   sanitizeCssValue,
@@ -147,10 +148,10 @@ class PulseBarCard extends HTMLElement {
         needsRender = true;
         break;
       }
-      const targetCfg = ec.target ?? this._cfg.target;
-      if (typeof targetCfg === 'string') {
-        const tState = hass.states[targetCfg];
-        const tPrev = this._prevStates[`__target__${targetCfg}`];
+      const targetId = resolveTargetEntityId(ec.target ?? this._cfg.target);
+      if (targetId) {
+        const tState = hass.states[targetId];
+        const tPrev = this._prevStates[`__target__${targetId}`];
         if (!tPrev || tPrev.state !== tState?.state || tPrev.last_updated !== tState?.last_updated) {
           needsRender = true;
           break;
@@ -252,16 +253,19 @@ class PulseBarCard extends HTMLElement {
     const scaledFill = bs.fill * barWidthScale;
     const fillDim = `width:${scaledFill}%;${transitionStyle}${fillStyle}`;
 
-    const targetHtml = this._buildTargetHtml(ec, cfg, bs.min, bs.max);
+    const { lineHtml: targetLineHtml, labelRowHtml: targetLabelRowHtml } = this._buildTargetHtml(ec, cfg, bs.min, bs.max);
     const sparklineHtml = this._buildSparklineHtml(ec, cfg);
 
     const barContainerHtml = `
-      <div class="pb-container" style="height:${height};border-radius:${borderRadius};--pb-animation-speed:${animSpeed}s;">
-        <div class="pb-track"></div>
-        ${sparklineHtml}
-        <div class="pb-fill${chargeClass}" data-entity="${escapeHtml(ec.entity)}" style="${fillDim}"></div>
-        ${targetHtml}
-        ${contentHtml}
+      <div class="pb-bar-stack">
+        ${targetLabelRowHtml}
+        <div class="pb-container" style="height:${height};border-radius:${borderRadius};--pb-animation-speed:${animSpeed}s;">
+          <div class="pb-track"></div>
+          ${sparklineHtml}
+          <div class="pb-fill${chargeClass}" data-entity="${escapeHtml(ec.entity)}" style="${fillDim}"></div>
+          ${targetLineHtml}
+          ${contentHtml}
+        </div>
       </div>`;
 
     const isInteractive = !!(ec.interactive ?? cfg.interactive);
@@ -342,25 +346,28 @@ class PulseBarCard extends HTMLElement {
   }
 
   /**
-   * Build target marker HTML.
+   * Build target marker HTML: the in-bar line (clipped, same as the fill)
+   * and, if `show_label`, a label row rendered as a sibling before the bar
+   * so its text stays visible instead of clipping with the line.
    * @param {EntityConfig} ec
    * @param {NormalizedConfig} cfg
    * @param {number} min
    * @param {number} max
-   * @returns {string}
+   * @returns {{lineHtml: string, labelRowHtml: string}}
    */
   _buildTargetHtml(ec, cfg, min, max) {
     const targetCfg = ec.target ?? cfg.target;
     const { value: targetNum, showLabel } = resolveTarget(targetCfg, this._hass);
-    if (targetNum === null) return '';
+    if (targetNum === null) return { lineHtml: '', labelRowHtml: '' };
 
     const targetPct = clamp((targetNum - min) / (max - min), 0, 1) * 100;
     const barWidthScale = computeBarWidthScale(ec, cfg);
     const targetPos = `left:${targetPct * barWidthScale}%`;
-    const labelHtml = showLabel
-      ? `<span class="pb-target-label">${escapeHtml(targetNum)}</span>`
+    const lineHtml = `<div class="pb-target" style="${targetPos}"></div>`;
+    const labelRowHtml = showLabel
+      ? `<div class="pb-target-label-row"><span class="pb-target-label" style="${targetPos}">${escapeHtml(targetNum)}</span></div>`
       : '';
-    return `<div class="pb-target" style="${targetPos}">${labelHtml}</div>`;
+    return { lineHtml, labelRowHtml };
   }
 
   /**
@@ -424,18 +431,28 @@ class PulseBarCard extends HTMLElement {
 
       /** @type {HTMLElement|null} */
       const targetEl = /** @type {HTMLElement|null} */ (row.querySelector('.pb-target'));
+      // Label is its own row now (see _buildTargetHtml), not a .pb-target
+      // child, so its position/visibility need updating separately.
+      const labelEl = /** @type {HTMLElement|null} */ (row.querySelector('.pb-target-label'));
       const targetCfg = ec.target ?? cfg.target;
       const { value: targetNum } = resolveTarget(targetCfg, this._hass);
       if (targetNum !== null) {
         const targetPct = clamp((targetNum - bs.min) / (bs.max - bs.min), 0, 1) * 100;
+        const leftPct = `${targetPct * barWidthScale}%`;
         if (targetEl) {
-          targetEl.style.left = `${targetPct * barWidthScale}%`;
+          targetEl.style.left = leftPct;
           targetEl.style.display = '';
-          const labelEl = targetEl.querySelector('.pb-target-label');
-          if (labelEl) labelEl.textContent = String(targetNum);
         }
-      } else if (targetEl) {
-        targetEl.style.display = 'none';
+        if (labelEl) {
+          labelEl.style.left = leftPct;
+          labelEl.textContent = String(targetNum);
+          const labelRow = /** @type {HTMLElement|null} */ (labelEl.closest('.pb-target-label-row'));
+          if (labelRow) labelRow.style.display = '';
+        }
+      } else {
+        if (targetEl) targetEl.style.display = 'none';
+        const labelRow = /** @type {HTMLElement|null} */ (row.querySelector('.pb-target-label-row'));
+        if (labelRow) labelRow.style.display = 'none';
       }
     }
   }
@@ -697,11 +714,11 @@ class PulseBarCard extends HTMLElement {
           last_updated: state.last_updated,
         };
       }
-      const targetCfg = ec.target ?? cfg.target;
-      if (typeof targetCfg === 'string') {
-        const tState = this._hass?.states[targetCfg];
+      const targetId = resolveTargetEntityId(ec.target ?? cfg.target);
+      if (targetId) {
+        const tState = this._hass?.states[targetId];
         if (tState) {
-          this._prevStates[`__target__${targetCfg}`] = {
+          this._prevStates[`__target__${targetId}`] = {
             state: tState.state,
             last_updated: tState.last_updated,
           };

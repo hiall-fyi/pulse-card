@@ -230,7 +230,7 @@ export function renderDonut(segments, opts = {}) {
   svg += `</svg>`;
 
   let center = `<div class="pc-donut-center">`;
-  const numStyleAttr = centerNumStyle ? ` style="${centerNumStyle}"` : '';
+  const numStyleAttr = centerNumStyle ? ` style="${sanitizeCssValue(centerNumStyle)}"` : '';
   center += `<div class="pc-donut-center-num"${numStyleAttr}>${escapeHtml(Math.round(total))}</div>`;
   if (centerLabel !== undefined && centerLabel !== null) {
     center += `<div class="pc-donut-center-label">${escapeHtml(centerLabel)}</div>`;

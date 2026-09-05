@@ -46,7 +46,7 @@ export function temporalAnchor(now, timeZone) {
  * @property {Array<HourlySlot>} slots - Hourly forecast slots, next 6h preferred.
  * @property {number} windSpeed - Current wind speed km/h.
  * @property {string} stabilityState - Atmos CE stability_assessment.
- * @property {number} uvIndex
+ * @property {number|null} uvIndex
  * @property {string} [timeZone] - IANA zone from resolveHassTimeZone; undefined → browser-local time-of-day anchor.
  */
 

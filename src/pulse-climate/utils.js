@@ -387,7 +387,7 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
     overlayType = attrs.overlay_type;
   }
 
-  const name = zoneConfig.name || attrs.friendly_name || entityId.replace(/^(climate|sensor)\./, '');
+  const name = zoneConfig.name || attrs.friendly_name || extractZoneName(entityId);
   const icon = zoneConfig.icon || attrs.icon || 'mdi:thermometer';
 
   const chipFilter = zoneConfig.chips || cardConfig.chips || null;
