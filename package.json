@@ -1,6 +1,6 @@
 {
   "name": "pulse-card",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "private": true,
   "description": "Compact horizontal bar chart card for Home Assistant sensor data visualization",
   "author": "hiall-fyi",
@@ -12,7 +12,7 @@
   "type": "module",
   "scripts": {
     "prebuild": "node scripts/inline-fonts.mjs",
-    "build": "npm run build:pulse-card && npm run build:pulse-switch && npm run build:pulse-weather",
+    "build": "npm run build:pulse-card && npm run build:pulse-weather && ([ -d src/pulse-switch ] && npm run build:pulse-switch || true)",
     "build:pulse-card": "esbuild src/pulse-bar/pulse-bar-card.js --bundle --outfile=dist/pulse-card.js --format=esm --minify --external:./pulse-bar-card-editor.js --external:./pulse-climate-editor.js --external:./pulse-weather-card-editor.js && node -e \"const f='dist/pulse-card.js';require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace('./pulse-bar-card-editor.js','./pulse-card-editor.js'))\" && esbuild src/pulse-bar/pulse-bar-card-editor.js --bundle --outfile=dist/pulse-card-editor.js --format=esm --minify && esbuild src/pulse-climate/pulse-climate-editor.js --bundle --outfile=dist/pulse-climate-editor.js --format=esm --minify && esbuild src/pulse-weather/pulse-weather-card-editor.js --bundle --outfile=dist/pulse-weather-card-editor.js --format=esm --minify",
     "build:pulse-switch": "esbuild src/pulse-switch/pulse-switch-card.js --bundle --outfile=dist/pulse-switch-card.js --format=esm --minify --external:./pulse-switch-card-editor.js && node -e \"const f='dist/pulse-switch-card.js';require('fs').writeFileSync(f,require('fs').readFileSync(f,'utf8').replace('./pulse-switch-card-editor.js','./pulse-switch-editor.js'))\" && esbuild src/pulse-switch/pulse-switch-card-editor.js --bundle --outfile=dist/pulse-switch-editor.js --format=esm --minify",
     "build:pulse-weather": "esbuild src/pulse-weather/pulse-weather-card.js --bundle --outfile=dist/pulse-weather-card.js --format=esm --minify --external:./pulse-weather-card-editor.js && esbuild src/pulse-weather/pulse-weather-card-editor.js --bundle --outfile=dist/pulse-weather-card-editor.js --format=esm --minify",
@@ -27,19 +27,19 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/coverage-v8": "^4.1.11",
     "esbuild": "^0.28.0",
     "eslint": "^10.0.0",
     "eslint-plugin-no-unsanitized": "^4.1.5",
     "eslint-plugin-security": "^4.0.0",
     "fast-check": "^4.7.0",
     "globals": "^17.4.0",
-    "jsdom": "^29.0.0",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "jsdom": "^30.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   },
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=22.22.2",
     "npm": ">=10.0.0"
   }
 }

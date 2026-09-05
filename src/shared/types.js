@@ -50,8 +50,8 @@ export {};
  * @typedef {object} Hass
  * @property {Record<string, HassEntityState>} states
  * @property {Record<string, HassEntityRegistryEntry>} [entities]
- * @property {function(string, string, Record<string, *>=): Promise<void>} callService
- * @property {function(Record<string, *>): Promise<*>} [callWS]
+ * @property {(domain: string, service: string, serviceData?: Record<string, *>) => Promise<void>} callService
+ * @property {(request: Record<string, *>) => Promise<*>} [callWS]
  * @property {{time_zone?: string}} [config] - HA system config; `time_zone` is the server's IANA zone.
  * @property {{time_zone?: string}} [locale] - User profile locale; `time_zone` is 'local' | 'server' (see resolveHassTimeZone).
  */

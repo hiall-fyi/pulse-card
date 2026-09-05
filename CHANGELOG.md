@@ -2,7 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+
+## [1.9.2] - 2026-09-05
+
+### Bar Card
+
+#### Bug fixes
+
+- **A gradient bar with three or more colour stops stopped blending after the first pair.** Anything past the second stop's start rendered as a flat colour instead of continuing the smooth blend `mode: gradient` promises. A disk-usage bar with green → orange → red stops, for example, jumped straight to solid orange, then solid red, with no blending at either boundary. Two-stop gradients were unaffected.
+- **A `target` set as `{ value: entity_id }` stopped following its entity.** The marker and its label only moved when the bar's *main* entity changed. Moving the reference entity on its own, an `input_number` used as a temperature target, for example, left the target line stuck until something else on the card happened to update at the same time.
+- **The target's label (`show_label: true`) is now actually visible.** It has rendered above the bar exactly as documented since the option was added, but sat entirely outside the bar's own clipped edge, so it never showed at any bar height. It now gets its own reserved space above the bar instead of floating past the clip.
+
+### Climate Card
+
+#### Bug fixes
+
+- **Hot-water zones now discover their history and overlay chip.** A zone configured through a `water_heater.*` entity, the shape Tado CE's boiler/hot-water zones use, couldn't find any of its related sensors: the temperature sparkline stayed blank and the overlay chip never showed, with no explanation anywhere in the card. The zone lookup only recognised `climate`, `sensor`, and `binary_sensor` entities; it now recognises `water_heater` too.
+
+#### Security
+
+- **A mould or condensation risk chip no longer trusts its sensor's state text outright.** The chip's severity styling read that text directly rather than checking it against the handful of values the card actually understands, so a state containing stray quote marks could interfere with the chip's own markup. It's now checked against the known severities first.
+
+### Weather Card
+
+#### Bug fixes
+
+- **Renaming your weather entity no longer freezes the card.** With no `weather_entity` set in the card config (the card finds one on its own), renaming that entity from Home Assistant's Settings → Entities (no dashboard edit needed) left the card showing its last render forever, with nothing to say why. It now picks up the new entity right away.
+- **The EU air-quality scale's "Poor" band gets its own colour, not "Fair"'s.** On the EU 1–6 scale, "Poor" (AQI 60–80, described by the EU as health effects possible for everyone) was sharing a mild yellow badge with "Fair" and "Moderate" instead of a clearly worse one.
+- **An unavailable air-quality sensor no longer shows as "Good".** A missing reading was coerced to zero, the cleanest possible score, so the card confidently reported clean air with no data behind it. It now hides the section instead, the same as any other missing sensor.
+- **An unavailable UV sensor no longer shows as UV 0.** Same issue as the air-quality one above, on the overview's UV stat: a missing reading read as the safest possible value instead of "no data". It now shows "--" instead.
+- **The atmosphere column no longer shows "0 J/kg" of storm energy when the CAPE sensor is unavailable.** The same coercion showed up here too, and it doubled as the switch deciding whether to show the CAPE and Lifted Index detail rows at all, so an unavailable sensor didn't just show a wrong number, it also kept a "Stable" reading and its detail rows on screen with nothing behind them. Both now correctly disappear when there's no reading to show.
+- **A new or cleared weather alert can now appear right away, not up to a minute late.** The card's change-detection check covered the weather entity and Atmos CE's atmospheric sensors but not its alert sensors, so a firing or clearing alert only showed up once the card's regular 60-second refresh caught up.
 
 
 ## [1.9.1] - 2026-08-01

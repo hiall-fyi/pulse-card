@@ -64,8 +64,8 @@ export async function loadEditorHelpers(logPrefix) {
  *
  * @param {number} index - Current row index.
  * @param {number} total - Total number of rows.
- * @param {function(number, number): void} onMove - Callback(index, direction).
- * @param {function(number): void} onRemove - Callback(index).
+ * @param {(index: number, direction: number) => void} onMove - Callback(index, direction).
+ * @param {(index: number) => void} onRemove - Callback(index).
  * @returns {import('lit').TemplateResult}
  */
 export function renderReorderButtons(index, total, onMove, onRemove) {

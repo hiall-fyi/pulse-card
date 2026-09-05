@@ -14,8 +14,8 @@ npm install
 
 ```bash
 npm run build              # Build all cards → dist/
-npm run build:pulse-card   # Build Pulse Card only
-npm run build:pulse-climate # Build Pulse Climate Card only
+npm run build:pulse-card   # Build Bar Card + Climate/Weather editors
+npm run build:pulse-weather # Build Weather Card only
 npm run dev                # Watch mode (Pulse Card)
 ```
 
@@ -68,25 +68,17 @@ src/
 │   ├── feature-availability.js     #   Per-section capability gating
 │   └── sections/                   #   One file per section type (zones, radial,
 │       └── …                       #   energy-flow, thermal, donut, slot-engine, …)
-├── pulse-weather/                  # Pulse Weather Card
-│   ├── pulse-weather-card.js       #   Main class
-│   ├── pulse-weather-card-editor.js#   Visual editor
-│   ├── styles.js                   #   CSS (--pw-* tokens, .pw-* classes)
-│   ├── constants.js                #   Section types, scales, sensor keys + VERSION
-│   ├── type-system.js              #   `t` text/layout builder (kicker, hero, stats)
-│   ├── section-shell.js            #   Section frame with brand-mark corner toggle
-│   ├── weather-fx.js               #   Atmospheric effect layers
-│   ├── weather-resolver.js         #   Atmos CE auto-discovery
-│   └── sections/                   #   overview, forecast, meteogram, wind, astro,
-│       └── …                       #   air-quality, alerts, atmosphere
-└── pulse-switch/                   # Pulse Switch Card (pre-release, staging only)
-    ├── pulse-switch-card.js        #   Main class
-    ├── pulse-switch-card-editor.js #   Visual editor
-    ├── styles.js                   #   CSS (--ps-* tokens, .ps-* classes)
-    ├── constants.js                #   Defaults + VERSION (independent of the family line)
-    ├── activity-led.js             #   Port activity LED
-    ├── utils.js                    #   Speed formatting, port type detection
-    └── types.js                    #   JSDoc typedefs
+└── pulse-weather/                  # Pulse Weather Card
+    ├── pulse-weather-card.js       #   Main class
+    ├── pulse-weather-card-editor.js#   Visual editor
+    ├── styles.js                   #   CSS (--pw-* tokens, .pw-* classes)
+    ├── constants.js                #   Section types, scales, sensor keys + VERSION
+    ├── type-system.js              #   `t` text/layout builder (kicker, hero, stats)
+    ├── section-shell.js            #   Section frame with brand-mark corner toggle
+    ├── weather-fx.js               #   Atmospheric effect layers
+    ├── weather-resolver.js         #   Atmos CE auto-discovery
+    └── sections/                   #   overview, forecast, meteogram, wind, astro,
+        └── …                       #   air-quality, alerts, atmosphere
 ```
 
 ## Pull Request Guidelines

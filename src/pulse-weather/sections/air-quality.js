@@ -45,7 +45,10 @@ function categoryLabelToTierKey(label) {
   if (l.includes('very unhealthy') || l.includes('hazardous') || l.includes('extremely poor')) return 'very_unhealthy';
   if (l.includes('sensitive')) return 'unhealthy_sg';
   if (l.includes('unhealthy') || l.includes('very poor')) return 'unhealthy';
-  if (l.includes('moderate') || l.includes('fair') || l.includes('poor')) return 'moderate';
+  // EU's bare "Poor" (health effects possible for everyone) is genuinely
+  // worse than "Fair"/"Moderate" and must not share their bucket.
+  if (l.includes('poor')) return 'unhealthy_sg';
+  if (l.includes('moderate') || l.includes('fair')) return 'moderate';
   if (l.includes('good')) return 'good';
   return 'unknown';
 }
@@ -73,7 +76,10 @@ export function renderAirQuality({ hass, config, discovery, weatherEntity: _weat
   if (!aqiEntityId || !hass.states[aqiEntityId]) return null;
 
   const aqiEntity = hass.states[aqiEntityId];
-  const aqiValue = Number(aqiEntity.state) || 0;
+  const aqiValue = Number(aqiEntity.state);
+  // An unavailable/unknown AQI entity must not read as AQI 0 ("Good"),
+  // the best possible reading, when there's no data at all.
+  if (!Number.isFinite(aqiValue)) return null;
   const ceCategory = /** @type {string|null} */ (aqiEntity.attributes?.category || null);
   const ceColor = /** @type {string|null} */ (aqiEntity.attributes?.color || null);
 

@@ -231,9 +231,12 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   }
 
   const uvSensor = discovery.atmosCe.uv_index;
-  const uvIndex = uvSensor
-    ? Number(hass.states[uvSensor]?.state) || 0
-    : Number(attrs.uv_index ?? 0);
+  const uvRaw = uvSensor
+    ? Number(hass.states[uvSensor]?.state)
+    : Number(attrs.uv_index);
+  // An unavailable/missing UV reading must not read as UV 0 (no burn risk).
+  // null so the stat tile shows "--" instead of a confidently wrong safe value.
+  const uvIndex = Number.isFinite(uvRaw) ? uvRaw : null;
 
   const { value: precipNow, unit: precipUnitRaw } = readSensorValue(hass, ce.precipitation);
   const precipUnit = /** @type {string} */ (precipUnitRaw || 'mm');
@@ -437,7 +440,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const statsFragment = t.statsRow([
     t.stat(`${Math.round(tempLow)}/${Math.round(tempHigh)}\u00b0`, 'range'),
     t.stat(`${Math.round(windSpeed)}${showGust ? ` / ${Math.round(windGusts)}` : ''} ${dirLabel}`, showGust ? 'wind / gust' : 'wind'),
-    t.stat(Math.round(uvIndex), 'uv'),
+    t.stat(uvIndex !== null ? Math.round(uvIndex) : '--', 'uv'),
     t.stat(cloudPct, 'cloud'),
   ], { columns: 4 });
 

@@ -105,10 +105,10 @@ function instabilityTier(score) {
  * @property {number|null} score - Instability score 0–100 (for fill height).
  * @property {string} source - 'composite' or 'fallback'.
  * @property {Record<string, unknown>|null} attrs - Composite sensor extra_state_attributes (or null).
- * @property {number} capeValue - Raw CAPE value (J/kg), 0 if unavailable.
- * @property {number} liValue - Raw Lifted Index value, 0 if unavailable.
- * @property {boolean} hasCape - Whether CAPE sensor is available.
- * @property {boolean} hasLI - Whether Lifted Index sensor is available.
+ * @property {number} capeValue - Raw CAPE value (J/kg), 0 if no usable reading.
+ * @property {number} liValue - Raw Lifted Index value, 0 if no usable reading.
+ * @property {boolean} hasCape - Whether the CAPE sensor has a usable (finite) reading.
+ * @property {boolean} hasLI - Whether the Lifted Index sensor has a usable (finite) reading.
  */
 
 /**
@@ -122,13 +122,15 @@ function instabilityTier(score) {
 export function resolveStabilityTier(hass, discovery) {
   const ce = discovery.atmosCe;
 
-  // Always compute score from CAPE + LI for fill height
-  const capeValue = ce.cape && hass.states[ce.cape]
-    ? Number(hass.states[ce.cape].state) || 0 : 0;
-  const liValue = ce.lifted_index && hass.states[ce.lifted_index]
-    ? Number(hass.states[ce.lifted_index].state) || 0 : 0;
-  const hasCape = !!(ce.cape && hass.states[ce.cape]);
-  const hasLI = !!(ce.lifted_index && hass.states[ce.lifted_index]);
+  // Always compute score from CAPE + LI for fill height. hasCape/hasLI mean
+  // "is there a usable number", not just "does the entity exist". An
+  // unavailable sensor must not read as CAPE/LI 0 (the calmest reading).
+  const capeParsed = ce.cape && hass.states[ce.cape] ? Number(hass.states[ce.cape].state) : NaN;
+  const liParsed = ce.lifted_index && hass.states[ce.lifted_index] ? Number(hass.states[ce.lifted_index].state) : NaN;
+  const hasCape = Number.isFinite(capeParsed);
+  const hasLI = Number.isFinite(liParsed);
+  const capeValue = hasCape ? capeParsed : 0;
+  const liValue = hasLI ? liParsed : 0;
   const score = (hasCape || hasLI) ? instabilityScore(capeValue, liValue) : null;
 
   // Primary: Atmos CE composite assessment sensor
@@ -577,7 +579,7 @@ export function particleConfig(score) {
  * Build thermal particle DOM elements for atmosphere column.
  * @param {number} score - Instability score 0–100.
  * @param {string} tierColor - Tier hex color (e.g. '#ff453a').
- * @param {function(): number} [rng=Math.random] - Random number generator (DI for testing).
+ * @param {() => number} [rng=Math.random] - Random number generator (DI for testing).
  * @returns {DocumentFragment} Fragment containing particle elements.
  */
 export function buildThermalParticles(score, tierColor, rng = Math.random) {

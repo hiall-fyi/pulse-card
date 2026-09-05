@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests, section ideas, and new-card suggestions are all
+        welcome here. If you'd rather float a rough idea first, [Discussions](https://github.com/hiall-fyi/pulse-card/discussions)
+        works just as well. This template is for when you already have a
+        concrete ask.
+  - type: checkboxes
+    attributes:
+      label: Before you start
+      options:
+        - label: I have searched the existing issues and discussions for this
+          required: true
+  - type: dropdown
+    id: card
+    attributes:
+      label: Which card does this concern?
+      options:
+        - Pulse Bar Card
+        - Pulse Climate Card
+        - Pulse Weather Card
+        - A new card
+        - Not card-specific
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What are you trying to do that you can't do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution
+      description: How you imagine it working, if you have a shape in mind.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Existing workaround, if any
