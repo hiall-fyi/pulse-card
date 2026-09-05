@@ -35,7 +35,7 @@
     "fast-check": "^4.7.0",
     "globals": "^17.4.0",
     "jsdom": "^30.0.1",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   },
   "engines": {
