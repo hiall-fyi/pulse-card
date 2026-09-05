@@ -237,11 +237,11 @@ function discoverZonesViaRegistry(entities, zoneNames, states) {
   for (const zoneName of zoneNames) {
     zoneEntities[zoneName] = {};
 
-    const climateEntityId = `climate.${zoneName}`;
-    const climateEntry = entities[climateEntityId];
-    if (!climateEntry?.device_id || climateEntry.platform !== 'tado_ce') continue;
+    // Hot-water zones have no climate entity; anchor on water_heater instead.
+    const anchorEntry = entities[`climate.${zoneName}`] ?? entities[`water_heater.${zoneName}`];
+    if (!anchorEntry?.device_id || anchorEntry.platform !== 'tado_ce') continue;
 
-    const deviceId = climateEntry.device_id;
+    const deviceId = anchorEntry.device_id;
 
     // Single scan: find all Tado CE entities sharing this device_id
     for (const [entityId, entry] of Object.entries(entities)) {
@@ -434,5 +434,5 @@ export function resetDiscoveryCache() {
  * @returns {string}
  */
 export function extractZoneName(entityId) {
-  return entityId.replace(/^(climate|sensor|binary_sensor)\./, '');
+  return entityId.replace(/^(climate|water_heater|sensor|binary_sensor)\./, '');
 }

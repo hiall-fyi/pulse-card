@@ -111,11 +111,14 @@ class PulseWeatherCard extends HTMLElement {
    * Cached entity discovery. Result depends only on weather_entity / atmos_source
    * config + the current hass.states keys — neither moves at typical render rates,
    * so caching saves the per-render scan of ~50 sensor keys × hass.states lookups.
-   * Invalidated on setConfig.
+   * Invalidated on setConfig, or here if the cached weather entity id no
+   * longer exists in hass.states. Covers an in-place entity rename in
+   * auto-discovery mode, which would otherwise freeze _fullRender permanently.
    * @returns {import('./types.js').WeatherDiscovery}
    */
   _getDiscovery() {
-    if (!this._discovery) {
+    const cachedId = this._discovery?.weatherEntityId;
+    if (!this._discovery || (cachedId && !(cachedId in /** @type {Hass} */ (this._hass).states))) {
       this._discovery = discoverWeatherEntities(
         /** @type {Hass} */ (this._hass).states,
         /** @type {Record<string, *>} */ (this._config),
@@ -139,6 +142,12 @@ class PulseWeatherCard extends HTMLElement {
       const eid = ce[key];
       const e = hass.states[eid];
       if (e) parts.push(`${key}=${e.state}`);
+    }
+    // Alert entities aren't part of atmosCe. Without this a new/cleared
+    // Meteoalarm warning wouldn't trigger a render until the 60s minute-tick.
+    for (const eid of discovery.alertEntityIds) {
+      const e = hass.states[eid];
+      if (e) parts.push(`${eid}=${e.state}`);
     }
     return parts.join('|');
   }

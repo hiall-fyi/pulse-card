@@ -89,6 +89,21 @@ export const STYLES = `${SHARED_STYLES}
     white-space: nowrap;
   }
 
+  /* Stacks the optional target-label row above the bar container, so the
+     label gets real layout height instead of a clipped negative offset. */
+  .pb-bar-stack {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  /* Reserves the height .pb-target-label sits in. */
+  .pb-target-label-row {
+    position: relative;
+    height: 14px;
+    margin-bottom: 2px;
+  }
+
   /* Bar container */
   .pb-container {
     position: relative;
@@ -145,11 +160,10 @@ export const STYLES = `${SHARED_STYLES}
     box-shadow: 0 0 0 1px var(--pulse-bg-card);
   }
 
-  /* Target label */
+  /* Target label. left is set inline per-instance, matching .pb-target's own. */
   .pb-target-label {
     position: absolute;
-    top: -18px;
-    left: 50%;
+    top: 0;
     transform: translateX(-50%);
     font-size: var(--pulse-font-caption);
     font-weight: var(--pulse-weight-medium);
@@ -312,7 +326,7 @@ export const STYLES = `${SHARED_STYLES}
     align-items: stretch;
     gap: var(--pulse-space-hairline);
   }
-  .pb-row[data-interactive] .pb-interactive-row .pb-container {
+  .pb-row[data-interactive] .pb-interactive-row .pb-bar-stack {
     flex: 1;
     min-width: 0;
   }

@@ -126,7 +126,7 @@ function resolveGradientColor(value, severityArray) {
   for (let i = 0; i < sorted.length - 1; i++) {
     const lower = sorted[i];
     const upper = sorted[i + 1];
-    if (num >= lower.from && num <= upper.to) {
+    if (num >= lower.from && num <= upper.from) {
       const range = upper.from - lower.from;
       const t = range > 0 ? (num - lower.from) / range : 0;
       return interpolateColor(lower.color, upper.color, clamp(t, 0, 1));
@@ -395,6 +395,18 @@ export function normalizeConfig(config) {
   }
 
   return merged;
+}
+
+/**
+ * Extract the entity id a target config tracks, if any (string form, or
+ * object `{ value: '<entity_id>' }` form; a numeric `value` tracks nothing).
+ * @param {number|string|import('./types.js').TargetObjectConfig|undefined|null} target
+ * @returns {string|null}
+ */
+export function resolveTargetEntityId(target) {
+  if (typeof target === 'string') return target;
+  if (target && typeof target === 'object' && typeof target.value === 'string') return target.value;
+  return null;
 }
 
 /**

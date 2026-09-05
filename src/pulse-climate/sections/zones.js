@@ -11,6 +11,9 @@ import { resolveHistoryTempSensor } from '../sensor-resolver.js';
 import { temperatureToColor, buildFilledSparkline, buildSparklineDataAttr, buildBloomFilter } from '../chart-primitives.js';
 import { buildSparklinePath } from '../../shared/utils.js';
 
+// The only severities styles.js actually paints (pc-severity-high/-medium/-critical).
+const VALID_SEVERITIES = new Set(['high', 'medium', 'critical']);
+
 /**
  * Render a single zone row HTML.
  * @param {import('../types.js').ZoneState} zs - Resolved zone state.
@@ -119,7 +122,8 @@ function renderZoneRow(zs, zoneConfig, cardConfig, sparklineData, timeZone) {
   if (zs.chips.length > 0) {
     html += `<div class="pc-zone-chips">`;
     for (const chip of zs.chips) {
-      const severityClass = chip.severity ? ` pc-severity-${chip.severity.toLowerCase()}` : '';
+      const sev = chip.severity ? String(chip.severity).toLowerCase() : '';
+      const severityClass = VALID_SEVERITIES.has(sev) ? ` pc-severity-${sev}` : '';
       const colorStyle = chip.color ? ` style="color:${sanitizeCssValue(chip.color)}"` : '';
       const entityAttr = chip.entityId ? ` data-entity="${escapeHtml(chip.entityId)}"` : '';
       html += `<span class="pc-chip${severityClass}"${colorStyle}${entityAttr} data-chip-type="${escapeHtml(chip.type)}">`;
