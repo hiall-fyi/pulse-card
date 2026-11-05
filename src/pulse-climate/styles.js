@@ -8,7 +8,7 @@
 import { SHARED_STYLES } from '../shared/styles.js';
 
 export const STYLES = `${SHARED_STYLES}
-/* Master pulse phase — typed CSS variable interpolated by :host animation.
+/* Master pulse phase: typed CSS variable interpolated by :host animation.
    Sub-elements that breathe read calc(... * var(--pc-pulse-phase)) so all
    motion stays in lockstep without any JS timer. Reduced-motion locks the
    variable at its initial value (0.5, mid-state) and suspends the host
@@ -31,7 +31,7 @@ export const STYLES = `${SHARED_STYLES}
 :host {
   display: block;
 
-  /* Card-local design tokens — override via card-mod or HA theme.
+  /* Card-local design tokens: override via card-mod or HA theme.
      Family-shared concerns (text colour, body type size, card chrome
      background, surface tint) live on --pulse-* and are inherited via
      SHARED_STYLES; only Climate-specific knobs declare locally. */
@@ -43,15 +43,15 @@ export const STYLES = `${SHARED_STYLES}
   --pc-gauge-radius: 3px;
   --pc-graph-height: 80px;
 
-  /* Hearth wash — static bottom-edge ember glow over --pulse-bg-card.
+  /* Hearth wash: static bottom-edge ember glow over --pulse-bg-card.
      Atmosphere module (state-driven conic gradient) animates over the top. */
   --pc-hearth-glow-inner: rgba(255, 138, 70, 0.10);
   --pc-hearth-glow-mid:   rgba(180, 70, 50, 0.04);
 
-  /* Section-local typography — values used by only one section, kept card-local
+  /* Section-local typography, values used by only one section, kept card-local
      so they don't pollute the shared token surface. */
-  --pc-detail-name: 15px;   /* zone detail panel — clicked-zone heading */
-  --pc-detail-stat: 22px;   /* zone detail panel — primary stat value */
+  --pc-detail-name: 15px;   /* zone detail panel: clicked-zone heading */
+  --pc-detail-stat: 22px;   /* zone detail panel: primary stat value */
 }
 
 ha-card {
@@ -67,7 +67,7 @@ ha-card {
   color: var(--pulse-text-primary);
 }
 
-/* Title — adds layout margin on top of shared typography. */
+/* Title: adds layout margin on top of shared typography. */
 .pulse-title { margin-bottom: 12px; }
 
 /* Section container */
@@ -114,7 +114,7 @@ ha-card {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Leading state ribbon — colour set by .pc-row-{state} below */
+/* Leading state ribbon: colour set by .pc-row-{state} below */
 .pc-row-ribbon {
   position: absolute;
   left: 0; top: 6px; bottom: 6px;
@@ -183,7 +183,7 @@ ha-card {
   min-width: 0;
 }
 
-/* State hierarchy aggregator — driven by rowStateClass() in utils.js.
+/* State hierarchy aggregator: driven by rowStateClass() in utils.js.
    Granular pc-row-heat / -cool / -off etc. stay for ribbon colour and
    per-state visual cues; aggregators (active / mid / quiet) drive the
    unified text + dim treatment across every section. */
@@ -311,7 +311,11 @@ ha-card {
   bottom: 0;
   border-radius: inherit;
   transition: width var(--pulse-anim-fill) ease, background-color var(--pulse-anim-mode) ease;
+  background: var(--pc-status-color, var(--pulse-text-secondary));
 }
+/* HomeKit saved-calls bar: a static full-width accent track behind the
+   reads-proportion fill, nothing here is ever dynamic. */
+.pc-power-bar-fill.pc-hk-write-track { width: 100%; --pc-status-color: var(--pulse-accent); }
 .pc-power-bar-fill.pc-bar-active {
   box-shadow: 0 0 8px 1px var(--pc-bar-glow, rgba(255, 152, 0, 0.4));
   animation: pc-bar-pulse 2.5s ease-in-out infinite;
@@ -333,7 +337,7 @@ ha-card {
   align-items: center;
   gap: var(--pulse-space-tight);
   font-size: var(--pulse-font-label);
-  color: var(--pulse-text-secondary);
+  color: var(--pc-status-color, var(--pulse-text-secondary));
   white-space: nowrap;
   cursor: pointer;
   position: relative;
@@ -445,7 +449,7 @@ ha-card {
   margin: 0;
 }
 
-/* API breakdown row inside the API tab — donut + legend chips side by side */
+/* API breakdown row inside the API tab: donut + legend chips side by side */
 .pc-api-breakdown-row {
   display: flex;
   align-items: center;
@@ -479,9 +483,9 @@ ha-card {
   margin-top: 4px;
 }
 
-/* Donut arcs — largest auto-blooms via inline filter attr (per-instance unique
+/* Donut arcs: largest auto-blooms via inline filter attr (per-instance unique
    id from renderDonut), idle dim 0.6. CSS does not set filter so inline attr
-   wins. Hover lifts opacity only — bloom stays anchored to active. */
+   wins. Hover lifts opacity only, bloom stays anchored to active. */
 .pc-donut-arc {
   opacity: 0.6;
   transition: opacity var(--pulse-anim-medium);
@@ -517,7 +521,7 @@ ha-card {
 }
 .pc-sparkline-filled.pc-sparkline-prominent { height: 40px; }
 
-/* Zone Pulse mode — waveform as row background */
+/* Zone Pulse mode: waveform as row background */
 .pc-zone-row-pulse {
   position: relative;
   height: 56px;
@@ -577,7 +581,7 @@ ha-card {
 }
 .pc-heating-glow { animation: pc-glow-pulse 3s ease-in-out infinite; }
 
-/* Heating row glow — warm border shadow */
+/* Heating row glow: warm border shadow */
 .pc-zone-row-pulse.pc-heating {
   animation: pc-row-glow 3s ease-in-out infinite;
 }
@@ -586,7 +590,7 @@ ha-card {
   50% { box-shadow: 0 0 16px 2px rgba(255, 152, 0, 0.4), inset 0 0 14px 2px rgba(255, 152, 0, 0.1); }
 }
 
-/* Strip rows — shared by thermal-strip's .pc-timeline-row and
+/* Strip rows: shared by thermal-strip's .pc-timeline-row and
    comfort-strip's .pc-heatmap-row. */
 .pc-section-thermal-strip .pc-timeline-row,
 .pc-section-comfort-strip .pc-heatmap-row {
@@ -627,7 +631,7 @@ ha-card {
   text-overflow: ellipsis;
   transition: color var(--pulse-anim-base);
 }
-/* Strip container — shared by thermal strip and comfort strip (timeline mode) */
+/* Strip container: shared by thermal strip and comfort strip (timeline mode) */
 .pc-section-thermal-strip .pc-strip-container,
 .pc-section-comfort-strip .pc-strip-container {
   flex: 1;
@@ -658,7 +662,7 @@ ha-card {
   color: var(--pulse-text-secondary);
 }
 
-/* Strip tooltip — shared by timeline and heatmap */
+/* Strip tooltip: shared by timeline and heatmap */
 .pc-strip-tooltip {
   position: absolute;
   top: -26px;
@@ -705,10 +709,10 @@ ha-card {
   z-index: 4;
 }
 
-/* Comfort Heatmap — HTML div cells for hover/click */
+/* Comfort Heatmap: HTML div cells for hover/click */
 .pc-section-comfort-strip .pc-heatmap-body { padding: 4px 0; position: relative; }
 
-/* Heatmap cells — shared by comfort strip, thermal strip (heatmap mode),
+/* Heatmap cells: shared by comfort strip, thermal strip (heatmap mode),
    and timeline-group's Thermal tab. */
 .pc-section-comfort-strip .pc-cells,
 .pc-section-thermal-strip .pc-cells,
@@ -777,6 +781,7 @@ ha-card {
 
 /* Energy Flow */
 .pc-ribbon-active { /* animation handled by SVG <animate> on gradient */ }
+.pc-flow-zone-text { cursor: pointer; }
 .pc-ribbon { cursor: pointer; transition: opacity var(--pulse-anim-base); }
 .pc-ribbon:hover { opacity: 1 !important; }
 .pc-ribbon.pc-dimmed { opacity: 0.2; }
@@ -1048,12 +1053,25 @@ ha-card {
   --mdc-icon-size: 36px;
   display: block;
   margin: 0 auto 6px;
+  color: var(--pc-status-color, var(--pulse-text-primary));
 }
 .pc-home-status-label {
   font-size: var(--pulse-font-large);
   font-weight: var(--pulse-weight-medium);
   margin-bottom: 4px;
+  color: var(--pc-status-color, var(--pulse-text-primary));
 }
+/* Finite status enum: colour set here, never via inline style.
+   --pc-bar-glow mirrors HVAC_VISUALS' fallback hex, only ever read by
+   .pc-power-bar-fill.pc-bar-active's box-shadow. */
+.pc-status-green    { --pc-status-color: var(--pulse-tier-moderate); --pc-bar-glow: #30d15840; }
+.pc-status-amber    { --pc-status-color: var(--pulse-tier-strong);   --pc-bar-glow: #ff9f0a40; }
+.pc-status-red      { --pc-status-color: var(--pulse-tier-gale);     --pc-bar-glow: #ff453a40; }
+.pc-status-accent   { --pc-status-color: var(--pulse-accent); }
+.pc-status-blue     { --pc-status-color: var(--pulse-tier-calm);     --pc-bar-glow: #5ac8fa40; }
+.pc-status-disabled { --pc-status-color: var(--pulse-disabled);      --pc-bar-glow: #61616140; }
+.pc-status-drying   { --pc-status-color: #9C27B0; --pc-bar-glow: #9C27B040; }
+.pc-status-fan      { --pc-status-color: #607D8B; --pc-bar-glow: #607D8B40; }
 .pc-home-status-detail {
   font-size: var(--pulse-font-kicker);
   color: var(--pulse-text-secondary);
@@ -1137,13 +1155,14 @@ ha-card {
   top: 0;
   height: 100%;
   border-radius: var(--pulse-radius-tight);
+  background: var(--pc-status-color, var(--pulse-text-secondary));
 }
 .pc-home-status-delta-text {
   font-size: var(--pulse-font-label);
   font-variant-numeric: tabular-nums;
   width: 40px;
   text-align: right;
-  color: var(--pulse-text-secondary);
+  color: var(--pc-status-color, var(--pulse-text-secondary));
 }
 .pc-home-status-summary {
   display: flex;
@@ -1242,6 +1261,7 @@ ha-card {
   height: 100%;
   border-radius: var(--pulse-radius-small);
   transition: width var(--pulse-anim-reveal) ease, background var(--pulse-anim-color) ease;
+  background: var(--pc-status-color, transparent);
 }
 .pc-rank-value {
   font-size: var(--pulse-font-body);
@@ -1279,7 +1299,7 @@ ha-card {
   .pc-api-row { flex-direction: column; }
 }
 
-/* Temperature transition glow — brief brightness flash on temp change */
+/* Temperature transition glow: brief brightness flash on temp change */
 .pc-temp-transitioning {
   filter: brightness(1.4);
   transition: filter var(--pulse-anim-mode) ease-in, filter var(--pulse-anim-fill) ease-out var(--pulse-anim-mode);
@@ -1339,7 +1359,7 @@ ha-card {
   font-variant-numeric: tabular-nums;
 }
 
-/* Per-zone dot cluster — breathes via master pulse phase */
+/* Per-zone dot cluster: breathes via master pulse phase */
 .pc-hero-dots {
   display: flex; align-items: center;
   gap: 10px; flex: 0 1 auto;
@@ -1371,7 +1391,7 @@ ha-card {
 .pc-hero-zone-dot.pc-hero-dot-off,
 .pc-hero-zone-dot.pc-hero-dot-unavail { background: rgba(255,255,255,0.15); opacity: 0.3; }
 
-/* Per-zone strip block — N rows of 24 cells, left-edge state ribbon */
+/* Per-zone strip block: N rows of 24 cells, left-edge state ribbon */
 .pc-hero-strips {
   display: flex; flex-direction: column;
   gap: 3px;
@@ -1472,7 +1492,7 @@ ha-card {
   z-index: 1;
 }
 
-/* Scoped to :host, not .pc-card-content — the atmosphere wash is a sibling of
+/* Scoped to :host, not .pc-card-content, the atmosphere wash is a sibling of
    that wrapper and the master pulse animates the host itself. Pinning the phase
    to 0.5 rests pulsing elements at their neutral size. */
 @media (prefers-reduced-motion: reduce) {
@@ -1610,7 +1630,7 @@ ha-card {
 .pc-state-legend-pip-idle { background: rgba(255, 255, 255, 0.08); }
 .pc-state-legend-pip-off  { background: rgba(255, 255, 255, 0.025); }
 
-/* State row tap-for-details — single-zone drill-down. Compare overlay is
+/* State row tap-for-details: single-zone drill-down. Compare overlay is
    intentionally not offered (categorical state timelines don't read
    stacked; the multi-row layout itself is the compare view). */
 .pc-state-row { cursor: pointer; border-radius: var(--pulse-radius-pill); transition: background var(--pulse-anim-fast); }
@@ -1626,7 +1646,7 @@ ha-card {
   text-align: right;
 }
 
-/* Thermal tab temperature legend — colour pips paired with anchor temps */
+/* Thermal tab temperature legend: colour pips paired with anchor temps */
 .pc-temp-legend {
   display: flex; gap: var(--pulse-space-element);
   flex-wrap: wrap;
@@ -1643,6 +1663,26 @@ ha-card {
   width: 10px; height: 10px;
   border-radius: 2px;
 }
+/* One rule per TEMP_COLOR_BANDS entry (chart-primitives.js), indexed by
+   array position, keep both in sync if the band colours ever change. */
+.pc-temp-legend-pip.pc-temp-band-0  { background: #1565C0; }
+.pc-temp-legend-pip.pc-temp-band-1  { background: #4FC3F7; }
+.pc-temp-legend-pip.pc-temp-band-2  { background: #4DB6AC; }
+.pc-temp-legend-pip.pc-temp-band-3  { background: #81C784; }
+.pc-temp-legend-pip.pc-temp-band-4  { background: #AED581; }
+.pc-temp-legend-pip.pc-temp-band-5  { background: #C5E1A5; }
+.pc-temp-legend-pip.pc-temp-band-6  { background: #FFF176; }
+.pc-temp-legend-pip.pc-temp-band-7  { background: #FFB74D; }
+.pc-temp-legend-pip.pc-temp-band-8  { background: #FF8A65; }
+.pc-temp-legend-pip.pc-temp-band-9  { background: #FF7043; }
+.pc-temp-legend-pip.pc-temp-band-10 { background: #F4511E; }
+.pc-temp-legend-pip.pc-temp-band-11 { background: #EF5350; }
+.pc-temp-legend-pip.pc-temp-band-12 { background: #EC407A; }
+.pc-temp-legend-pip.pc-temp-band-13 { background: #E91E63; }
+.pc-temp-legend-pip.pc-temp-band-14 { background: #D81B60; }
+.pc-temp-legend-pip.pc-temp-band-15 { background: #C2185B; }
+.pc-temp-legend-pip.pc-temp-band-16 { background: #AD1457; }
+.pc-temp-legend-pip.pc-temp-band-17 { background: #880E4F; }
 
 /* State timeline cells (consumed by state-timeline-view) */
 .pc-state-timeline-cells {

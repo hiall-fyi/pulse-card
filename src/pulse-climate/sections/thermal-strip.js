@@ -4,7 +4,7 @@
  * humidity history color-coded. Supports timeline (SVG strip) and heatmap
  * (HTML div grid) rendering modes. Attribute config controls temperature
  * or humidity display.
- * Pure renderer — no side effects, no DOM access.
+ * Pure renderer: no side effects, no DOM access.
  */
 
 import { escapeHtml } from '../../shared/utils.js';
@@ -47,9 +47,7 @@ export function renderThermalStripSection(zones, sectionConfig, states, discover
   html += `<span class="pc-section-subtitle">Tap a zone for details</span>`;
   html += `</div>`;
 
-  /* Temperature heatmap delegates the body to thermal-heatmap-view (same
-     renderer powers the timeline_group Thermal tab). Timeline mode and
-     humidity heatmap take the inline path below. */
+  // Temperature heatmap delegates to thermal-heatmap-view (shared with the timeline_group Thermal tab); other modes stay inline.
   if (mode === 'heatmap' && !isHumidity) {
     html += `<div class="pc-zone-detail" id="timeline-detail"></div>`;
     html += renderThermalHeatmapView(zones, states, discovery, historyCache, timeZone);

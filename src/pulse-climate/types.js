@@ -6,7 +6,7 @@
 export {};
 
 /**
- * HA-framework typedefs are shared — see src/shared/types.js.
+ * HA-framework typedefs are shared; see src/shared/types.js.
  * @typedef {import('../shared/types.js').ActionConfig} ActionConfig
  * @typedef {import('../shared/types.js').Hass} Hass
  * @typedef {import('../shared/types.js').HassEntityState} HassEntityState
@@ -96,9 +96,13 @@ export {};
  * @property {boolean} isUnavailable
  * @property {number|null} currentTemp - Current temperature.
  * @property {number|null} targetTemp - Target temperature.
+ * @property {{low: number, high: number}|null} targetRange - Heat/cool band of a range thermostat, else null.
  * @property {number|null} humidity - Current humidity %.
  * @property {number} heatingPower - Heating power 0-100 (0 if unavailable).
  * @property {number} coolingPower - AC power 0-100 (0 if unavailable).
+ * @property {boolean} hasPowerData - True when a readable heating or AC power source exists.
+ * @property {boolean} hasHeatingPowerData - True when a readable heating power source exists.
+ * @property {boolean} hasAcPowerData - True when a readable AC power sensor exists.
  * @property {string} hvacAction - 'heating' | 'cooling' | 'idle' | 'off' | 'drying' | 'fan'.
  * @property {string} hvacMode - 'heat' | 'cool' | 'auto' | 'off' | etc.
  * @property {string} presetMode - 'home' | 'away' | etc.
@@ -115,7 +119,7 @@ export {};
  * @property {string} type - Chip type identifier.
  * @property {string} icon - MDI icon.
  * @property {string} label - Display text.
- * @property {string} [color] - Optional color override.
+ * @property {string} [tier] - Finite colour tier (green/amber/red/blue/accent/disabled/drying/fan) rendered via a pc-status-* class.
  * @property {string} [severity] - Risk level for color coding.
  * @property {string} [entityId] - Source entity ID for tap-to-entity (omit = use zone climate entity).
  */
@@ -165,6 +169,7 @@ export {};
  * @property {number} timestamp - Cache creation time (Date.now()).
  * @property {Record<string, {t:number, v:number}[]>} data - Entity ID → numeric data points.
  * @property {Record<string, {t:number, state:string, power:number}[]>} [stateData] - Entity ID → HVAC state history.
+ * @property {Record<string, number>} [fetchedAt] - Per-key fetch time; key is the entity id, or `state:<id>` for state history.
  */
 
 /**
@@ -215,7 +220,7 @@ export {};
 
 /**
  * @typedef {object} EnergyFlowOptions
- * @property {'energy_flow'} type - Section type.
+ * @property {'energy_flow'|'energy_flow_ac'} type - Section type.
  */
 
 /**

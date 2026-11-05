@@ -27,7 +27,7 @@ function isNonEmptyString(val) {
  * Resolve the best temperature sensor entity for history data.
  *
  * Resolution chain (first non-empty match wins):
- * 1. zoneConfig.temperature_entity  (YAML override — no existence check; user intent wins)
+ * 1. zoneConfig.temperature_entity  (YAML override, no existence check; user intent wins)
  * 2. climate attributes.external_temp_sensor  (Tado CE external sensor)
  * 3. discovery.zoneEntities[zoneName].temperature  (auto-discovered)
  * 4. climateEntityId  (climate entity fallback)
@@ -60,7 +60,7 @@ export function resolveHistoryTempSensor(climateEntityId, states, zoneEntities, 
  * Resolve the best humidity sensor entity for history data.
  *
  * Resolution chain (first non-empty match wins):
- * 1. zoneConfig.humidity_entity  (YAML override — no existence check; user intent wins)
+ * 1. zoneConfig.humidity_entity  (YAML override, no existence check; user intent wins)
  * 2. climate attributes.external_humidity_sensor  (Tado CE external sensor)
  * 3. discovery.zoneEntities[zoneName].humidity  (auto-discovered)
  * 4. null  (no humidity data available)

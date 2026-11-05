@@ -6,13 +6,13 @@
 
 import { FAMILY_VERSION } from '../shared/version.js';
 
-/** Pulse Bar Card version — tracks the shared family release line. */
+/** Pulse Bar Card version, tracks the shared family release line. */
 export const VERSION = FAMILY_VERSION;
 
 /** Console log prefix. */
 export const LOG_PREFIX = 'Pulse Card:';
 
-/** Default configuration values — opinionated minimal style. */
+/** Default configuration values, opinionated minimal style. */
 export const DEFAULTS = {
   min: 0,
   max: 100,

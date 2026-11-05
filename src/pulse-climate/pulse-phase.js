@@ -1,7 +1,7 @@
 /**
  * @module pulse-climate/pulse-phase
  * @description Idempotent attach point for the master pulse phase. The animation
- * itself lives in styles.js (`:host { animation: pc-master-pulse 4s ... }`) — this
+ * itself lives in styles.js (`:host { animation: pc-master-pulse 4s ... }`), this
  * module exists so future host-side wiring (cross-card sync, debug toggles) has
  * a single attach point.
  */

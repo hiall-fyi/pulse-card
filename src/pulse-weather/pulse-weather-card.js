@@ -1,13 +1,13 @@
 /**
  * @module pulse-weather/pulse-weather-card
- * @description Main card element — lifecycle, section dispatch, and DOM management.
+ * @description Main card element: lifecycle, section dispatch, and DOM management.
  */
 
 import { VERSION, CARD_NAME, EDITOR_NAME, FORECAST_REFRESH_MS, LOG_PREFIX } from './constants.js';
 import { STYLES } from './styles.js';
 import { normalizeWeatherConfig } from './utils.js';
 // eslint-disable-next-line no-unused-vars -- kept so any file assigning innerHTML has escapeHtml in scope; escaping itself is delegated to the section renderers
-import { escapeHtml, buildGridOptions, isReducedMotion } from '../shared/utils.js';
+import { escapeHtml, buildGridOptions, isReducedMotion, setHassTempUnit } from '../shared/utils.js';
 import { makeActivatable } from '../shared/action-handler.js';
 import { discoverWeatherEntities, deriveSourceSlug } from './weather-resolver.js';
 import { deriveTodaySunBoundaries, anchorEventOn } from './weather-primitives.js';
@@ -22,6 +22,12 @@ import { renderAtmosphere, buildThermalParticles } from './sections/atmosphere.j
 import { renderMeteogram } from './sections/meteogram.js';
 
 /** @typedef {import('./types.js').Hass} Hass */
+
+/** Log a failed forecast call and return null as the fallback value. */
+function warnAndNull(/** @type {string} */ what, /** @type {unknown} */ e) {
+  console.warn(`${LOG_PREFIX} ${what}`, e);
+  return null;
+}
 
 /**
  * Section renderer dispatch map.
@@ -38,9 +44,7 @@ const SECTION_RENDERERS = {
   meteogram: renderMeteogram,
 };
 
-/**
- * Pulse Weather Card — standalone weather visualization card for Home Assistant.
- */
+/** Pulse Weather Card: standalone weather visualization card for Home Assistant. */
 class PulseWeatherCard extends HTMLElement {
   /** Create card instance. */
   constructor() {
@@ -56,12 +60,16 @@ class PulseWeatherCard extends HTMLElement {
     this._atmosExpanded = false;
     /** @type {object|null} */
     this._forecastData = null;
+    /** @type {string|null} */
+    this._forecastEntityId = null;
     /** @type {number} */
     this._forecastLastFetch = 0;
     /** @type {string|null} */
     this._subscribedEntityId = null;
     /** @type {string|null} */
     this._atmosConfigEntryId = null;
+    /** @type {boolean} */
+    this._atmosRegistryWarned = false;
     /** @type {import('./types.js').WeatherDiscovery|null} */
     this._discovery = null;
     /** @type {boolean} */
@@ -72,7 +80,7 @@ class PulseWeatherCard extends HTMLElement {
     this._countdownTimer = null;
     /** @type {number|null} */
     this._minuteTimer = null;
-    /** @type {string|null} Last configured entity id we warned about — prevents log spam on every hass tick. */
+    /** @type {string|null} Last configured entity id we warned about, prevents log spam on every hass tick. */
     this._warnedMissingEntity = null;
     /** @type {string|null} Last derived/configured slug we warned about for missing Atmos CE sensors. */
     this._warnedMissingAtmosCe = null;
@@ -101,15 +109,14 @@ class PulseWeatherCard extends HTMLElement {
     this._warnedMissingAtmosCe = null;
     // weather_entity / atmos_source may have changed; force re-discovery on next access.
     this._discovery = null;
-    // Section indices are re-derived from the new YAML; existing
-    // toggle state would key against stale indices, so wipe it.
+    // Section indices are re-derived from the new YAML, so wipe toggle state that would key against stale indices.
     this._proState = {};
     if (this._hass) this._fullRender();
   }
 
   /**
    * Cached entity discovery. Result depends only on weather_entity / atmos_source
-   * config + the current hass.states keys — neither moves at typical render rates,
+   * config + the current hass.states keys, neither moves at typical render rates,
    * so caching saves the per-render scan of ~50 sensor keys × hass.states lookups.
    * Invalidated on setConfig, or here if the cached weather entity id no
    * longer exists in hass.states. Covers an in-place entity rename in
@@ -143,8 +150,7 @@ class PulseWeatherCard extends HTMLElement {
       const e = hass.states[eid];
       if (e) parts.push(`${key}=${e.state}`);
     }
-    // Alert entities aren't part of atmosCe. Without this a new/cleared
-    // Meteoalarm warning wouldn't trigger a render until the 60s minute-tick.
+    // Alert entities aren't part of atmosCe; without this a new/cleared Meteoalarm warning wouldn't render until the 60s minute-tick.
     for (const eid of discovery.alertEntityIds) {
       const e = hass.states[eid];
       if (e) parts.push(`${eid}=${e.state}`);
@@ -175,14 +181,12 @@ class PulseWeatherCard extends HTMLElement {
     if (this._warnedMissingAtmosCe === triedSlug) return;
     this._warnedMissingAtmosCe = triedSlug;
     const hint = cfg.atmos_source
-      ? `Set atmos_source matches no sensor.${triedSlug}_* entities — check the slug.`
+      ? `Set atmos_source matches no sensor.${triedSlug}_* entities. Check the slug.`
       : `Derived slug "${triedSlug}" matches no sensor.${triedSlug}_* entities. If you renamed your weather entity after installing Atmos CE, set atmos_source manually in the card config.`;
     console.warn(`${LOG_PREFIX} atmosphere / air_quality / meteogram sections configured but no Atmos CE sensors discovered. ${hint}`);
   }
 
-  /**
-   * Clear every timer owned by this card. Idempotent; safe to call repeatedly.
-   */
+  /** Clear every timer owned by this card. Idempotent; safe to call repeatedly. */
   _cleanupTimers() {
     if (this._phaseTimer) { clearTimeout(this._phaseTimer); this._phaseTimer = null; }
     if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null; }
@@ -190,12 +194,13 @@ class PulseWeatherCard extends HTMLElement {
   }
 
   /**
-   * Set hass object — called by HA on every state change.
+   * Set hass object: called by HA on every state change.
    * Uses differential update detection to avoid unnecessary re-renders.
    * @param {Hass} hass - Home Assistant hass object.
    */
   set hass(hass) {
     this._hass = hass;
+    setHassTempUnit(hass);
     if (!this._config) return;
 
     const configuredId = this._config.weather_entity;
@@ -204,8 +209,7 @@ class PulseWeatherCard extends HTMLElement {
       || '';
     const weatherEntity = hass.states[weatherId];
     if (!weatherEntity) {
-      // Surface configured-but-missing entity once per unique id so users can
-      // diagnose typos instead of staring at a blank card.
+      // Surface a configured-but-missing entity once per unique id so users can diagnose typos.
       if (configuredId && this._warnedMissingEntity !== configuredId) {
         console.warn(`${LOG_PREFIX} weather_entity "${configuredId}" not found in hass.states. Check the entity_id in your card config (likely a typo, or the integration was removed).`);
         this._warnedMissingEntity = configuredId;
@@ -215,7 +219,7 @@ class PulseWeatherCard extends HTMLElement {
 
     // Atmos CE sensors (CAPE, lifted_index, freeze level, wind shear, etc.)
     // can update without the weather entity itself changing. The atmosphere
-    // column, storm narrative, and AQI gauge all read from these — gate must
+    // column, storm narrative, and AQI gauge all read from these, gate must
     // see them or a CAPE swing from 200 → 1500 J/kg stays invisible until
     // the 60s minuteTimer fires.
     const ceFingerprint = this._getCeFingerprint(hass);
@@ -226,7 +230,7 @@ class PulseWeatherCard extends HTMLElement {
       this._fullRender();
     }
 
-    // Always check forecast staleness — independent of weather state changes
+    // Always check forecast staleness: independent of weather state changes
     this._subscribeForecast(hass, weatherId);
   }
 
@@ -243,6 +247,11 @@ class PulseWeatherCard extends HTMLElement {
     if (this._forecastFetching) return;
     this._forecastFetching = true;
     this._subscribedEntityId = entityId;
+    // A different entity must not inherit the previous entity's forecast while its own loads.
+    if (this._forecastEntityId !== entityId) {
+      this._forecastData = null;
+      this._forecastEntityId = null;
+    }
 
     // Always reset the fetching flag, even on early return / throw.
     // Previously the flag could stick permanently if hass.callWS was
@@ -257,7 +266,13 @@ class PulseWeatherCard extends HTMLElement {
           // Find config entry ID from any Atmos CE entity (cached after first lookup)
           if (!this._atmosConfigEntryId) {
             const entityReg = /** @type {Array<Record<string, unknown>>} */ (
-              await hass.callWS({ type: 'config/entity_registry/list' }).catch(() => [])
+              await hass.callWS({ type: 'config/entity_registry/list' }).catch((/** @type {unknown} */ e) => {
+                if (!this._atmosRegistryWarned) {
+                  this._atmosRegistryWarned = true;
+                  console.warn(`${LOG_PREFIX} entity registry lookup failed, extended forecast unavailable (admin rights required)`, e);
+                }
+                return [];
+              })
             );
             const atmosEntity = entityReg.find((e) => e.platform === 'atmos_ce');
             this._atmosConfigEntryId = /** @type {string|null} */ (atmosEntity?.config_entry_id || null);
@@ -269,7 +284,7 @@ class PulseWeatherCard extends HTMLElement {
               service: 'get_extended_forecast',
               service_data: { config_entry_id: this._atmosConfigEntryId, type: 'hourly' },
               return_response: true,
-            }).catch(() => null);
+            }).catch((/** @type {unknown} */ e) => warnAndNull('extended forecast fetch failed, falling back to standard hourly', e));
             const extResp = /** @type {Record<string, unknown>|null} */ (extResult);
             const extResponse = /** @type {Record<string, unknown>|undefined} */ (extResp?.response);
             if (extResponse?.forecast) {
@@ -277,10 +292,12 @@ class PulseWeatherCard extends HTMLElement {
             }
           }
         } catch (e) {
-          console.debug(`${LOG_PREFIX} extended forecast fetch failed, falling back to standard hourly`, e);
+          console.warn(`${LOG_PREFIX} extended forecast fetch failed, falling back to standard hourly`, e);
         }
       }
 
+      let dailyFailed = false;
+      let hourlyFailed = false;
       let dailyResult = null;
       if (entityId && hass.states[entityId]) {
         dailyResult = await hass.callWS({
@@ -290,7 +307,10 @@ class PulseWeatherCard extends HTMLElement {
           target: { entity_id: entityId },
           service_data: { type: 'daily' },
           return_response: true,
-        }).catch(() => null);
+        }).catch((/** @type {unknown} */ e) => {
+          dailyFailed = true;
+          return warnAndNull('daily forecast fetch failed', e);
+        });
       }
 
       let standardHourly = null;
@@ -302,7 +322,10 @@ class PulseWeatherCard extends HTMLElement {
           target: { entity_id: entityId },
           service_data: { type: 'hourly' },
           return_response: true,
-        }).catch(() => null);
+        }).catch((/** @type {unknown} */ e) => {
+          hourlyFailed = true;
+          return warnAndNull('hourly forecast fetch failed', e);
+        });
         const hResp = /** @type {Record<string, unknown>|null} */ (hourlyResult);
         const hResponse = /** @type {Record<string, unknown>|undefined} */ (hResp?.response);
         const hourlyEntry = /** @type {Record<string, unknown>|undefined} */ (hResponse?.[entityId]);
@@ -313,11 +336,17 @@ class PulseWeatherCard extends HTMLElement {
       const dResponse = /** @type {Record<string, unknown>|undefined} */ (dResp?.response);
       const dailyEntry = /** @type {Record<string, unknown>|undefined} */ (dResponse?.[entityId]);
 
+      const prev = /** @type {{hourly: Array<Record<string, unknown>>, daily: Array<Record<string, unknown>>}|null} */ (
+        this._forecastEntityId === entityId ? this._forecastData : null
+      );
+      // A half whose own call failed keeps its previous data, for the same entity only.
       this._forecastData = {
-        hourly: extendedHourly || standardHourly || [],
-        daily: /** @type {Array<Record<string, unknown>>} */ (dailyEntry?.forecast || []),
+        hourly: extendedHourly || (prev && hourlyFailed ? prev.hourly : standardHourly || []),
+        daily: prev && dailyFailed ? prev.daily : /** @type {Array<Record<string, unknown>>} */ (dailyEntry?.forecast || []),
       };
+      this._forecastEntityId = entityId;
       this._forecastLastFetch = Date.now();
+      if (!this.isConnected) return;
       this._fullRender();
     } catch (e) {
       console.warn(`${LOG_PREFIX} forecast fetch failed; retries throttled to ${FORECAST_REFRESH_MS / 1000}s. Inspect the error below to diagnose. Common causes: weather entity offline, integration disabled, network failure.`, e);
@@ -327,12 +356,15 @@ class PulseWeatherCard extends HTMLElement {
     }
   }
 
-  /**
-   * Unsubscribe from forecast subscriptions (cleanup).
-   */
+  /** Unsubscribe from forecast subscriptions (cleanup). */
   _unsubscribeForecasts() {
     this._subscribedEntityId = null;
     this._forecastLastFetch = 0;
+  }
+
+  connectedCallback() {
+    /* Reconnect after dashboard edit: disconnectedCallback cleared the timers, so a render re-arms them. */
+    if (this._config && this._hass) this._fullRender();
   }
 
   disconnectedCallback() {
@@ -340,9 +372,7 @@ class PulseWeatherCard extends HTMLElement {
     this._cleanupTimers();
   }
 
-  /**
-   * Full render — rebuild all sections in config order.
-   */
+  /** Full render: rebuild all sections in config order. */
   _fullRender() {
     if (!this._hass || !this._config || !this.shadowRoot) return;
 
@@ -364,7 +394,7 @@ class PulseWeatherCard extends HTMLElement {
             config: section,
             discovery,
             weatherEntity,
-            forecastData: this._forecastData,
+            forecastData: this._forecastEntityId === discovery.weatherEntityId ? this._forecastData : null,
             // Section index in the config + the persisted pro-toggle
             // state for that index. Renderers that have a view-swap
             // pro view forward `proInitial` to the shell so the toggle
@@ -374,7 +404,7 @@ class PulseWeatherCard extends HTMLElement {
           });
           if (html) parts.push(html);
         } catch (e) {
-          console.warn(`${LOG_PREFIX} section "${section?.type}" renderer threw — section will be skipped, other sections continue. Please share the error below when reporting.`, e);
+          console.warn(`${LOG_PREFIX} section "${section?.type}" renderer threw: section will be skipped, other sections continue. Please share the error below when reporting.`, e);
         }
       }
     }
@@ -397,7 +427,7 @@ class PulseWeatherCard extends HTMLElement {
       }, 60000);
     }
 
-    // Countdown timer — tied to .pw-astro-countdown presence in the DOM.
+    // Countdown timer: tied to .pw-astro-countdown presence in the DOM.
     // The element identity can change across renders, so a short-lived
     // countdown per-render remains correct; it stops itself when the
     // element is gone and self-clears on expiry.
@@ -417,10 +447,7 @@ class PulseWeatherCard extends HTMLElement {
     }
   }
 
-  /**
-   * Schedule a single re-render at the next sky phase boundary.
-   * Only fires at golden hour start/end, blue hour start/end, sunrise, sunset.
-   */
+  /** Schedule a single re-render at the next sky phase boundary (golden/blue hour start/end, sunrise, sunset). */
   _schedulePhaseTransition() {
     if (this._phaseTimer) { clearTimeout(this._phaseTimer); this._phaseTimer = null; }
     if (!this._hass || !this._config) return;
@@ -434,8 +461,7 @@ class PulseWeatherCard extends HTMLElement {
     const now = nowDate.getTime();
     const boundaries = [];
 
-    // Sun boundaries — next_rising / next_setting are already "next
-    // future event" by HA convention.
+    // Sun boundaries: next_rising / next_setting are already "next future event" by HA convention.
     const nextRisingAttr = /** @type {string|undefined} */ (sunEntity.attributes?.next_rising);
     const nextSettingAttr = /** @type {string|undefined} */ (sunEntity.attributes?.next_setting);
     const { todaySunrise, todaySunset } =
@@ -485,16 +511,14 @@ class PulseWeatherCard extends HTMLElement {
   }
 
   /**
-   * Post-render DOM hooks — inject FX elements and bind tab interactions.
+   * Post-render DOM hooks: inject FX elements and bind tab interactions.
    * Called after innerHTML is set, so DOM elements are available.
    * @param {import('./types.js').WeatherDiscovery} _discovery - Discovery result.
    */
   _postRender(_discovery) {
     if (!this.shadowRoot || !this._hass) return;
 
-    /* Skip generating purely decorative FX rather than painting hundreds of
-       nodes for CSS to freeze. Air haze is excluded — it gates itself, because
-       part of its output is static and data-bearing. */
+    /* Skip purely decorative FX rather than painting hundreds of nodes for CSS to freeze; air haze gates itself because part of its output is static and data-bearing. */
     const skipMotionFx = isReducedMotion();
 
     const fxContainers = skipMotionFx
@@ -510,8 +534,7 @@ class PulseWeatherCard extends HTMLElement {
           cloudCover = JSON.parse(cloudData);
         }
       } catch {
-        // data-cloud JSON parse failure — attribute set by our own render,
-        // so only reachable if truncated mid-update; safe to ignore silently.
+        // data-cloud JSON parse failure: only reachable if truncated mid-update; safe to ignore silently.
       }
 
       const frag = buildConditionFx(condition, isNight, cloudCover);
@@ -557,19 +580,7 @@ class PulseWeatherCard extends HTMLElement {
       container.replaceChildren(particleFrag);
     }
 
-    /* Pro toggle — brand-mark corner button on each section. The section's
-       `data-pro-action` attribute decides what the click does:
-         view-swap  — flip data-pro on the section root, CSS swaps the
-                      .pw-view-default / .pw-view-pro siblings. Runtime-only
-                      state, resets on full re-render.
-         wind-mode  — toggle the section config's speed_mode between 'speed'
-                      and 'gust', then trigger a full re-render so the rose
-                      centre + brand mark update in sync.
-       Each click is scoped to the specific section that fired it via its
-       index in shadowRoot's .pw-section list. Without this scope a
-       multi-section-same-type config (two wind sections, two AQI sections)
-       would broadcast every click to every section of that type and toggle
-       them all together. */
+    /* Pro toggle: each click is scoped to its section by index in the .pw-section list, so same-type sections (two wind, two AQI) don't toggle together. */
     const allSections = [...this.shadowRoot.querySelectorAll('.pw-section')];
     const proToggles = this.shadowRoot.querySelectorAll('button.pw-brand-mark-corner');
     for (const btn of proToggles) {
@@ -592,7 +603,7 @@ class PulseWeatherCard extends HTMLElement {
             target_section.speed_mode = target_section.speed_mode === 'gust' ? 'speed' : 'gust';
           } else if (action === 'meteo-horizon' && target_section.type === 'meteogram') {
             // Derive the CURRENT effective horizon from whichever setting
-            // the renderer actually consumes — explicit `hours` wins if
+            // the renderer actually consumes: explicit `hours` wins if
             // set, else `horizon`, else default 'short'. Toggling from
             // `horizon` alone would no-op the first click when the user
             // has e.g. `hours: 24` set: handler flips horizon from
@@ -603,8 +614,7 @@ class PulseWeatherCard extends HTMLElement {
               ? explicitHours >= 18
               : target_section.horizon === 'long';
             target_section.horizon = currentLong ? 'short' : 'long';
-            // Explicit `hours` would otherwise win over horizon — clear it
-            // so the toggle drives the chart.
+            // Explicit `hours` would otherwise win over horizon, so clear it and let the toggle drive the chart.
             if ('hours' in target_section) delete target_section.hours;
           } else if (action === 'aqi-scale' && target_section.type === 'air_quality') {
             target_section.scale = target_section.scale === 'us' ? 'eu' : 'us';
@@ -623,16 +633,14 @@ class PulseWeatherCard extends HTMLElement {
       });
     }
 
-    /* HA intercepts touch/pointer events for card reordering — we need explicit
-       drag-scroll + stopPropagation on touch to keep horizontal swipes working. */
+    /* HA intercepts touch/pointer events for card reordering, so drag-scroll + stopPropagation on touch keep horizontal swipes working. */
     const strips = this.shadowRoot.querySelectorAll('.pw-hourly-strip');
     for (const strip of strips) {
       let isDown = false;
       let startX = 0;
       let scrollLeft = 0;
 
-      /* Focusable scroll container — the browser's native arrow-key scrolling
-         covers keyboard access, so no key handler is needed. */
+      /* Focusable scroll container: the browser's native arrow-key scrolling covers keyboard access, so no key handler is needed. */
       const stripEl = /** @type {HTMLElement} */ (strip);
       stripEl.setAttribute('tabindex', '0');
       stripEl.setAttribute('role', 'group');
@@ -708,7 +716,7 @@ class PulseWeatherCard extends HTMLElement {
 
   /**
    * Return grid options for HA's sections (grid) view. Uses `rows: 'auto'` so
-   * the cell sizes to content — section heights vary (a meteogram or forecast
+   * the cell sizes to content: section heights vary (a meteogram or forecast
    * row is far taller than overview), so any fixed row count would clip and
    * overlap the card below. See {@link buildGridOptions}.
    * @returns {{columns: number, min_columns: number, rows: 'auto'}}

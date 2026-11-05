@@ -3,7 +3,7 @@
  * @description Professional time-series weather chart showing temperature,
  * precipitation, cloud cover, and wind simultaneously on a shared time axis.
  * yr.no-style overlay layout: precip bars behind temperature curve.
- * Single SVG, single viewBox, uniform scaling — no preserveAspectRatio="none".
+ * Single SVG, single viewBox, uniform scaling, no preserveAspectRatio="none".
  */
 
 import { tempToColor, conditionIcon, escapeHtml, sanitizeCssValue, filterFinite, futureHourly, finiteNumber, uniqueSvgId, formatDateTime, resolveHassTimeZone } from '../weather-primitives.js';
@@ -45,20 +45,13 @@ const VB_WIDTH = 600;
 const VB_HEIGHT = 280;
 const CHART_PAD_X = 8;
 
-/* Sky-ground vertical layout (y coords):
-     Sky zone     0-80   — cond / wind / temp labels float just above their
-                            curve point (per-hour, not fixed y)
-     Curve zone   80-200 — temperature curve + area fill
-     Ground zone  200-220 — precipitation bars grow up from y=220
-     Axis zone    240-272 — time labels at y=254, sunset / sunrise italics at y=272 */
+/* Sky-ground y layout: sky 0-80, curve 80-200, ground 200-220 (precip bars grow up from y=220), axis 240-272. */
 const CURVE_Y_START = 80;
 const CURVE_Y_END = 200;
 const PRECIP_BASELINE_Y = 220;
 const TIME_LABEL_Y = 254;
 const CLUSTER_OFFSET_ABOVE_CURVE = 12;  // px above the curve point
-const CLUSTER_WIND_OFFSET = 30;         // wind barb sits a bit higher than the
-                                        // text labels so the stem (18u) plus
-                                        // any barbs don't hit the curve line
+const CLUSTER_WIND_OFFSET = 30;         // higher than the text labels so stem + barbs clear the curve
 
 const PRECIP_BAR_WIDTH_RATIO = 0.9;
 const LABEL_INTERVAL = 3;
@@ -83,8 +76,7 @@ export function slotX(i, n) {
  * @returns {number} Y coordinate in viewBox units.
  */
 export function tempY(temp, min, max) {
-  // If any input is non-finite (bad forecast data slipped past the filter),
-  // anchor the Y coordinate mid-curve rather than emitting NaN into path d=.
+  // If any input is non-finite, anchor Y mid-curve rather than emitting NaN into path d=.
   if (!Number.isFinite(temp) || !Number.isFinite(min) || !Number.isFinite(max)) {
     return (CURVE_Y_START + CURVE_Y_END) / 2;
   }
@@ -105,10 +97,7 @@ function formatHourLabel(dt, timeZone) {
   return formatDateTime(d, timeZone, { hour: '2-digit', hourCycle: 'h23' });
 }
 
-/** Safety cap: pathological extended-forecast arrays can carry thousands of
- * entries; spreading all of them into Math.min/max hits V8's argument limit.
- * 500 is well above the hourly.hours upper bound of 48, with generous
- * headroom for higher-granularity sources. */
+/** Safety cap: spreading thousands of extended-forecast entries into Math.min/max hits V8's argument limit; 500 is well above the 48-hour upper bound. */
 const MAX_RAW_FORECAST_ENTRIES = 500;
 
 /**
@@ -120,8 +109,7 @@ const MAX_RAW_FORECAST_ENTRIES = 500;
  */
 export function buildMeteogramData(hourlyData, hours = 24, timeZone) {
   if (!Array.isArray(hourlyData)) return null;
-  // Cap the input array first so the filter/sort/spread below can never fan
-  // tens of thousands of args into Math.min(...arr).
+  // Cap the input array first so the filter/sort/spread below can never fan tens of thousands of args into Math.min(...arr).
   const capped = hourlyData.slice(0, MAX_RAW_FORECAST_ENTRIES);
   const future = futureHourly(capped, new Date());
 
@@ -160,8 +148,7 @@ export function buildMeteogramData(hourlyData, hours = 24, timeZone) {
     };
   });
 
-  // Drop entries where temperature isn't finite — one NaN poisons Math.min/max
-  // and flows NaN into every SVG coordinate downstream.
+  // Drop entries where temperature isn't finite, since one NaN poisons Math.min/max and every SVG coordinate downstream.
   const points = filterFinite(rawPoints, (p) => p.temp);
   if (points.length < 2) return null;
 
@@ -223,7 +210,7 @@ function renderCloudStripBg(data) {
 }
 
 /**
- * Render precipitation bars in the ground zone — grow up from
+ * Render precipitation bars in the ground zone, grow up from
  * PRECIP_BASELINE_Y (y=220), max height 20px so they never invade the
  * curve zone above.
  * @param {MeteogramData} data - Meteogram data object.
@@ -323,8 +310,7 @@ function renderTempCurve(data) {
   svg += `<path d="${areaPath}" fill="url(#${gradId})"/>`;
   svg += `<path d="${linePath}" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-  // Hourly temperature labels live in the staggered cluster below
-  // the curve — see clusterLabels below.
+  // Hourly temperature labels live in the staggered cluster below the curve (see clusterLabels).
 
   return svg;
 }
@@ -360,8 +346,7 @@ function renderTimeLabels(data) {
  */
 function renderWindBarbAt(x, y, kmh, bearing) {
   const knots = kmh / 1.852;
-  // Stem points downwind: bearing 0° (N) means wind blows N→S, stem points S = SVG 90°.
-  // SVG 0° is right (east). Convert bearing → SVG rotation: stemRotation = (bearing + 180) % 360 - 90.
+  // Stem points downwind: SVG rotation = (bearing + 180) % 360 - 90 (bearing 0° N blows N→S; SVG 0° is east).
   const stemRotation = (((bearing + 180) % 360) - 90 + 360) % 360;
   let remaining = Math.round(knots / 5) * 5;
   const pennants = Math.floor(remaining / 50); remaining -= pennants * 50;
@@ -439,8 +424,7 @@ export function renderMeteogram({ hass, config, forecastData }) {
   const hourly = forecastData?.hourly || [];
   if (hourly.length < 2) return null;
 
-  // Axis hour labels render in the HA-configured zone (browser-local when the
-  // profile prefers 'local'), so a user abroad sees home wall-clock hours.
+  // Axis hour labels render in the HA-configured zone (browser-local when the profile prefers 'local').
   const timeZone = resolveHassTimeZone(hass);
 
   // Meteogram exposes a horizon toggle (12h ↔ 24h) on the brand mark.
@@ -468,8 +452,7 @@ export function renderMeteogram({ hass, config, forecastData }) {
   // Drive brand-mark variant from the current hour's condition
   const variant = brandMarkVariant(data.points[0]?.condition || 'sunny', false);
 
-  // Layer order inside SVG: precip → curve → staggered cluster → axis
-  // The old condition-icon and wind-arrow renderers are unused under the new layout.
+  // Layer order inside SVG: precip → curve → staggered cluster → axis.
   const layers = [];
   layers.push(renderPrecipBars(data));
   layers.push(renderPrecipLabels(data));
@@ -504,7 +487,7 @@ export function renderMeteogram({ hass, config, forecastData }) {
     // proInitial reflects the EFFECTIVE rendered horizon (driven by
     // hoursForData), not just `config.horizon`. A user with explicit
     // `hours: 24` and no `horizon` should see the brand mark in the
-    // "long" state because the chart is already showing 24 hours —
+    // "long" state because the chart is already showing 24 hours,
     // otherwise the first click flips an invisible boolean and the
     // chart appears stuck.
     proInitial: hoursForData >= 18,

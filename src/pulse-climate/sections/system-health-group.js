@@ -9,7 +9,7 @@
  *     order (Bridge → HomeKit → API) + active view body
  *
  * active_tab fallback: if user config sets active_tab to a view that isn't
- * discovered at render time, host falls back to the first available view —
+ * discovered at render time, host falls back to the first available view,
  * silent degradation matching existing per-section behaviour.
  */
 

@@ -1,6 +1,6 @@
 /**
  * @module pulse-weather/styles
- * @description CSS design system for Pulse Weather Card — design tokens,
+ * @description CSS design system for Pulse Weather Card, design tokens,
  * glass panels, typography, tier colors, transitions, and FX keyframes.
  */
 
@@ -50,7 +50,7 @@ ${SHARED_STYLES}
   --pw-warn-yellow: #ffd60a;
   --pw-good-green: #30d158;
 
-  /* Card-local — Weather is the only consumer at this size; everything else
+  /* Card-local: Weather is the only consumer at this size; everything else
      uses the shared --pulse-font-* scale. */
   --pw-font-caption: 13px;
 
@@ -71,12 +71,12 @@ ${SHARED_STYLES}
   border-radius: var(--pulse-radius-cartouche);
   background: var(--pulse-bg-card);
   color: var(--pulse-text-primary);
-  /* font-family inherits from the HA frame — same as pulse-climate-card. */
+  /* font-family inherits from the HA frame, same as pulse-climate-card. */
   container-type: inline-size;
 }
 
 /* ── Cartouche frame primitive ─────────────────────────────────── */
-/* Default sky gradient — applies to every section unless that section
+/* Default sky gradient: applies to every section unless that section
    paints its own background (atmosphere, air-quality). Promoted from
    per-section duplication so alerts / wind no longer leak light theme
    pw-card cream backdrop in light mode. */
@@ -261,7 +261,7 @@ ${SHARED_STYLES}
 
 .pw-atmos-scale-label {
   font-size: 9px;
-  /* No opacity here — the parent .pw-atmos-scale already sets 0.5. */
+  /* No opacity here: the parent .pw-atmos-scale already sets 0.5. */
   color: var(--pw-ink-cream-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -326,7 +326,7 @@ ${SHARED_STYLES}
   font-variant-numeric: tabular-nums;
 }
 
-/* LCL height marker (dashed line, grey — distinct from freeze marker) */
+/* LCL height marker (dashed line, grey, distinct from freeze marker) */
 .pw-atmos-lcl-marker {
   position: absolute;
   left: 0;
@@ -633,7 +633,7 @@ ${SHARED_STYLES}
   animation: pw-radarBlink var(--pw-radar-dur, 2.5s) ease-out infinite;
 }
 
-/* ── Alert rows — Pulse DNA ────────────────────────────────────── */
+/* ── Alert rows: Pulse DNA ────────────────────────────────────── */
 .pw-alert-list { display: flex; flex-direction: column; padding: 0 var(--pulse-space-card-wide); }
 
 .pw-alert-row {
@@ -653,7 +653,7 @@ ${SHARED_STYLES}
 .pw-day-arc-marker { position: absolute; top: -3px; width: 8px; height: 8px; background: #ffd60a; border-radius: var(--pulse-radius-circle); border: 1px solid rgba(0,0,0,0.2); transform: translateX(-50%); box-shadow: 0 0 6px rgba(255,214,10,0.4); }
 
 /* Backstop for animation declared in markup. weather-fx.js and wind.js set
-   animation as an inline style, which outranks a plain declaration — hence
+   animation as an inline style, which outranks a plain declaration, hence
    !important. The primary gate skips generating FX entirely, in
    pulse-weather-card.js _postRender. */
 @media (prefers-reduced-motion: reduce) {
@@ -713,13 +713,13 @@ ${SHARED_STYLES}
  * ════════════════════════════════════════════════════════════════
  * Every section composes its DOM from t.* builders in type-system.js,
  * which emit one of these classes. Per-section CSS blocks below are
- * layout-only (padding, grid, gradient, brand-mark corner offset) —
+ * layout-only (padding, grid, gradient, brand-mark corner offset),
  * they should never restate font-size / font-weight
  * / text-transform. To add a new role, add it here AND in
  * type-system.js together.
  */
 
-/* Hero block — wraps heroTier + display + narrative. Sections that
+/* Hero block: wraps heroTier + display + narrative. Sections that
    compose their hero via t.heroBlock get the centred stacked layout
    for free; sections that need a different rhythm compose the
    primitives manually. */
@@ -731,7 +731,7 @@ ${SHARED_STYLES}
 }
 .pw-hero-block .pw-t-narrative { margin-top: 0; }
 
-/* Top-marg wrapper — reserves the right gutter for the brand mark. */
+/* Top-marg wrapper: reserves the right gutter for the brand mark. */
 .pw-t-marg { padding-right: 36px; }
 /* Narrative directly under a kicker sits a tight gap below. */
 .pw-t-marg .pw-t-kicker + .pw-t-narrative { margin-top: var(--pw-gap-tight); }
@@ -747,7 +747,7 @@ ${SHARED_STYLES}
 }
 .pw-t-kicker::after { content: " ·"; opacity: 0.5; }
 
-/* Hero numbers — display size, tabular numerals. */
+/* Hero numbers: display size, tabular numerals. */
 .pw-t-display {
   font-weight: 600;
   font-size: var(--pulse-font-display);
@@ -765,8 +765,8 @@ ${SHARED_STYLES}
   text-shadow: none;
 }
 
-/* Hero tier — Atmosphere uses the larger title flavour, AQI the
-   smaller body-sm flavour. Title Case — no text-transform. */
+/* Hero tier: Atmosphere uses the larger title flavour, AQI the
+   smaller body-sm flavour. Title Case: no text-transform. */
 .pw-t-hero-tier {
   font-weight: 600;
   text-align: center;
@@ -782,7 +782,7 @@ ${SHARED_STYLES}
   margin-top: 3px;
 }
 
-/* Narrative — Sentence case body. Centred caption that fills the
+/* Narrative: Sentence case body. Centred caption that fills the
    section width; copy is short enough that wrapping happens only on
    narrow phones. Sections that need a different rhythm override. */
 .pw-t-narrative {
@@ -794,7 +794,7 @@ ${SHARED_STYLES}
   margin-top: var(--pw-gap-tight);
 }
 
-/* Italic gloss — lowercase italic body-sm. */
+/* Italic gloss: lowercase italic body-sm. */
 .pw-t-gloss {
   font-style: italic;
   font-weight: 600;
@@ -805,7 +805,7 @@ ${SHARED_STYLES}
   text-align: center;
 }
 
-/* Italic meta caption — sentence-case italic micro. */
+/* Italic meta caption: sentence-case italic micro. */
 .pw-t-meta {
   font-style: italic;
   font-weight: 600;
@@ -838,7 +838,7 @@ ${SHARED_STYLES}
   text-transform: none;
 }
 
-/* Chart caption — header above a chart. Lowercase 0.14em micro. */
+/* Chart caption: header above a chart. Lowercase 0.14em micro. */
 .pw-t-chart-caption {
   text-align: center;
   font-weight: 600;
@@ -876,7 +876,7 @@ button.pw-brand-mark-corner:focus-visible {
   outline: 2px solid var(--pulse-accent, var(--pw-vermilion));
   outline-offset: 3px;
 }
-/* Decorative brand mark (sections without a click action — Forecast,
+/* Decorative brand mark (sections without a click action, Forecast,
    Atmosphere) sits at lower opacity so users don't try to tap it.
    Interactive marks live at full opacity, gain hover scale + focus
    ring above. */
@@ -895,7 +895,7 @@ div.pw-brand-mark-corner {
 }
 
 /* Default-vs-pro view swap (in-place fade replace). Sections that
-   only have a default view today work fine — the rule has no effect
+   only have a default view today work fine, the rule has no effect
    without a sibling .pw-view-pro.
    The view wrapper inherits the same flex-column layout the content
    slot uses, so children inside a view keep their gap rhythm. */
@@ -920,7 +920,7 @@ div.pw-brand-mark-corner {
   color: var(--pw-ink-cream-muted);
   font-family: inherit;
 }
-/* Location stamp — same anatomy as kicker but tighter tracking and
+/* Location stamp: same anatomy as kicker but tighter tracking and
    smaller-cap aesthetic; rendered in Overview only via plain markup,
    not via t.kicker (which would add the trailing " ·"). */
 .pw-overview-v2 .pw-loc-stamp {
@@ -936,7 +936,7 @@ div.pw-brand-mark-corner {
   margin: 0;
 }
 /* Overview stats use vertical dividers between columns instead of a
-   top hairline — gives a calmer visual rhythm under the busy hero
+   top hairline: gives a calmer visual rhythm under the busy hero
    block. */
 .pw-overview-v2 .pulse-stats-row .pw-t-stat {
   padding: 7px 4px;
@@ -952,7 +952,7 @@ div.pw-brand-mark-corner {
   z-index: 5;
 }
 /* Pro view: 7-day temperature spark sits between the day arc and the
-   stats grid. Caption above, sparkline below — same anatomy as a
+   stats grid. Caption above, sparkline below, same anatomy as a
    chart-caption + chart pair anywhere else in the family. */
 .pw-overview-v2 .pw-overview-spark-block {
   margin: 0;
@@ -1188,7 +1188,7 @@ div.pw-brand-mark-corner {
    each tick matches the underlying timeline. A grid-based layout
    would centre intermediate labels inside their grid cells (30%
    / 50% / 70%) and create a 4–5% drift between label position and
-   actual time — making NOW-cursor look misaligned even when its
+   actual time: making NOW-cursor look misaligned even when its
    percentage is correct. */
 .pw-astro-v2 .pw-astro-rb-axis {
   position: absolute;
@@ -1212,8 +1212,8 @@ div.pw-brand-mark-corner {
 .pw-astro-v2 .pw-astro-rb-axis span:nth-child(4) { left: 75%; }
 .pw-astro-v2 .pw-astro-rb-axis span:nth-child(5) { left: 100%; transform: translateX(-100%); }
 
-/* The second stats row sits flush under the first — no divider, no
-   extra margin — so they read as one block. */
+/* The second stats row sits flush under the first, no divider, no
+   extra margin: so they read as one block. */
 .pw-astro-v2 .pulse-stats-row + .pulse-stats-row {
   margin-top: var(--pw-gap-tight);
 }
@@ -1238,7 +1238,7 @@ div.pw-brand-mark-corner {
   color: var(--pw-ink-cream-muted);
   font-family: inherit;
 }
-/* Vertical column visualisation — atmospheric profile up to 5km
+/* Vertical column visualisation: atmospheric profile up to 5km
    (auto-scales when freeze level or LCL exceed 4km). The CAPE fill
    grows from the surface up; the freeze level and LCL markers are
    absolutely-positioned tags + lines at their altitude bottom-%. */
@@ -1327,7 +1327,7 @@ div.pw-brand-mark-corner {
   z-index: 5;
 }
 
-/* ── Wind (cartouche wrap only — rose preserved) ─ */
+/* ── Wind (cartouche wrap only: rose preserved) ─ */
 .pw-wind-v2 .pw-content {
   padding: var(--pw-pad-y) var(--pw-pad-x);
   display: flex;
@@ -1386,7 +1386,7 @@ div.pw-brand-mark-corner {
   text-transform: lowercase;
   opacity: 0.6;
 }
-/* Pollutant tiles use the larger body size — the value here is a
+/* Pollutant tiles use the larger body size, the value here is a
    hero stat, not a chip. The grid layout itself comes from the
    shared .pulse-stats-row primitive. */
 .pw-air-quality-v2 .pulse-stats-row .pw-t-stat-v {

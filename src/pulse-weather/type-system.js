@@ -40,17 +40,10 @@ export function lower(text) {
   return String(text || '').toLowerCase();
 }
 
-/**
- * The shared text builders. Every section should compose its DOM
- * from these instead of writing class names by hand.
- *
- * All builders escape their inputs except the `dataToken` builder, which
- * is intended for content like "PM2.5" / "O₃" that already comes from a
- * trusted constant, not user state.
- */
+/** The shared text builders: sections compose DOM from these, and all escape inputs except `dataToken` (trusted constants like "PM2.5"). */
 export const t = {
   /**
-   * Section anchor — top-marg kicker.
+   * Section anchor: top-marg kicker.
    * @param {string} text
    * @returns {string}
    */
@@ -89,7 +82,7 @@ export const t = {
   /**
    * Narrative line (Forecast "Warming through midweek"; Atmosphere
    * "Storm risk peaks 16:00…"). Sentence case content composed by the
-   * caller — this builder doesn't transform case.
+   * caller: this builder doesn't transform case.
    * @param {string} text
    * @returns {string}
    */
@@ -130,7 +123,7 @@ export const t = {
   /**
    * Single stat tile = value on top, label under. Pass `data: true`
    * when the label is a chemical formula or other data token (PM2.5,
-   * O₃, NO₂) — the CSS skips lowercase text-transform so the
+   * O₃, NO₂): the CSS skips lowercase text-transform so the
    * formula renders as-given. The label is always HTML-escaped:
    * subscript / superscript characters survive escapeHtml unchanged,
    * so there's no need to bypass escaping for the visual to work.
@@ -159,7 +152,7 @@ export const t = {
 
   /**
    * Pre-trusted data token (chemical formula, sensor source acronym).
-   * Caller is responsible for the value being safe — this builder
+   * Caller is responsible for the value being safe, this builder
    * intentionally does NOT escape, so subscripts (O₃) and superscripts
    * survive.
    * @param {string} preEscaped
@@ -170,7 +163,7 @@ export const t = {
   },
 
   /**
-   * Hero block — heroTier + display value (with optional unit suffix)
+   * Hero block: heroTier + display value (with optional unit suffix)
    * + narrative line, all stacked + centred. Sections that need a
    * different rhythm (e.g. left-aligned, no narrative) compose the
    * primitives manually instead.
@@ -193,7 +186,7 @@ export const t = {
   },
 
   /**
-   * Stats row — grid of stat tiles emitted by `t.stat(...)`. Wrapper
+   * Stats row: grid of stat tiles emitted by `t.stat(...)`. Wrapper
    * uses the shared `.pulse-stats-row` class with `data-cols` /
    * `data-divided` attributes so layout is the same across cards.
    *

@@ -3,10 +3,10 @@
  * @description Render a Time × Zone comfort score matrix using HTML divs
  * (not SVG) for per-cell hover and per-row click interactions.
  * Includes legend and detail panel support.
- * Pure renderer — no side effects, no DOM access.
+ * Pure renderer: no side effects, no DOM access.
  */
 
-import { escapeHtml, formatHHMM, isUnavailableState } from '../../shared/utils.js';
+import { escapeHtml, formatHHMM, isUnavailableState, celsiusDeltaToUnit } from '../../shared/utils.js';
 import { resolveZoneContext, rowStateClass } from '../utils.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slot-engine.js';
@@ -17,9 +17,9 @@ import { renderHeatmapStrip, renderTimelineStrip, renderTimeLabels } from './slo
  */
 const COMFORT_LEVEL_MAP = {
   Comfortable: 100,              // green
-  Warm: 70, Cool: 70,           // amber — one band off ideal
-  Hot: 35, Cold: 35,            // red — two bands off
-  Sweltering: 10, Freezing: 10, // deep red — extreme
+  Warm: 70, Cool: 70,           // amber, one band off ideal
+  Hot: 35, Cold: 35,            // red, two bands off
+  Sweltering: 10, Freezing: 10, // deep red, extreme
 };
 
 /**
@@ -37,19 +37,56 @@ export function computeComfortScore(actualTemp, targetTemp, humidity, comfortLev
   }
   if (isNaN(actualTemp) || isNaN(targetTemp)) return null;
   let score = 100;
-  score -= Math.min(50, Math.abs(actualTemp - targetTemp) * 10);
+  score -= Math.min(50, (Math.abs(actualTemp - targetTemp) / celsiusDeltaToUnit(1)) * 10);
   if (humidity !== null && humidity !== undefined) {
     score -= Math.min(25, Math.abs(humidity - 45) * 0.5);
   }
   if (comfortLevel !== null && comfortLevel !== undefined) {
     // tado_ce emits "<band> <humidity-suffix>" (e.g. "Comfortable Dry"); the
     // base band is always the first word. ?? 50 is a forward-compat NaN guard
-    // for a future band not in the map — keep it.
+    // for a future band not in the map, keep it.
     const band = comfortLevel.split(' ')[0];
     const mapped = COMFORT_LEVEL_MAP[band] ?? 50;
     score = score * 0.7 + mapped * 0.3;
   }
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * Read a zone's comfort level string, or null when the entity is absent or unavailable.
+ * @param {Record<string, string>} zoneEntities
+ * @param {Record<string, *>} states
+ * @returns {string|null}
+ */
+export function readComfortLevel(zoneEntities, states) {
+  const comfortEntity = zoneEntities?.comfort_level;
+  return (comfortEntity && !isUnavailableState(states[comfortEntity])) ? states[comfortEntity].state : null;
+}
+
+/**
+ * Current comfort score inputs for a zone, read from the same sensors the strip uses.
+ * @param {import('../types.js').ZoneConfig} zoneConfig
+ * @param {{entityId: string, zoneEntities: Record<string, string>, zoneState: *}} zoneContext - From resolveZoneContext.
+ * @param {Record<string, *>} states
+ * @returns {{temp: number|null, humidity: number|null, target: number|null, level: string|null}}
+ */
+export function resolveComfortInputs(zoneConfig, zoneContext, states) {
+  const { entityId, zoneEntities, zoneState } = zoneContext;
+  /** @param {string} id @param {number|null} own */
+  const read = (id, own) => {
+    if (id === entityId) return own;
+    if (isUnavailableState(states[id])) return null;
+    const v = Number.parseFloat(states[id].state);
+    return Number.isFinite(v) ? v : null;
+  };
+  const tempId = resolveHistoryTempSensor(entityId, states, zoneEntities, zoneConfig).entityId;
+  const humId = resolveHistoryHumSensor(entityId, states, zoneEntities, zoneConfig)?.entityId;
+  return {
+    temp: read(tempId, zoneState.currentTemp),
+    humidity: humId ? read(humId, zoneState.humidity) : zoneState.humidity,
+    target: zoneState.targetTemp ?? null,
+    level: readComfortLevel(zoneEntities, states),
+  };
 }
 
 /**
@@ -142,19 +179,14 @@ export function renderComfortStripSection(zones, sectionConfig, states, discover
     const humSensorId = humResolved?.entityId || null;
     const tempData = historyCache?.data?.[tempSensorId] || [];
     const humData = humSensorId ? (historyCache?.data?.[humSensorId] || []) : [];
-    const targetTemp = states[entityId]?.attributes?.temperature ?? null;
-    const comfortEntity = zoneEntities.comfort_level;
-    const comfortLevel = (comfortEntity && !isUnavailableState(states[comfortEntity]))
-      ? states[comfortEntity].state
-      : null;
+    const targetTemp = zoneState.targetTemp ?? null;
+    const comfortLevel = readComfortLevel(zoneEntities, states);
 
     /** @type {import('./slot-engine.js').SlotData[]} */
     const slotData = [];
     const slotSize = windowMs / slots;
 
-    /* Seed lastScore from the most recent data point before the window starts —
-       prevents early slots from rendering empty when valid data exists just
-       before the window boundary. */
+    // Seed lastScore from the last point before the window so early slots are not empty.
     /** @type {number|null} */
     let lastScore = null;
     if (tempData.length > 0) {

@@ -1,15 +1,15 @@
 /**
  * @module shared/styles
  * @description Shared CSS design tokens and utility classes for all Pulse Card
- * family members. Defines the visual identity system — theme colors, glass
+ * family members. Defines the visual identity system: theme colors, glass
  * panels, typography scale, shape, spacing, and interactive state patterns.
  *
  * Token categories:
- * - **Theme colors** — text, backgrounds, borders, accent, status, disabled
- * - **Glass panel** — frosted glass overlay (background, blur, border)
- * - **Typography** — semantic font-size scale and weight tokens
- * - **Shape** — border-radius tokens for cards, panels, bars, pills
- * - **Spacing** — gap tokens for card, section, element, tight
+ * - **Theme colors**: text, backgrounds, borders, accent, status, disabled
+ * - **Glass panel**: frosted glass overlay (background, blur, border)
+ * - **Typography**: semantic font-size scale and weight tokens
+ * - **Shape**: border-radius tokens for cards, panels, bars, pills
+ * - **Spacing**: gap tokens for card, section, element, tight
  *
  * Usage: import and prepend to each card's own STYLES export.
  * ```js
@@ -29,7 +29,7 @@
  */
 export const SHARED_STYLES = `
 /* ══════════════════════════════════════════════════════════════════
- * Pulse Card Family — Shared Design Tokens
+ * Pulse Card Family: Shared Design Tokens
  * ══════════════════════════════════════════════════════════════════ */
 
 :host {
@@ -119,7 +119,7 @@ export const SHARED_STYLES = `
   --pulse-radius-circle: 50%;                /* dots, donut centres, circular markers */
 
   /* ── Spacing ───────────────────────────────────────────────────── */
-  --pulse-space-card-wide: 20px;     /* weather chrome — wider inset for hero/cartouche layouts */
+  --pulse-space-card-wide: 20px;     /* weather chrome: wider inset for hero/cartouche layouts */
   --pulse-space-card: 16px;          /* card-edge padding, section margins */
   --pulse-space-panel: 14px;         /* glass-panel inner pad, cartouche inset */
   --pulse-space-section: 12px;       /* between section blocks */
@@ -158,14 +158,14 @@ export const SHARED_STYLES = `
   outline-offset: 2px;
 }
 
-/* Card title — 16px medium weight */
+/* Card title: 16px medium weight */
 .pulse-title {
   font-size: var(--pulse-font-title);
   font-weight: var(--pulse-weight-medium);
   color: var(--pulse-text-primary);
 }
 
-/* Section label — uppercase, small, secondary tone.
+/* Section label: uppercase, small, secondary tone.
    No opacity multiplier: --pulse-text-secondary is already the dimmed token,
    stacking 0.7 on top dropped light-theme contrast below WCAG-large threshold. */
 .pulse-section-label {
@@ -176,7 +176,7 @@ export const SHARED_STYLES = `
   color: var(--pulse-text-secondary);
 }
 
-/* Glass panel — frosted overlay */
+/* Glass panel: frosted overlay */
 .pulse-glass {
   background: var(--pulse-glass-bg);
   backdrop-filter: blur(var(--pulse-glass-blur));
@@ -184,12 +184,12 @@ export const SHARED_STYLES = `
   border: 1px solid var(--pulse-glass-border);
 }
 
-/* Stats row — grid layout primitive shared across the Pulse card
+/* Stats row: grid layout primitive shared across the Pulse card
    family. Children are stat tiles emitted by each card's own type
    builder (e.g. pulse-weather's pt.stat). The row controls only
    layout: column count, divider, gap, margin.
-   - data-cols: "3" | "4" — column count (default 4)
-   - data-divided: "true" — adds a 1px hairline at the top so the row
+   - data-cols: "3" | "4": column count (default 4)
+   - data-divided: "true": adds a 1px hairline at the top so the row
      reads as a footer rather than a flush block. */
 .pulse-stats-row {
   display: grid;

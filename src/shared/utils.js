@@ -19,18 +19,20 @@ export function escapeHtml(str) {
 }
 
 /**
- * Sanitize a CSS value to prevent style injection.
+ * Sanitize a CSS value so it is safe in a CSS declaration and inside a quoted HTML attribute.
  * @param {*} value
  * @returns {string}
  */
 export function sanitizeCssValue(value) {
   if (value === undefined || value === null || value === '') return '';
-  const str = String(value);
-  return str
-    .replace(/[;{}]/g, '')
-    .replace(/url\s*\(/gi, '')
-    .replace(/expression\s*\(/gi, '')
-    .replace(/-moz-binding\s*:/gi, '');
+  // The strip runs first so a stripped character cannot split a keyword; the keyword rule keeps the word and drops the ( or : run so removal cannot reassemble a keyword.
+  // eslint-disable-next-line no-control-regex -- control characters are the point
+  const out = String(value).replace(/[;{}&"'`<>\\\u0000-\u001f\u007f]/g, '');
+  return out
+    // eslint-disable-next-line security/detect-unsafe-regex -- \s and ( are disjoint, so the run is matched linearly
+    .replace(/(url|expression)(?:\s*\()+/gi, '$1')
+    // eslint-disable-next-line security/detect-unsafe-regex -- \s and : are disjoint, so the run is matched linearly
+    .replace(/(-moz-binding)(?:\s*:)+/gi, '$1');
 }
 
 /**
@@ -53,7 +55,7 @@ export function clamp(value, min, max) {
  * the cell to `rows * 64px - 8px`; any card whose content (zone rows, heatmap,
  * timeline, donut) is taller than that estimate then paints past its cell and
  * overlaps the card below. `'auto'` is the value HA's YAML
- * `grid_options: { rows: auto }` carries — verified working on HA 2026.6 — and
+ * `grid_options: { rows: auto }` carries (verified working on HA 2026.6) and
  * must be passed explicitly: simply omitting `rows` is NOT equivalent at
  * runtime, so the string is set here on purpose, not left to a default.
  *
@@ -64,11 +66,7 @@ export function buildGridOptions(minColumns) {
   return { columns: 12, min_columns: minColumns, rows: 'auto' };
 }
 
-/**
- * Rejects strings longer than this cap before numeric-digit inspection to
- * rule out any ReDoS risk — a CSS dimension has no legitimate use case near
- * this length, so the cap is effectively unreachable in real configs.
- */
+/** Cap rejects overlong strings before numeric-digit inspection to rule out ReDoS. */
 const CSS_VALUE_MAX_LEN = 32;
 
 /**
@@ -97,7 +95,7 @@ export function cssValue(value) {
 
 /**
  * Check if user prefers reduced motion.
- * Safe for non-browser environments (SSR, tests) — returns false.
+ * Safe for non-browser environments (SSR, tests): returns false.
  * @returns {boolean}
  */
 export function isReducedMotion() {
@@ -131,7 +129,7 @@ export function formatNumericDisplay(value, decimals = 1) {
  *
  * Returning a plain string (not a formatter) keeps this a one-shot decision
  * that callers resolve once per render and thread into `formatHHMM` / any
- * `Intl` options — the leaf formatters stay `hass`-agnostic.
+ * `Intl` options; the leaf formatters stay `hass`-agnostic.
  *
  * @param {import('./types.js').Hass|null|undefined} hass
  * @returns {string|undefined} IANA zone name, or undefined for browser-local.
@@ -163,13 +161,12 @@ export function resolveHassTimeZone(hass) {
  */
 export function formatDateTime(d, timeZone, options) {
   if (!d || isNaN(d.getTime())) return '';
-  // 'en-GB' fixes the locale so output is stable across machines; timeZone
-  // undefined lets Intl fall back to the runtime (browser) zone.
+  // 'en-GB' fixes the locale for stable output; undefined timeZone falls back to the browser zone.
   return new Intl.DateTimeFormat('en-GB', { ...options, timeZone }).format(d);
 }
 
 /**
- * Format a Date as zero-padded 24-hour "HH:MM" — the HH:MM shape of
+ * Format a Date as zero-padded 24-hour "HH:MM", the HH:MM shape of
  * {@link formatDateTime}. Same `(d, timeZone)` contract; self-guards null
  * dates by returning ''.
  *
@@ -194,13 +191,13 @@ export function makeWarn(prefix) {
     console.warn(`${prefix} ${msg}`, ...args);
 }
 
-/** HA states that mean "no usable value" — shared O(1) lookup. */
+/** HA states that mean "no usable value": shared O(1) lookup. */
 const UNAVAILABLE_STATES = new Set(['unavailable', 'unknown', 'error']);
 
 /**
  * Whether an HA entity state object carries no usable value. A missing state
  * counts as unavailable. `unavailable`, `unknown`, and `error` are all treated
- * uniformly across the family — the same three strings every card's renderer
+ * uniformly across the family: the same three strings every card's renderer
  * must skip.
  * @param {{state?: string}|null|undefined} state - hass.states[entityId].
  * @returns {boolean}
@@ -208,6 +205,43 @@ const UNAVAILABLE_STATES = new Set(['unavailable', 'unknown', 'error']);
 export function isUnavailableState(state) {
   if (!state) return true;
   return UNAVAILABLE_STATES.has(state.state ?? '');
+}
+
+let _hassTempUnit = '°C';
+
+/**
+ * Store the Home Assistant temperature unit from hass.config, else reset to Celsius.
+ * @param {*} hass
+ */
+export function setHassTempUnit(hass) {
+  const unit = hass?.config?.unit_system?.temperature;
+  _hassTempUnit = typeof unit === 'string' && unit ? unit : '°C';
+}
+
+/**
+ * Unit for a temperature entity: its own attribute, else the Home Assistant unit.
+ * @param {*} attrs
+ * @returns {string}
+ */
+export function resolveTempUnit(attrs) {
+  return attrs?.unit_of_measurement || attrs?.temperature_unit || _hassTempUnit;
+}
+
+const isHassFahrenheit = () => _hassTempUnit.includes('F');
+
+/** @param {number} temp @returns {number} Home Assistant unit to Celsius; non-finite passes through. */
+export function toCelsius(temp) {
+  return isHassFahrenheit() && Number.isFinite(temp) ? ((temp - 32) * 5) / 9 : temp;
+}
+
+/** @param {number} celsius @returns {number} Celsius to the Home Assistant unit; non-finite passes through. */
+export function fromCelsius(celsius) {
+  return isHassFahrenheit() && Number.isFinite(celsius) ? (celsius * 9) / 5 + 32 : celsius;
+}
+
+/** @param {number} delta @returns {number} Celsius difference to the Home Assistant unit; non-finite passes through. */
+export function celsiusDeltaToUnit(delta) {
+  return isHassFahrenheit() && Number.isFinite(delta) ? delta * 1.8 : delta;
 }
 
 let _domIdCounter = 0;
@@ -270,8 +304,7 @@ export async function fetchSparklineData(hass, entityIds, hoursToShow = 24) {
         }
         results[eid] = points;
       } catch (e) {
-        // Isolate per-entity parsing errors so one bad entity doesn't block others.
-        // Log so HA history-format drift is diagnosable instead of silently empty.
+        // Isolate per-entity parse errors and log them so HA history-format drift stays diagnosable.
         console.warn(`${SPARKLINE_LOG_PREFIX} parse failed for %s: %O`, eid, e);
         results[eid] = [];
       }
@@ -310,10 +343,7 @@ export async function fetchClimateStateHistory(hass, entityIds, hoursToShow = 24
       start_time: start.toISOString(),
       end_time: now.toISOString(),
       entity_ids: entityIds,
-      /* minimal_response keeps payload small and gives us the main state
-         (`heat` / `cool` / `off` etc) which is what we need for the timeline.
-         hvac_action lives in attributes — costs ~10× payload to include —
-         and most users care about the mode timeline anyway. */
+      /* minimal_response keeps the payload small; hvac_action lives in attributes (~10× payload). */
       minimal_response: true,
       significant_changes_only: false,
     });
@@ -336,9 +366,7 @@ export async function fetchClimateStateHistory(hass, entityIds, hoursToShow = 24
           if (raw === 'heat' || raw === 'heating') bucket = 'heating';
           else if (raw === 'cool' || raw === 'cooling') bucket = 'cooling';
           else if (raw === 'off') bucket = 'off';
-          /* Power isn't in minimal-response payload; default to a non-zero
-             nominal so any heating/cooling slot lands at least in the low
-             tier, otherwise opacity stays at 0 and the cell never shows. */
+          /* Power isn't in the minimal response; non-zero nominal keeps heating/cooling cells visible. */
           const power = (bucket === 'heating' || bucket === 'cooling') ? 50 : 0;
           points.push({ t, state: bucket, power });
         }
@@ -459,7 +487,7 @@ export function buildSparklinePath(data, width, height, slots = 24, aggregateFun
  * actual point to the next midpoint. Without smoothing, or for exactly two
  * points, emits straight line segments.
  *
- * This is the shared rendering core — callers (Bar sparkline auto-scale,
+ * This is the shared rendering core; callers (Bar sparkline auto-scale,
  * Climate multi-series shared axis) project their data to {x,y} pixels then
  * call this so the curve maths lives in one place.
  * @param {{x:number, y:number}[]} pts - Points already projected to pixels.

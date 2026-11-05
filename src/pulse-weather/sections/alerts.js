@@ -66,8 +66,7 @@ function blipAngle(a) {
  */
 export function buildAlert(attrs, isActive) {
   const type = /** @type {string} */ (attrs.alert_type || attrs.type || 'wind');
-  // Level is contractually numeric (Atmos CE: 1–4). Explicit finite check
-  // so a non-numeric value falls back to 1 audibly rather than NaN.
+  // Level is contractually numeric (Atmos CE: 1–4); explicit finite check so a bad value falls back to 1 rather than NaN.
   const rawLevel = Number(attrs.level);
   const severity = Number.isFinite(rawLevel) && rawLevel > 0 ? rawLevel : 1;
   // Radar hex derives from the same bucket as the text tone, so the blip and
@@ -124,7 +123,7 @@ export function buildAlert(attrs, isActive) {
 
 /**
  * Build a ticker row HTML fragment for one alert.
- * Derives segments from the parseAlerts() output shape — see the task brief.
+ * Derives segments from the parseAlerts() output shape, see the task brief.
  * @param {import('../types.js').AlertData} alert
  * @returns {string}
  */
@@ -165,7 +164,7 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
   //
   // INVARIANT (locked by predicate audit 2026-06-22, D3): only the
   // ActiveAlertSensor exposes `all_alerts`; the upcoming/count sensors do
-  // not. The `break` below relies on this — if Atmos CE ever adds
+  // not. The `break` below relies on this, if Atmos CE ever adds
   // `all_alerts` to a second sensor, this loop must switch from
   // "first match wins" to picking the active-alert sensor explicitly.
   const alerts = [];
@@ -193,7 +192,7 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
   const breatheDur = breatheDuration(severityRatio).toFixed(2);
   const alertWash = hasAlerts ? tensionWash(worstColor, severityRatio * alertCompound) : tensionWash('#30d158', 0.08);
 
-  // Radar — CRT green phosphor style, severity-colored
+  // Radar: CRT green phosphor style, severity-colored
   const radarSize = 140;
   const cx = radarSize / 2;
   const cy = radarSize / 2;
@@ -211,7 +210,7 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
   // the centre; the further in the future an upcoming alert starts, the
   // further out it sits, clamped to the radar edge). Angle is a stable
   // per-alert hash so blips spread across all 360° and never stack on one
-  // point or a single radial line — and, being deterministic, they don't
+  // point or a single radial line, and, being deterministic, they don't
   // jump position on every re-render the way Math.random() would.
   const blipsHtml = alerts.map((a) => {
     const bx = cx + Math.cos(blipAngle(a)) * blipDistance(a);
@@ -261,10 +260,7 @@ export function renderAlerts({ hass, config, discovery, proPersisted = false }) 
         ${tickerRows ? `<div class="pw-alert-list">${tickerRows}</div>` : ''}
         ${timestampHtml}`;
 
-  /* Pro view — the default ticker compresses each alert to a one-line keyword
-     sequence; pro lays out full headline, meta (issue/expiry/severity),
-     description prose, and any reported locations. Falls back to All Clear
-     when there's nothing active. */
+  /* Pro view: full headline, meta, description and locations (the default ticker compresses each alert to keywords); falls back to All Clear when nothing is active. */
   const proAlertCards = alerts.map((a) => {
     const tone = severityBucket(a.severity);
     const headline = a.summary || a.desc || a.type;

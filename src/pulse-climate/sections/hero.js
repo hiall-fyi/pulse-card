@@ -1,13 +1,13 @@
 /**
  * @module pulse-climate/sections/hero
- * @description Hero block — large home avg temperature, per-zone dot
+ * @description Hero block: large home avg temperature, per-zone dot
  * cluster (state-coloured, breathing on the master pulse phase), and
  * per-zone 24h temperature strips with state ribbon. Pure renderer;
  * consumes pre-resolved zone states from the card.
  */
 
-import { escapeHtml, formatNumericDisplay, sanitizeCssValue } from '../../shared/utils.js';
-import { classifyClimateState } from '../utils.js';
+import { escapeHtml, formatNumericDisplay, sanitizeCssValue, fromCelsius } from '../../shared/utils.js';
+import { classifyClimateState, zoneActionWord, formatTemperature, zoneStateKey } from '../utils.js';
 import { stateTemperatureToColor } from '../chart-primitives.js';
 
 /** Map climate state to hero status label. */
@@ -49,14 +49,9 @@ const STRIP_ROW_CAP = 6;
  * @returns {string}
  */
 function dotStateClass(zone) {
-  /* Template-literal form keeps the audit's dynamic-prefix detection happy:
-     `pc-hero-dot-${state}` matches the css-audit script's regex for
-     dynamically composed class names. */
-  let state = 'idle';
-  if (zone.isUnavailable) state = 'unavail';
-  else if (zone.hvacAction === 'heating') state = 'heating';
-  else if (zone.hvacAction === 'cooling') state = 'cooling';
-  else if (zone.hvacAction === 'off') state = 'off';
+  // Template-literal form `pc-hero-dot-${state}` keeps the css-audit dynamic-prefix detection working.
+  const key = zoneStateKey({ ...zone, hvacMode: undefined });
+  const state = key === 'unavail' ? 'unavail' : key === 'heat' ? 'heating' : key === 'cool' ? 'cooling' : key === 'off' ? 'off' : 'idle';
   return `pc-hero-dot-${state}`;
 }
 
@@ -66,11 +61,8 @@ function dotStateClass(zone) {
  * @returns {string}
  */
 function stripRowClass(zone) {
-  let state = 'idle';
-  if (zone.isUnavailable) state = 'unavail';
-  else if (zone.hvacAction === 'heating') state = 'heat';
-  else if (zone.hvacAction === 'cooling') state = 'cool';
-  else if (zone.hvacAction === 'off') state = 'off';
+  const key = zoneStateKey({ ...zone, hvacMode: undefined });
+  const state = ['unavail', 'heat', 'cool', 'off'].includes(key) ? key : 'idle';
   return `pc-row-${state}`;
 }
 
@@ -89,8 +81,7 @@ export function renderHero(zoneStates, cardConfig, historyMap, outdoor) {
   const live = zoneStates.filter((z) => !z.isUnavailable);
   const state = classifyClimateState(zoneStates);
 
-  /* Home avg samples ALL zones with finite currentTemp regardless of
-     hvacAction — sensors keep reading even when zones are off. */
+  // Home avg samples all zones with finite currentTemp regardless of hvacAction: sensors keep reading when off.
   const tempSamples = zoneStates.filter(
     (z) => !z.isUnavailable && typeof z.currentTemp === 'number' && Number.isFinite(z.currentTemp),
   );
@@ -104,8 +95,8 @@ export function renderHero(zoneStates, cardConfig, historyMap, outdoor) {
   const stateLabel = STATE_LABELS[state] || 'Idle';
 
   const tempDisplay = avgTemp === null
-    ? '—'
-    : `${formatNumericDisplay(avgTemp)}${escapeHtml(unit)}`;
+    ? '\u2014'
+    : escapeHtml(formatTemperature(avgTemp, unit));
 
   let html = `<div class="pc-hero pc-state-${state}">`;
 
@@ -120,9 +111,8 @@ export function renderHero(zoneStates, cardConfig, historyMap, outdoor) {
   html += `<div class="pc-hero-dots">`;
   for (const zone of zoneStates) {
     const cls = dotStateClass(zone);
-    const titleParts = [escapeHtml(zone.name)];
-    if (!zone.isUnavailable && zone.hvacAction) titleParts.push(escapeHtml(zone.hvacAction));
-    html += `<span class="pc-hero-zone-dot ${cls}" data-entity="${escapeHtml(zone.entityId)}" title="${titleParts.join(' — ')}"></span>`;
+    const titleParts = [escapeHtml(zone.name), escapeHtml(zoneActionWord(zone))];
+    html += `<span class="pc-hero-zone-dot ${cls}" data-entity="${escapeHtml(zone.entityId)}" title="${titleParts.join(', ')}"></span>`;
   }
   html += `</div>`;
 
@@ -169,8 +159,7 @@ function renderStripsBlock(zoneStates, historyMap) {
   const visible = zoneStates.slice(0, STRIP_ROW_CAP);
   const overflow = zoneStates.length - visible.length;
 
-  /* Skip the entire strips block when no history is available for any zone — keeps
-     the hero compact during initial load before the history fetch resolves. */
+  // Skip the strips block when no zone has history, keeping the hero compact until the fetch resolves.
   let anyHistory = false;
   for (const zone of visible) {
     const h = historyMap?.get?.(zone.entityId);
@@ -203,8 +192,8 @@ function renderStripRow(zone, history, slots) {
   let cells = '';
   if (Array.isArray(history) && history.length >= 2) {
     const range = {
-      minTemp: zone.minTemp ?? 18,
-      maxTemp: zone.maxTemp ?? 26,
+      minTemp: zone.minTemp ?? fromCelsius(18),
+      maxTemp: zone.maxTemp ?? fromCelsius(26),
     };
     const stateKey = zone.isUnavailable ? 'off' : zone.hvacAction;
     const step = Math.max(1, Math.floor(history.length / slots));
@@ -214,7 +203,7 @@ function renderStripRow(zone, history, slots) {
       cells += `<span style="background:${sanitizeCssValue(colour)}"></span>`;
     }
   } else {
-    /* Ghost cells when history empty — keeps row layout aligned with peers. */
+    /* Ghost cells when history empty, keeps row layout aligned with peers. */
     for (let i = 0; i < slots; i++) {
       cells += `<span class="pc-hero-zone-strip-cell-ghost"></span>`;
     }

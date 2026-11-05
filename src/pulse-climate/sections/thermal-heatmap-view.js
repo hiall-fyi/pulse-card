@@ -4,10 +4,10 @@
  * Cells use the rainbow temperature palette via temperatureToColor(). Each
  * row carries a 24h average stat column to match state-timeline's duration
  * column so rows align grid-for-grid across tab switches. Pure body
- * renderer — no section header.
+ * renderer: no section header.
  */
 
-import { escapeHtml, formatNumericDisplay, sanitizeCssValue } from '../../shared/utils.js';
+import { escapeHtml, formatNumericDisplay, resolveTempUnit, toCelsius, fromCelsius } from '../../shared/utils.js';
 import { resolveZoneContext, rowStateClass } from '../utils.js';
 import { resolveHistoryTempSensor } from '../sensor-resolver.js';
 import { temperatureToColor, TEMP_COLOR_BANDS } from '../chart-primitives.js';
@@ -44,9 +44,8 @@ export function renderThermalHeatmapView(zones, states, discovery, historyCache,
 
   let totalAvgSum = 0;
   let totalAvgCount = 0;
-  let unit = '°C';
-  /* Observed temperature span across every rendered cell — drives the
-     dynamic legend so it only lists bands the data actually crosses. */
+  let unit = resolveTempUnit(null);
+  // Observed temperature span across every rendered cell: drives the legend to list only crossed bands.
   let obsMin = Infinity;
   let obsMax = -Infinity;
 
@@ -86,15 +85,13 @@ export function renderThermalHeatmapView(zones, states, discovery, historyCache,
   }
   html += '</div>';
   html += renderTimeAxis();
-  const obsRange = (obsMin <= obsMax) ? { min: obsMin, max: obsMax } : null;
+  const obsRange = (obsMin <= obsMax) ? { min: toCelsius(obsMin), max: toCelsius(obsMax) } : null;
   html += renderFooter(totalAvgSum, totalAvgCount, unit, zones.length, obsRange);
   return html;
 }
 
 function renderTimeAxis() {
-  /* Trailing span aligns with the per-row stat column — label it "avg" once
-     here so each row's number reads unambiguously as the 24h average, not
-     the live reading (which lives in the zones section). */
+  // Trailing span aligns with the per-row stat column: label it "avg" so rows read as the 24h average.
   return `<div class="pc-timeline-group-axis">`
     + `<span></span>`
     + `<div class="ticks"><span>−24h</span><span>−18h</span><span>−12h</span><span>−6h</span><span>now</span></div>`
@@ -113,7 +110,7 @@ function renderTimeAxis() {
 function renderFooter(totalAvgSum, totalAvgCount, unit, zoneCount, obsRange) {
   const homeAvg = totalAvgCount > 0 ? totalAvgSum / totalAvgCount : null;
   const avgDisplay = homeAvg === null
-    ? '—'
+    ? '\u2014'
     : `${formatNumericDisplay(homeAvg)}${escapeHtml(unit)}`;
   return `<div class="pc-timeline-group-footer">`
     + renderTempLegend(unit, obsRange)
@@ -123,13 +120,13 @@ function renderFooter(totalAvgSum, totalAvgCount, unit, zoneCount, obsRange) {
 
 /**
  * Render the temperature legend by walking the TEMP_COLOR_BANDS table in
- * chart-primitives.js — single source of truth for the palette. Each band
+ * chart-primitives.js: single source of truth for the palette. Each band
  * becomes one pill: pip coloured per the band's hex, label naming the
  * band's range (e.g. "≤14°C", "16–17°C", "≥34°C").
  *
  * Dynamic range: only bands the observed data actually crosses are shown,
- * so the legend tracks the live window — cool colours in winter, hot
- * colours during a heatwave — without ever overflowing into extra rows.
+ * so the legend tracks the live window: cool colours in winter, hot
+ * colours during a heatwave, without ever overflowing into extra rows.
  * The first shown band uses a "≤" label and the last an "≥" label so the
  * legend reads as a closed range even when the middle bands are trimmed.
  * Falls back to the full table when no data has been observed yet.
@@ -139,13 +136,9 @@ function renderFooter(totalAvgSum, totalAvgCount, unit, zoneCount, obsRange) {
  * @returns {string}
  */
 function renderTempLegend(unit, obsRange) {
-  const isF = unit?.includes('F');
-  /** Convert a Celsius boundary to display units. */
-  const toDisplay = (/** @type {number} */ tC) => isF ? Math.round((tC * 9) / 5 + 32) : tC;
+  const toDisplay = (/** @type {number} */ tC) => Math.round(fromCelsius(tC));
 
-  /* Select the contiguous band slice the observed range crosses. A band
-     [prevUpper, upper] is in range when its span overlaps [min, max].
-     Without data, show the whole table. */
+  // Select bands whose [prevUpper, upper] span overlaps the observed [min, max]; with no data show them all.
   const inRange = TEMP_COLOR_BANDS.map((band, i) => {
     if (!obsRange) return true;
     const lowerC = i === 0 ? -Infinity : /** @type {number} */ (TEMP_COLOR_BANDS[i - 1].upper);
@@ -174,7 +167,7 @@ function renderTempLegend(unit, obsRange) {
       label = `${prevUpperC !== null ? toDisplay(prevUpperC) : 0}–${toDisplay(/** @type {number} */ (band.upper))}${unit}`;
     }
     html += `<span class="pc-temp-legend-pill">`
-      + `<span class="pc-temp-legend-pip" style="background:${sanitizeCssValue(band.color)}"></span>`
+      + `<span class="pc-temp-legend-pip pc-temp-band-${i}"></span>`
       + `${escapeHtml(label)}`
       + `</span>`;
   }

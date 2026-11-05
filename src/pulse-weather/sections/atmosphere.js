@@ -5,12 +5,12 @@
  * stability assessment integration. Replaces the previous gauge display.
  *
  * Pure functions (exported for testing):
- * - ATMOS_CE_TIER_MAP — tier mapping constant
- * - resolveStabilityTier — composite sensor → fallback resolution
- * - columnFillHeight — score → fill percentage
- * - freezeMarkerPosition — altitude → column position
- * - particleConfig — score → particle parameters
- * - buildThermalParticles — score + color → DOM fragment
+ * - ATMOS_CE_TIER_MAP: tier mapping constant
+ * - resolveStabilityTier: composite sensor → fallback resolution
+ * - columnFillHeight: score → fill percentage
+ * - freezeMarkerPosition: altitude → column position
+ * - particleConfig: score → particle parameters
+ * - buildThermalParticles: score + color → DOM fragment
  */
 
 import { capeColor, escapeHtml, sanitizeCssValue, deriveTodaySunBoundaries, formatHHMM, resolveHassTimeZone } from '../weather-primitives.js';
@@ -36,7 +36,7 @@ export const ATMOS_CE_TIER_MAP = Object.freeze({
 
 /**
  * Map Atmos CE tier states to fill height percentages.
- * Used when composite sensor is the source — provides visual consistency
+ * Used when composite sensor is the source, provides visual consistency
  * between tier label and column fill.
  * @type {Readonly<Record<string, number>>}
  */
@@ -60,7 +60,7 @@ function liftedIndexTier(value) {
 
 /**
  * Compute combined instability score (0–100) from CAPE and Lifted Index.
- * CAPE contributes 60%, LI contributes 40% — CAPE is the stronger signal.
+ * CAPE contributes 60%, LI contributes 40%, CAPE is the stronger signal.
  * Used as fallback when composite sensor unavailable, and always for fill height.
  *
  * Inputs assume Atmos CE's normalised units. A non-Atmos provider that
@@ -112,7 +112,7 @@ function instabilityTier(score) {
  */
 
 /**
- * Resolve stability tier — prefer Atmos CE composite sensor, fallback to score.
+ * Resolve stability tier: prefer Atmos CE composite sensor, fallback to score.
  * When composite is source, fill height uses TIER_FILL_MAP for visual consistency.
  * When fallback, fill height uses instabilityScore(cape, li).
  * @param {{states: Object<string, {state: string, attributes: Object}>}} hass - Home Assistant state object.
@@ -163,7 +163,7 @@ export function resolveStabilityTier(hass, discovery) {
 
 /**
  * Compute CAPE fill height as percentage of column.
- * Direct 1:1 mapping — kept as named function for future non-linear mapping.
+ * Direct 1:1 mapping, kept as named function for future non-linear mapping.
  * @param {number} score - Instability score 0–100.
  * @returns {number} Fill height percentage, clamped [0, 100].
  */
@@ -212,7 +212,7 @@ export function computeColumnScale(freezeAltM, lclAltM) {
 
   const labelInterval = Math.ceil(scaleMax / 5000) * 1000;
   // Round scaleMax up to a multiple of labelInterval so the label ladder
-  // descends evenly to 0 — otherwise the last gap collapses (e.g. scaleMax
+  // descends evenly to 0: otherwise the last gap collapses (e.g. scaleMax
   // 7000 with interval 2000 produced labels [7000, 5000, 3000, 1000, 0]
   // where the final 1000 → 0 step was half the others).
   scaleMax = Math.ceil(scaleMax / labelInterval) * labelInterval;
@@ -238,7 +238,7 @@ export function cloudBandOpacity(coverPct) {
 
 /**
  * Severity rank for Atmos CE composite-sensor per-dimension tiers.
- * Used to spot a shear-dominated headline tier — when CAPE / LI /
+ * Used to spot a shear-dominated headline tier, when CAPE / LI /
  * lapse all read `none` but `wind_shear_tier` is `slight` or above,
  * the composite escalates to e.g. "Moderate" and the existing
  * tier-description wording would promise "severe storms expected"
@@ -296,7 +296,7 @@ export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySun
 
   // Shear-dominated short-circuit: composite tier escalated by wind
   // shear alone (CAPE / LI / lapse all `none`). "Severe storms
-  // expected" would mislead — name the shear and skip storm wording.
+  // expected" would mislead: name the shear and skip storm wording.
   const driver = classifyAtmosDriver(attrs);
   if (driver && driver.maxThermal === 0 && driver.shearTier >= 2) {
     return 'Wind shear elevated · atmosphere thermally quiet';
@@ -306,7 +306,7 @@ export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySun
   const nowMs = now.getTime();
   const sunsetPassed = sunsetMs !== null && nowMs >= sunsetMs;
 
-  // Locate forecast peak — only honour when hourly slots actually carry
+  // Locate forecast peak: only honour when hourly slots actually carry
   // CAPE. An all-zero series collapses indexOf to slot 0 and would
   // falsely claim the peak is happening "now".
   const slots = Array.isArray(hourly) ? hourly.slice(0, 6) : [];
@@ -328,8 +328,7 @@ export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySun
     }
   }
 
-  // No usable peak time → lean on tier description, optionally suffixed
-  // by sunset state. Never fabricate a clock time.
+  // No usable peak time: lean on the tier description, optionally suffixed by sunset state; never fabricate a clock time.
   if (peakLabel === null || peakMs === null) {
     const base = tierDesc || 'Storm risk active';
     return sunsetPassed ? `${base} · calming overnight` : base;
@@ -341,8 +340,8 @@ export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySun
 
   if (peakInPast) {
     return sunsetPassed
-      ? `Storm risk easing — peaked ${peakLabel}, calming overnight`
-      : `Storm risk easing — peaked ${peakLabel}`;
+      ? `Storm risk easing: peaked ${peakLabel}, calming overnight`
+      : `Storm risk easing: peaked ${peakLabel}`;
   }
   if (peakNow) {
     if (sunsetPassed) return 'Storm risk peaking now, calming overnight';
@@ -354,7 +353,7 @@ export function composeStormNarrative({ tierKey, tierDesc, hourly, now, todaySun
     return `Storm risk peaks ${peakLabel}, calming after sunset`;
   }
   if (sunsetMs !== null) {
-    // Peak falls after sunset — don't promise "calming after sunset".
+    // Peak falls after sunset: don't promise "calming after sunset".
     return `Storm risk peaks ${peakLabel} (after sunset)`;
   }
   return `Storm risk peaks ${peakLabel}`;
@@ -627,7 +626,7 @@ export function renderAtmosphere({ hass, config, discovery, forecastData }) {
   const ce = discovery.atmosCe;
 
   if (!ce.cape && !ce.lifted_index && !ce.freezing_level_height) {
-    console.debug(`${LOG_PREFIX} Atmosphere section requires Atmos CE sensors (cape / lifted_index / freezing_level_height) — section skipped. Install Atmos CE integration if you want the atmospheric stability column.`);
+    console.debug(`${LOG_PREFIX} Atmosphere section requires Atmos CE sensors (cape / lifted_index / freezing_level_height): section skipped. Install Atmos CE integration if you want the atmospheric stability column.`);
     return null;
   }
 
@@ -658,10 +657,7 @@ export function renderAtmosphere({ hass, config, discovery, forecastData }) {
   const stormTiers = ['slight', 'enhanced', 'moderate', 'high'];
   const variant = stormTiers.includes(tierKey) ? 'rain' : 'cloudy';
 
-  /* Narrative is time-aware + evidence-gated: compare current time vs forecast
-     peak vs sunset so the subline never promises "calming after sunset" when
-     sunset has already passed, and never invents "late afternoon" when the
-     forecast provider doesn't expose CAPE. See composeStormNarrative. */
+  /* Narrative is time-aware and evidence-gated (current time vs forecast peak vs sunset); see composeStormNarrative. */
   const now = new Date();
   const sunStateForNarrative = discovery.sunEntityId ? hass.states[discovery.sunEntityId] : null;
   const { todaySunset } = deriveTodaySunBoundaries(
@@ -679,11 +675,7 @@ export function renderAtmosphere({ hass, config, discovery, forecastData }) {
     timeZone: resolveHassTimeZone(hass),
   });
 
-  /* Vertical column visualisation — 5 km (or auto-scaled) atmospheric profile
-     with three overlaid markers: a CAPE fill growing up from the ground, a
-     freeze-level marker (cyan) where temperature crosses 0 °C, and an LCL
-     marker (dashed grey) for the lifted condensation level (cloud base).
-     The wider the LCL ↔ freeze gap, the deeper the cloud layer that can form. */
+  /* Vertical column visualisation: 5 km atmospheric profile with CAPE fill, freeze-level marker and LCL marker; a wider LCL-freeze gap means a deeper cloud layer. */
   const freezeAlt = freezeSensor.value ?? 0;
   const lclAlt = lclSensor.value ?? 0;
   const { scaleMax, labels: scaleLabels } = computeColumnScale(freezeAlt, lclAlt);

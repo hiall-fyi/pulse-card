@@ -2,10 +2,10 @@
  * @module pulse-climate/sections/slot-engine
  * @description Shared slot computation, strip rendering, and tooltip utilities
  * for thermal timeline and comfort heatmap sections.
- * Pure functions — no side effects, no DOM access (except tooltip factory).
+ * Pure functions: no side effects, no DOM access (except tooltip factory).
  */
 
-import { escapeHtml, sanitizeCssValue, formatHHMM } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, formatHHMM, formatNumericDisplay } from '../../shared/utils.js';
 
 /**
  * @typedef {object} SlotData
@@ -139,7 +139,7 @@ export function renderHeatmapStrip(slotData, colorFn, _options = {}) {
 
 /**
  * Create a reusable floating tooltip element for strip/cell hover.
- * Uses absolute positioning — append to a container without overflow:hidden.
+ * Uses absolute positioning: append to a container without overflow:hidden.
  * @returns {{show: (refRect: DOMRect, x: number, text: string) => void, hide: () => void, element: HTMLElement}}
  */
 export function createStripTooltip() {
@@ -238,8 +238,9 @@ const TOUCH_AUTOHIDE_MS = 2000;
  * @param {HTMLElement} crosshairEl - The .strip-crosshair element.
  * @param {Element} refEl - Reference element for X coordinate calculation (e.g. first strip).
  * @param {number} labelOffset - Pixel offset from parentEl left to refEl left.
+ * @param {AbortSignal} [signal] - Aborting removes the listeners and clears the touch timer.
  */
-export function bindCrosshair(parentEl, crosshairEl, refEl, labelOffset) {
+export function bindCrosshair(parentEl, crosshairEl, refEl, labelOffset, signal) {
   /** @type {ReturnType<typeof setTimeout>|null} */
   let touchTimer = null;
 
@@ -257,12 +258,16 @@ export function bindCrosshair(parentEl, crosshairEl, refEl, labelOffset) {
     if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
   };
 
+  signal?.addEventListener('abort', () => {
+    if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+  }, { once: true });
+
   // Desktop: hover
   parentEl.addEventListener('pointermove', (/** @type {*} */ ev) => {
     if (ev.pointerType === 'touch') return;
     showAt(ev.clientX);
-  });
-  parentEl.addEventListener('pointerleave', hide);
+  }, { signal });
+  parentEl.addEventListener('pointerleave', hide, { signal });
 
   // Mobile: tap-to-pin with auto-hide
   parentEl.addEventListener('pointerdown', (/** @type {*} */ ev) => {
@@ -270,11 +275,7 @@ export function bindCrosshair(parentEl, crosshairEl, refEl, labelOffset) {
     showAt(ev.clientX);
     if (touchTimer) clearTimeout(touchTimer);
     touchTimer = setTimeout(hide, TOUCH_AUTOHIDE_MS);
-  });
-  parentEl.addEventListener('pointerup', (/** @type {*} */ ev) => {
-    if (ev.pointerType !== 'touch') return;
-    // Keep crosshair visible — auto-hide timer will clean up
-  });
+  }, { signal });
 }
 
 // ── Drag Selection Binding ──────────────────────────────────────────
@@ -286,8 +287,9 @@ export function bindCrosshair(parentEl, crosshairEl, refEl, labelOffset) {
  * @param {*[]|null} slots - Parsed slot data array.
  * @param {{show: (rect: DOMRect, x: number, text: string) => void, hide: () => void}} tooltip - Tooltip instance.
  * @param {string} [unit=''] - Unit suffix for tooltip display.
+ * @param {AbortSignal} [signal] - Aborting removes the listeners, the highlight and the pending hide timer.
  */
-export function bindDragSelect(container, slots, tooltip, unit = '') {
+export function bindDragSelect(container, slots, tooltip, unit = '', signal) {
   if (!slots || slots.length === 0) return;
   const totalSlots = slots.length;
 
@@ -295,6 +297,13 @@ export function bindDragSelect(container, slots, tooltip, unit = '') {
   let dragStartIdx = null;
   /** @type {HTMLElement|null} */
   let highlight = null;
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let hideTimer = null;
+
+  signal?.addEventListener('abort', () => {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if (highlight) { highlight.remove(); highlight = null; }
+  }, { once: true });
 
   container.addEventListener('pointerdown', (/** @type {*} */ ev) => {
     if (ev.pointerType === 'touch' && ev.isPrimary === false) return;
@@ -310,7 +319,7 @@ export function bindDragSelect(container, slots, tooltip, unit = '') {
     highlight.style.display = '';
     highlight.style.left = `${(dragStartIdx / totalSlots * 100).toFixed(1)}%`;
     highlight.style.width = '0%';
-  });
+  }, { signal });
 
   container.addEventListener('pointermove', (/** @type {*} */ ev) => {
     if (dragStartIdx === null || !highlight) return;
@@ -320,7 +329,7 @@ export function bindDragSelect(container, slots, tooltip, unit = '') {
     const maxIdx = Math.max(dragStartIdx, dragEndIdx);
     highlight.style.left = `${(minIdx / totalSlots * 100).toFixed(1)}%`;
     highlight.style.width = `${((maxIdx - minIdx + 1) / totalSlots * 100).toFixed(1)}%`;
-  });
+  }, { signal });
 
   container.addEventListener('pointerup', (/** @type {*} */ ev) => {
     if (dragStartIdx === null) { dragStartIdx = null; return; }
@@ -331,16 +340,17 @@ export function bindDragSelect(container, slots, tooltip, unit = '') {
     const rangeSlots = slots.slice(minIdx, maxIdx + 1).filter((/** @type {*} */ s) => s.v !== null);
     if (rangeSlots.length > 0) {
       const vals = rangeSlots.map((/** @type {*} */ s) => s.v);
-      const avg = (vals.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / vals.length).toFixed(1);
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
+      const avg = formatNumericDisplay(vals.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0) / vals.length);
+      const min = formatNumericDisplay(Math.min(...vals));
+      const max = formatNumericDisplay(Math.max(...vals));
       const startLabel = slots[minIdx]?.l || '';
       const endLabel = slots[maxIdx]?.l || '';
       const text = `${startLabel} – ${endLabel}: avg ${avg}${unit}, ${min}${unit} – ${max}${unit}`;
       const parentRect = container.getBoundingClientRect();
       tooltip.show(parentRect, (minIdx + maxIdx) / 2 / totalSlots * parentRect.width, text);
-      setTimeout(() => tooltip.hide(), 3000);
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => tooltip.hide(), 3000);
     }
     dragStartIdx = null;
-  });
+  }, { signal });
 }

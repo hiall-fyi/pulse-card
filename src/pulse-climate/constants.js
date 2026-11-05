@@ -6,7 +6,7 @@
 
 import { FAMILY_VERSION } from '../shared/version.js';
 
-/** Pulse Climate Card version — tracks the shared family release line. */
+/** Pulse Climate Card version, tracks the shared family release line. */
 export const VERSION = FAMILY_VERSION;
 
 /** Custom element tag name. */
@@ -18,31 +18,28 @@ export const EDITOR_NAME = 'pulse-climate-card-editor';
 /** Console log prefix. */
 export const LOG_PREFIX = 'Pulse Climate Card:';
 
-/**
- * HVAC action → visual mapping.
- * Colors use CSS custom property references where possible (resolved at render time).
- * Fallback hex values chosen for ≥4.5:1 contrast on both light (#fff) and dark (#1c1c1c) backgrounds.
- */
+/** In Celsius; converted at the use site. Largest gap between current and target that still reads as At target, and sets the row class in every section using rowStateClass (Zones, Home Status, Radial, Ranking, strips). */
+export const AT_TARGET_TOLERANCE = 0.3;
+
+/** HVAC action → visual mapping; fallback hex values give ≥4.5:1 contrast on light and dark backgrounds. */
 export const HVAC_VISUALS = {
-  heating: { icon: 'mdi:fire', token: 'var(--pulse-tier-strong)', fallback: '#ff9f0a', label: 'Heating' },
-  cooling: { icon: 'mdi:snowflake', token: 'var(--pulse-tier-calm)', fallback: '#5ac8fa', label: 'Cooling' },
-  drying:  { icon: 'mdi:water-off', token: null, fallback: '#9C27B0', label: 'Drying' },
-  fan:     { icon: 'mdi:fan', token: null, fallback: '#607D8B', label: 'Fan' },
-  idle:    { icon: 'mdi:clock-outline', token: 'var(--pulse-text-secondary)', fallback: '#9E9E9E', label: 'Idle' },
-  off:     { icon: 'mdi:power', token: 'var(--pulse-disabled)', fallback: '#616161', label: 'Off' },
+  heating: { icon: 'mdi:fire', token: 'var(--pulse-tier-strong)', fallback: '#ff9f0a', label: 'Heating', tier: 'amber' },
+  cooling: { icon: 'mdi:snowflake', token: 'var(--pulse-tier-calm)', fallback: '#5ac8fa', label: 'Cooling', tier: 'blue' },
+  drying:  { icon: 'mdi:water-off', token: null, fallback: '#9C27B0', label: 'Drying', tier: 'drying' },
+  fan:     { icon: 'mdi:fan', token: null, fallback: '#607D8B', label: 'Fan', tier: 'fan' },
+  preheating: { icon: 'mdi:radiator', token: null, fallback: '#ff9f0a', label: 'Preheating', tier: 'amber' },
+  defrosting: { icon: 'mdi:snowflake-melt', token: null, fallback: '#5ac8fa', label: 'Defrosting', tier: 'blue' },
+  idle:    { icon: 'mdi:clock-outline', token: 'var(--pulse-text-secondary)', fallback: '#9E9E9E', label: 'Idle', tier: null },
+  off:     { icon: 'mdi:power', token: 'var(--pulse-disabled)', fallback: '#616161', label: 'Off', tier: 'disabled' },
 };
 
-/**
- * Mold/condensation risk → color mapping.
- * Uses HA theme label-badge variables with hardcoded fallbacks.
- * All fallback colors tested for ≥4.5:1 contrast on both light and dark backgrounds.
- */
+/** Mold/condensation risk → color mapping; HA theme variables with fallbacks tested for ≥4.5:1 contrast. */
 export const RISK_COLORS = {
-  None: { token: 'var(--pulse-tier-moderate)', fallback: '#30d158' },
-  Low:  { token: 'var(--pulse-tier-moderate)', fallback: '#30d158' },
-  Medium: { token: 'var(--pulse-tier-strong)', fallback: '#ff9f0a' },
-  High: { token: 'var(--pulse-tier-gale)', fallback: '#ff453a' },
-  Critical: { token: 'var(--pulse-tier-gale)', fallback: '#ff453a' },
+  None: { token: 'var(--pulse-tier-moderate)', fallback: '#30d158', tier: 'green' },
+  Low:  { token: 'var(--pulse-tier-moderate)', fallback: '#30d158', tier: 'green' },
+  Medium: { token: 'var(--pulse-tier-strong)', fallback: '#ff9f0a', tier: 'amber' },
+  High: { token: 'var(--pulse-tier-gale)', fallback: '#ff453a', tier: 'red' },
+  Critical: { token: 'var(--pulse-tier-gale)', fallback: '#ff453a', tier: 'red' },
 };
 
 /** Default section order. */
@@ -53,17 +50,13 @@ export const SECTION_TYPES = [
   'zones', 'api', 'bridge', 'homekit', 'weather',
   'environment', 'thermal', 'schedule',
   'graph', 'donut',
-  'thermal_strip', 'comfort_strip', 'energy_flow', 'radial',
+  'thermal_strip', 'comfort_strip', 'energy_flow', 'energy_flow_ac', 'radial',
   'home_status', 'zone_ranking',
   'timeline_group',
   'system_health_group',
 ];
 
-/**
- * Default chart color palette — 8 visually distinct colors.
- * Uses HA CSS custom properties with hardcoded fallbacks.
- * Tested for ≥3:1 contrast on both light (#fff) and dark (#1c1c1c) backgrounds.
- */
+/** Default chart palette: 8 distinct colors with fallbacks tested for ≥3:1 contrast on light and dark. */
 export const CHART_PALETTE = [
   'var(--pulse-tier-calm)',
   'var(--pulse-tier-gale)',
@@ -98,4 +91,5 @@ export const SECTION_DEFAULTS = {
   comfort_strip: { slots_per_hour: 1, hours_to_show: 24, mode: 'heatmap' },
   radial: { size: 280, attribute: 'temperature' },
   energy_flow: {},
+  energy_flow_ac: {},
 };

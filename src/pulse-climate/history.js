@@ -7,7 +7,7 @@
  */
 
 /** Default sparkline fetch interval in ms (5 minutes). */
-const SPARKLINE_INTERVAL = 5 * 60 * 1000;
+export const SPARKLINE_INTERVAL = 5 * 60 * 1000;
 
 // ── Shared Module-Level Cache ───────────────────────────────────────
 // Multiple pulse-climate-card instances on the same page share this cache.
@@ -15,7 +15,7 @@ const SPARKLINE_INTERVAL = 5 * 60 * 1000;
 // updates the shared store; subsequent instances reuse it.
 
 /** @type {import('./types.js').HistoryCache} */
-let _sharedCache = { timestamp: 0, data: {}, stateData: {} };
+let _sharedCache = { timestamp: 0, data: {}, stateData: {}, fetchedAt: {} };
 
 /**
  * Get the shared module-level history cache.
@@ -36,17 +36,7 @@ export function getSharedCache() {
  * @returns {import('./types.js').HistoryCache} The updated shared cache.
  */
 export function updateSharedCache(freshData, freshStateData) {
-  const merged = { ..._sharedCache.data };
-  for (const [key, value] of Object.entries(freshData)) {
-    if (value.length > 0) merged[key] = value;
-  }
-  const mergedState = { ..._sharedCache.stateData };
-  if (freshStateData) {
-    for (const [key, value] of Object.entries(freshStateData)) {
-      if (Array.isArray(value) && value.length > 0) mergedState[key] = value;
-    }
-  }
-  _sharedCache = { timestamp: Date.now(), data: merged, stateData: mergedState };
+  _sharedCache = updateCache(_sharedCache, freshData, freshStateData);
   return _sharedCache;
 }
 
@@ -57,7 +47,7 @@ export function updateSharedCache(freshData, freshStateData) {
  * @returns {import('./types.js').HistoryCache}
  */
 export function createHistoryCache() {
-  return { timestamp: 0, data: {}, stateData: {} };
+  return { timestamp: 0, data: {}, stateData: {}, fetchedAt: {} };
 }
 
 /**
@@ -70,17 +60,42 @@ export function isCacheValid(cache) {
 }
 
 /**
- * Update cache with fresh data from fetchSparklineData.
- * Only merges entries with actual data — empty arrays from transient failures
- * do not overwrite existing cached data.
+ * Check that every needed key was fetched within SPARKLINE_INTERVAL.
+ * @param {import('./types.js').HistoryCache} cache
+ * @param {string[]} ids - Temperature/hub entity ids (key = entity id).
+ * @param {string[]} [climateIds] - Climate ids whose state history is needed (key = `state:<id>`).
+ * @param {number} [now]
+ * @returns {boolean}
+ */
+export function cacheCovers(cache, ids, climateIds = [], now = Date.now()) {
+  const stamps = cache.fetchedAt || {};
+  const isFresh = (/** @type {string} */ key) => stamps[key] > 0 && (now - stamps[key]) < SPARKLINE_INTERVAL;
+  return ids.every(isFresh) && climateIds.every((id) => isFresh('state:' + id));
+}
+
+/**
+ * Merge fresh fetch results into a cache; only non-empty arrays replace data and get a fresh per-key stamp.
  * @param {import('./types.js').HistoryCache} cache
  * @param {Record<string, {t: number, v: number}[]>} freshData
+ * @param {Record<string, {t: number, state: string, power: number}[]>} [freshStateData]
  * @returns {import('./types.js').HistoryCache}
  */
-export function updateCache(cache, freshData) {
+export function updateCache(cache, freshData, freshStateData) {
+  const now = Date.now();
   const merged = { ...cache.data };
+  const mergedState = { ...cache.stateData };
+  const fetchedAt = { ...cache.fetchedAt };
   for (const [key, value] of Object.entries(freshData)) {
-    if (value.length > 0) merged[key] = value;
+    if (value.length > 0) {
+      merged[key] = value;
+      fetchedAt[key] = now;
+    }
   }
-  return { timestamp: Date.now(), data: merged };
+  for (const [key, value] of Object.entries(freshStateData || {})) {
+    if (Array.isArray(value) && value.length > 0) {
+      mergedState[key] = value;
+      fetchedAt['state:' + key] = now;
+    }
+  }
+  return { ...cache, timestamp: now, data: merged, stateData: mergedState, fetchedAt };
 }

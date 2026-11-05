@@ -9,8 +9,8 @@
 import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
 import { renderSparklineHtml } from '../chart-primitives.js';
 
+/** Colour fed to the SVG sparkline attribute, not a style= sink, stays a literal. */
 const HK_COLOR = 'var(--pulse-tier-moderate)';
-const HK_WRITE_COLOR = 'var(--pulse-accent)';
 
 /**
  * @param {Record<string, string>|null|undefined} hubEntities
@@ -42,7 +42,7 @@ export function computeHomekitSavedLabel(hubEntities, states) {
 }
 
 /**
- * Render the HomeKit body (no section header — caller's responsibility).
+ * Render the HomeKit body (no section header: caller's responsibility).
  *
  * @param {Record<string, string>} hubEntities
  * @param {Record<string, *>} states
@@ -55,7 +55,7 @@ export function renderHomekitView(hubEntities, states, historyCache) {
   const connState = states[hubEntities.homekit_connected];
   if (!connState) return '';
   const connected = connState.state === 'on';
-  const connColor = connected ? HK_COLOR : 'var(--pulse-tier-gale)';
+  const connTier = connected ? 'green' : 'red';
   const connLabel = connected ? 'Connected' : 'Disconnected';
   const dotClass = connected ? 'pc-pulse-dot pc-connected' : 'pc-pulse-dot pc-disconnected';
 
@@ -72,7 +72,7 @@ export function renderHomekitView(hubEntities, states, historyCache) {
 
   let html = '';
   html += `<div class="pc-zone-chips">`;
-  html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.homekit_connected)}" style="color:${sanitizeCssValue(connColor)}">`;
+  html += `<span class="pc-chip pc-status-${connTier}" data-entity="${escapeHtml(hubEntities.homekit_connected)}">`;
   html += `<span class="${dotClass}"></span>`;
   html += `${escapeHtml(connLabel)}`;
   if (uptime) html += ` <span class="pc-chip-aside">${escapeHtml(uptime)}</span>`;
@@ -81,7 +81,7 @@ export function renderHomekitView(hubEntities, states, historyCache) {
     html += `<span class="pc-chip">${escapeHtml(mappedZones)} zones</span>`;
   }
   if (reconnectCount !== undefined && reconnectCount > 0) {
-    html += `<span class="pc-chip" style="color:var(--pulse-tier-strong)">Reconnects: ${escapeHtml(reconnectCount)}</span>`;
+    html += `<span class="pc-chip pc-status-amber">Reconnects: ${escapeHtml(reconnectCount)}</span>`;
   }
   html += `</div>`;
 
@@ -90,8 +90,8 @@ export function renderHomekitView(hubEntities, states, historyCache) {
     html += `<div class="pc-homekit-bar-stack">`;
     html += `<div class="pc-power-bar-container">`;
     html += `<div class="pc-power-bar-track"></div>`;
-    html += `<div class="pc-power-bar-fill" style="width:100%;background:${sanitizeCssValue(HK_WRITE_COLOR)}"></div>`;
-    html += `<div class="pc-power-bar-fill" style="width:${sanitizeCssValue(readsPct.toFixed(1))}%;background:${sanitizeCssValue(HK_COLOR)}"></div>`;
+    html += `<div class="pc-power-bar-fill pc-hk-write-track"></div>`;
+    html += `<div class="pc-power-bar-fill pc-status-green" style="width:${sanitizeCssValue(readsPct.toFixed(1))}%"></div>`;
     html += `</div>`;
     html += `</div>`;
 
@@ -104,14 +104,14 @@ export function renderHomekitView(hubEntities, states, historyCache) {
     html += `<div class="pc-zone-chips">`;
     const readsDataEntity = hubEntities.homekit_reads_saved || '';
     const writesDataEntity = hubEntities.homekit_writes_saved || '';
-    html += `<span class="pc-chip"${readsDataEntity ? ` data-entity="${escapeHtml(readsDataEntity)}"` : ''} style="color:${sanitizeCssValue(HK_COLOR)}">Reads: ${escapeHtml(readsSaved)}</span>`;
+    html += `<span class="pc-chip pc-status-green"${readsDataEntity ? ` data-entity="${escapeHtml(readsDataEntity)}"` : ''}>Reads: ${escapeHtml(readsSaved)}</span>`;
     if (writesSaved > 0) {
-      html += `<span class="pc-chip"${writesDataEntity ? ` data-entity="${escapeHtml(writesDataEntity)}"` : ''} style="color:${sanitizeCssValue(HK_WRITE_COLOR)}">Writes: ${escapeHtml(writesSaved)}</span>`;
+      html += `<span class="pc-chip pc-status-accent"${writesDataEntity ? ` data-entity="${escapeHtml(writesDataEntity)}"` : ''}>Writes: ${escapeHtml(writesSaved)}</span>`;
     }
     html += `</div>`;
   }
 
-  // Write details — only show when there's actual write activity
+  // Write details: only show when there's actual write activity
   const writeAttempts = Number(attrs.write_attempts) || 0;
   const writeSuccesses = Number(attrs.write_successes) || 0;
   const writeFallbacks = Number(attrs.write_fallbacks) || 0;
@@ -120,7 +120,7 @@ export function renderHomekitView(hubEntities, states, historyCache) {
     html += `<div class="pc-zone-chips">`;
     if (writeAttempts > 0) html += `<span class="pc-chip">Attempts: ${escapeHtml(writeAttempts)}</span>`;
     if (writeSuccesses > 0) html += `<span class="pc-chip">Successes: ${escapeHtml(writeSuccesses)}</span>`;
-    if (writeFallbacks > 0) html += `<span class="pc-chip" style="color:var(--pulse-tier-strong)">Fallbacks: ${escapeHtml(writeFallbacks)}</span>`;
+    if (writeFallbacks > 0) html += `<span class="pc-chip pc-status-amber">Fallbacks: ${escapeHtml(writeFallbacks)}</span>`;
     if (writeLatency > 0) html += `<span class="pc-chip">Latency: ${escapeHtml(writeLatency)}ms</span>`;
     html += `</div>`;
   }

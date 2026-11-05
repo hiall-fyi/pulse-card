@@ -1,16 +1,14 @@
 /**
  * @module shared/editor-helpers
  * @description Shared helpers for visual editors across all Pulse cards.
- * Shared helpers based on the Pulse Card editor — the reference
+ * Shared helpers based on the Pulse Card editor, the reference
  * implementation. Only patterns that are identical across all three
  * editors live here.
  */
 
 import { html, nothing, css } from 'lit';
 
-/* Every Pulse card editor uses renderReorderButtons() which emits
-   .pulse-move-icon and .pulse-remove-icon. The matching styles travel with
-   the helper so the selectors and their styling stay together. */
+/* Styles for the .pulse-move-icon / .pulse-remove-icon emitted by renderReorderButtons(), kept beside the helper. */
 export const SHARED_EDITOR_STYLES = css`
   .pulse-move-icon {
     color: var(--pulse-text-secondary);
@@ -38,7 +36,7 @@ const ICON_REMOVE = 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.
 /**
  * Load HA card helpers to register ha-entity-picker and other HA components.
  * Call once from connectedCallback. Forces lazy load by creating an entities
- * card and requesting its config element — same pattern HA's own editors use.
+ * card and requesting its config element, the same pattern HA's own editors use.
  *
  * @param {string} logPrefix - Card name for warning messages.
  * @returns {Promise<boolean>} Whether helpers loaded successfully.

@@ -5,6 +5,7 @@
  */
 
 import { compassLabel, escapeHtml, sanitizeCssValue, formatCondition, uniqueSvgId, futureHourly as filterFutureHourly, deriveTodaySunBoundaries, readCeOrAttr, readCeUnit, readSensorValue, deriveBrandVariant, formatHHMM, resolveHassTimeZone } from '../weather-primitives.js';
+import { resolveTempUnit } from '../../shared/utils.js';
 import { intensityRatio, tensionVignette } from '../../shared/visual-tension.js';
 import { composeNarrative } from '../narrative.js';
 import { brandMarkVariant } from '../brand-mark.js';
@@ -67,10 +68,10 @@ export function buildWeatherSummary({ precipNow, precipLabel, slots, windSpeed, 
   const stormTiers = ['slight', 'enhanced', 'moderate', 'high'];
   if (stabilityState && stormTiers.includes(stabilityState)) {
     const peakCape = Math.max(...next2h.map((h) => Number(h.cape) || 0));
-    if (peakCape > 1000) return { icon: '\u26A1', text: `Thunderstorms possible \u2014 CAPE ${peakCape}J/kg` };
+    if (peakCape > 1000) return { icon: '\u26A1', text: `Thunderstorms possible, CAPE ${peakCape}J/kg` };
   }
   if (windSpeed >= 39) return { icon: '\u{1F4A8}', text: `Strong winds ${Math.round(windSpeed)} km/h` };
-  if (uvIndex >= 6) return { icon: '\u2600\uFE0F', text: 'High UV \u2014 protection needed' };
+  if (uvIndex >= 6) return { icon: '\u2600\uFE0F', text: 'High UV: protection needed' };
   let clearHours = 0;
   for (const h of slots) {
     if ((Number(h.precipitation_probability) || 0) < 20) clearHours++;
@@ -88,8 +89,7 @@ export function buildWeatherSummary({ precipNow, precipLabel, slots, windSpeed, 
  * @returns {{svgPath: string, areaPath: string, peakValue: number, peakIndex: number, maxCape: number}} Sparkline data.
  */
 export function buildCapeSparklineSvg(slots, width, height) {
-  // Coerce NaN/Infinity to 0 before Math.max — Math.max(...[NaN]) is NaN
-  // which poisons every downstream coordinate.
+  // Coerce NaN/Infinity to 0 before Math.max, since Math.max(...[NaN]) is NaN and poisons every downstream coordinate.
   const values = slots.map((h) => {
     const n = Number(h.cape);
     return Number.isFinite(n) ? n : 0;
@@ -129,9 +129,9 @@ export function buildPrecipLabel(precipNow, precipUnit, rainNow, rainUnit, showe
     return `${parts.join(' \u00b7 ')} now`;
   }
   if (precipNow > 0) {
-    return `Precipitation \u2014 next 12h \u00b7 ${escapeHtml(precipNow.toFixed(1))} ${escapeHtml(precipUnit)} now`;
+    return `Precipitation: next 12h \u00b7 ${escapeHtml(precipNow.toFixed(1))} ${escapeHtml(precipUnit)} now`;
   }
-  return 'Precipitation \u2014 next 12h';
+  return 'Precipitation: next 12h';
 }
 
 
@@ -158,27 +158,25 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const humidity = val('humidity', 'humidity');
   const windSpeed = val('wind_speed', 'wind_speed');
   const windBearing = val('wind_direction', 'wind_bearing');
-  /* Gust attribute name varies by integration: HA's standard is
-     `wind_gust_speed` (OpenWeatherMap, met.no, others); older Atmos CE
-     composite sensors expose `wind_gusts`. Read both so the 4-col Gust
-     stat stays consistent with Wind section's rose. */
+  /* Gust attribute varies by integration: HA's standard is `wind_gust_speed`, older Atmos CE composite sensors expose `wind_gusts`; read both. */
   const windGusts = val('wind_gusts', 'wind_gust_speed') || val('wind_gusts', 'wind_gusts');
   const dewPoint = val('dew_point', 'dew_point');
   const visibility = val('visibility', 'visibility');
   const pressure = val('pressure', 'pressure');
 
-  const tempUnit = unit('temperature', '°C');
+  const fallbackTempUnit = resolveTempUnit(attrs);
+  const tempUnit = unit('temperature', fallbackTempUnit);
   const visUnit = unit('visibility', 'km');
   const pressUnit = unit('pressure', 'hPa');
-  const dewUnit = unit('dew_point', '°C');
+  const dewUnit = unit('dew_point', fallbackTempUnit);
   // Resolve today's L / H. Preference order:
-  //   1. Daily forecast slot [0] — HA's standard shape exposes
+  //   1. Daily forecast slot [0]: HA's standard shape exposes
   //      `templow` (day min) + `temperature` (day max) for daily type.
   //   2. Scan hourly forecast for today's entries and take min/max.
   //   3. Legacy attrs.forecast (only populated on a few older
   //      integrations; hourly attrs flat-out have no templow and
   //      `temperature` ≈ current, which causes L === H bug).
-  //   4. Collapse to current temp when nothing usable — better than
+  //   4. Collapse to current temp when nothing usable, better than
   //      fabricating a ±5° range that misleads users.
   const dailyForecast = /** @type {Array<Record<string, unknown>>|undefined} */ (forecastData?.daily);
   const hourlyForecast = /** @type {Array<Record<string, unknown>>|undefined} */ (forecastData?.hourly);
@@ -234,8 +232,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const uvRaw = uvSensor
     ? Number(hass.states[uvSensor]?.state)
     : Number(attrs.uv_index);
-  // An unavailable/missing UV reading must not read as UV 0 (no burn risk).
-  // null so the stat tile shows "--" instead of a confidently wrong safe value.
+  // An unavailable/missing UV reading must not read as UV 0; null so the tile shows "--" instead of a wrongly safe value.
   const uvIndex = Number.isFinite(uvRaw) ? uvRaw : null;
 
   const { value: precipNow, unit: precipUnitRaw } = readSensorValue(hass, ce.precipitation);
@@ -288,7 +285,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   const vignetteGrad = tensionVignette(tempIntensity);
   const vignetteHtml = vignetteGrad ? `<div class="pw-tension-vignette" style="background: ${sanitizeCssValue(vignetteGrad)}"></div>` : '';
 
-  /* Plain text — the hero renders this through t.gloss, which takes a string. */
+  /* Plain text: the hero renders this through t.gloss, which takes a string. */
   const feelsContext = feelsContextSensor?.state || '';
   const feelsDiff = feelsContextSensor?.attributes?.difference;
   let feelsPlain = '';
@@ -302,7 +299,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
 
   const showGust = windGusts > windSpeed + 5;
 
-  // Two phases only — no golden / blue split. sun.sun is the single
+  // Two phases only: no golden / blue split. sun.sun is the single
   // source of truth: above_horizon → Day (sunrise → sunset, amber
   // gradient), below_horizon → Night (today's sunset → tomorrow's
   // sunrise, cool blue). The previous 6-theme cascade was a long
@@ -327,7 +324,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       fillStyle = 'background: linear-gradient(to right, #ff9f0a, #ffd60a)';
       labelColor = '#ff9f0a';
     } else {
-      // Night — sunset to tomorrow's sunrise. If the user is looking
+      // Night: sunset to tomorrow's sunrise. If the user is looking
       // pre-sunrise, today's sunset is ~yesterday; deriveTodaySunBoundaries
       // already returns the most-recent sunset so the math holds.
       const startMs = todaySunsetForPhase.getTime();
@@ -343,9 +340,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
     const labelStyle = ` style="color:${sanitizeCssValue(labelColor)}"`;
     const markerIcon = isDaytime ? '' : '\u{1F319}';
 
-    /* No container opacity — it would multiply against the labels and drop the
-       night cyan under the contrast floor. The cyan fill and moon marker already
-       signal night. */
+    /* No container opacity: it would multiply against the labels and drop the night cyan under the contrast floor. */
     dayArcHtml = `
       <div class="pw-day-arc">
         <span class="pw-day-arc-label"${labelStyle}>${escapeHtml(leftLabel)}</span>
@@ -372,8 +367,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
     const slots = futureHourly.slice(0, 12);
 
     const precipLabel = buildPrecipLabel(precipNow, precipUnit, rainNow, rainUnit, showersNow, showersUnit, snowfallNow, snowfallUnit);
-    /* Live precip outranks the forecast narrative during active rain. Plain
-       text: t.narrative takes a string, and buildPrecipLabel already escapes. */
+    /* Live precip outranks the forecast narrative during active rain; plain text since t.narrative takes a string and buildPrecipLabel already escapes. */
     if (precipNow > 0) {
       narrativeText = precipLabel;
     } else {
@@ -390,8 +384,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
       narrativeText = narrative.sentence;
     }
 
-    /* 300 J/kg is the floor buildCapeSparklineSvg scales against — below it the
-       curve is flat at the baseline, so there is nothing to show. */
+    /* 300 J/kg is the floor buildCapeSparklineSvg scales against; below it the curve is flat, so there is nothing to show. */
     if (slots.some((h) => Number(h.cape) > 300)) {
       const w = 320;
       const h = 24;
@@ -477,7 +470,7 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
 
   // Extended stats row (humidity / dew point / pressure trend /
   // visibility category) appears below the standard stats whenever
-  // at least two of the four fields are available. No toggle —
+  // at least two of the four fields are available. No toggle,
   // information density is the default for the Overview section.
   const visCategory = visibilityCatSensor?.state || '';
   const pressureTrend = pressureTrendSensor?.state || '';
@@ -491,16 +484,16 @@ export function renderOverview({ hass, config, discovery, weatherEntity, forecas
   if (extendedAvailable) {
     const humStat = Number.isFinite(humidity) && humidity > 0
       ? t.stat(`${Math.round(humidity)}%`, dewComfort || 'humidity')
-      : t.stat('—', 'humidity');
+      : t.stat('\u2014', 'humidity');
     const dewStat = Number.isFinite(dewPoint)
       ? t.stat(`${Math.round(dewPoint)}${dewUnit}`, 'dew point')
-      : t.stat('—', 'dew point');
+      : t.stat('\u2014', 'dew point');
     const pressStat = Number.isFinite(pressure) && pressure > 0
       ? t.stat(`${Math.round(pressure)}`, pressureTrend ? `${pressUnit} ${pressureTrend}` : pressUnit)
-      : t.stat('—', 'pressure');
+      : t.stat('\u2014', 'pressure');
     const visStat = Number.isFinite(visibility) && visibility > 0
       ? t.stat(`${visibility.toFixed(visibility < 10 ? 1 : 0)}${visUnit}`, visCategory || 'visibility')
-      : t.stat('—', 'visibility');
+      : t.stat('\u2014', 'visibility');
     extendedStatsRow = t.statsRow([humStat, dewStat, pressStat, visStat], { columns: 4 });
   }
 

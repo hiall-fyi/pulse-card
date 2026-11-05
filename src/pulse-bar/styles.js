@@ -1,6 +1,6 @@
 /**
  * @module styles
- * @description CSS styles for Pulse Card — exported as a template literal
+ * @description CSS styles for Pulse Card, exported as a template literal
  * string for Shadow DOM encapsulation.
  */
 
@@ -10,7 +10,7 @@ export const STYLES = `${SHARED_STYLES}
   :host {
     display: block;
 
-    /* Card-local design tokens — override via card-mod or HA theme.
+    /* Card-local design tokens, override via card-mod or HA theme.
        Family-shared concerns live on --pulse-* via SHARED_STYLES. */
     --pb-columns: 1;
     --pb-track-opacity: 0.12;
@@ -30,7 +30,7 @@ export const STYLES = `${SHARED_STYLES}
     gap: var(--pulse-space-element, 12px);
   }
 
-  /* Multi-column grid — responsive: auto-collapse on narrow screens */
+  /* Multi-column grid, responsive: auto-collapse on narrow screens */
   .pb-card[class*="columns-"] {
     display: grid;
     grid-template-columns: repeat(var(--pb-columns), 1fr);
@@ -43,7 +43,7 @@ export const STYLES = `${SHARED_STYLES}
     }
   }
 
-  /* Bar row — each entity */
+  /* Bar row, one per entity */
   .pb-row {
     display: flex;
     flex-direction: column;
@@ -54,7 +54,7 @@ export const STYLES = `${SHARED_STYLES}
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Labels row (outside mode — default) */
+  /* Labels row (outside mode, default) */
   .pb-labels {
     display: flex;
     justify-content: space-between;
@@ -146,7 +146,7 @@ export const STYLES = `${SHARED_STYLES}
     font-size: var(--pulse-font-body, clamp(10px, 40cqh, 16px));
   }
 
-  /* Target marker — visually distinct from fill */
+  /* Target marker, visually distinct from fill */
   .pb-target {
     position: absolute;
     top: -1px;
@@ -183,7 +183,7 @@ export const STYLES = `${SHARED_STYLES}
   .pb-indicator.down { color: var(--pb-indicator-color, var(--pulse-status-red)); }
   .pb-indicator.neutral { color: var(--pb-indicator-color, var(--pulse-text-secondary)); }
 
-  /* Inverted indicator — up is bad, down is good (CPU, memory, disk usage) */
+  /* Inverted indicator: up is bad, down is good (CPU, memory, disk usage) */
   .pb-indicator.inverted.up { color: var(--pb-indicator-color, var(--pulse-status-red)); }
   .pb-indicator.inverted.down { color: var(--pb-indicator-color, var(--pulse-status-green)); }
 
@@ -226,7 +226,7 @@ export const STYLES = `${SHARED_STYLES}
     padding: 8px 0;
   }
 
-  /* Title — adds layout padding on top of shared typography. */
+  /* Title: adds layout padding on top of shared typography. */
   .pulse-title { padding-bottom: 4px; }
 
   /* Hover feedback */
@@ -239,7 +239,7 @@ export const STYLES = `${SHARED_STYLES}
     }
   }
 
-  /* Secondary info group — wraps name + secondary line */
+  /* Secondary info group: wraps name + secondary line */
   .pb-name-group {
     display: flex;
     flex-direction: column;
@@ -257,7 +257,7 @@ export const STYLES = `${SHARED_STYLES}
     text-overflow: ellipsis;
   }
 
-  /* Inside bar — inherit text color from parent, reduce opacity */
+  /* Inside bar: inherit text color from parent, reduce opacity */
   .pb-content .pb-secondary {
     color: inherit;
     opacity: 0.6;
@@ -320,7 +320,7 @@ export const STYLES = `${SHARED_STYLES}
     opacity: 0.4;
   }
 
-  /* Interactive bar row layout — pb-container between step buttons */
+  /* Interactive bar row layout: pb-container between step buttons */
   .pb-row[data-interactive] .pb-interactive-row {
     display: flex;
     align-items: stretch;

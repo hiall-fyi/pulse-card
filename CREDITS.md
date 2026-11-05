@@ -4,6 +4,10 @@ Community members who shaped Pulse Card through bug reports, feature requests, t
 
 ---
 
+### v1.10.0
+
+- **[@dragorex71](https://github.com/dragorex71)** — Reported that a SmartIR air conditioner driven through Broadlink always showed as Idle in the Zones row while Home Status had it heating, with screenshots of both. Pasting the entity's attributes showed it reports only its mode and never an `hvac_action`, which is what led the card to work the action out from the mode and temperatures ([#69](https://github.com/hiall-fyi/pulse-card/issues/69))
+
 ### v1.8.4
 
 - **[@BirbByte](https://github.com/BirbByte)** — Reported cards overflowing their slot and overlapping the card below in sections view, with annotated screenshots showing that the hitbox stayed in place while the content painted past the card's bounding box. That hitbox-versus-paint detail is what pinned the cause to the card's reported grid height ([#50](https://github.com/hiall-fyi/pulse-card/issues/50))

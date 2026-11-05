@@ -1,13 +1,13 @@
 /**
  * @module pulse-weather/constants
- * @description Constants for Pulse Weather Card — section types, tier colors,
+ * @description Constants for Pulse Weather Card, section types, tier colors,
  * Beaufort scale, UV colors, AQI categories, animation constants, and
  * Atmos CE sensor keys.
  */
 
 import { FAMILY_VERSION } from '../shared/version.js';
 
-/** Pulse Weather Card version — tracks the shared family release line. */
+/** Pulse Weather Card version: tracks the shared family release line. */
 export const VERSION = FAMILY_VERSION;
 
 /** Card custom element name. */
@@ -16,7 +16,7 @@ export const CARD_NAME = 'pulse-weather-card';
 /** Editor custom element name. */
 export const EDITOR_NAME = 'pulse-weather-card-editor';
 
-/** Console log prefix — keep consistent with sibling cards (Pulse Card, Pulse Climate Card, Pulse Switch Card). */
+/** Console log prefix: keep consistent with sibling cards (Pulse Card, Pulse Climate Card, Pulse Switch Card). */
 export const LOG_PREFIX = 'Pulse Weather Card:';
 
 /** Valid section type identifiers. */
@@ -40,7 +40,7 @@ export const TIER_COLORS = /** @type {const} */ ({
 });
 
 /**
- * Temperature-to-color thresholds (°C). Evaluated in order — first match wins.
+ * Temperature-to-color thresholds (°C). Evaluated in order, first match wins.
  * @type {ReadonlyArray<{max: number, color: string}>}
  */
 export const TEMP_TIERS = [
@@ -132,7 +132,7 @@ export const CAPE_TIERS = [
 
 /**
  * Lifted index interpretation thresholds.
- * Evaluated in order — first match wins (note: descending values).
+ * Evaluated in order: first match wins (note: descending values).
  * @type {ReadonlyArray<{min: number, color: string, label: string}>}
  */
 export const LIFTED_INDEX_TIERS = [
@@ -166,10 +166,10 @@ export const MAX_STARS = 40;
 /** Maximum cloud count. */
 export const MAX_CLOUDS = 8;
 
-/** Radar sweep duration — active alerts (seconds). */
+/** Radar sweep duration: active alerts (seconds). */
 export const SWEEP_ACTIVE_S = 4;
 
-/** Radar sweep duration — all clear (seconds). */
+/** Radar sweep duration: all clear (seconds). */
 export const SWEEP_CALM_S = 8;
 
 /** Forecast data refresh interval (milliseconds). */
@@ -266,8 +266,7 @@ export const ATMOS_CE_SENSOR_KEYS = [
   'uv_index', 'uv_index_clear_sky', 'visibility',
   // Atmospheric stability
   'cape', 'lifted_index', 'freezing_level_height', 'soil_temperature', 'soil_moisture',
-  // Atmospheric stability (derived by Atmos CE)
-  // Wind shear + lapse rate: support both old and new Atmos CE entity ID formats
+  // Atmospheric stability (derived by Atmos CE); wind shear + lapse rate support both old and new Atmos CE entity ID formats
   'wind_shear_0_6_km', 'lapse_rate_700_500_hpa', 'lcl_height', 'stability_assessment',
   // Derived weather insights
   'dew_point_comfort', 'visibility_category', 'feels_like_context', 'pressure_trend',

@@ -1,6 +1,6 @@
 /**
  * @module pulse-climate/sections/homekit
- * @description Thin shell — renders the section header (with " · N saved"
+ * @description Thin shell: renders the section header (with " · N saved"
  * suffix derived from the same predicate the body uses) and delegates the
  * body to homekit-view. Same module powers system_health_group's HomeKit tab.
  */

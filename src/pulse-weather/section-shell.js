@@ -9,7 +9,7 @@
  * Sections that have a pro view pass both `body` (default) and
  * `proView`; the shell wraps each in `.pw-view-default` / `.pw-view-pro`
  * and the [data-pro] CSS rules in styles.js handle the swap. Sections
- * without a pro view pass only `body` — the shell renders it directly
+ * without a pro view pass only `body`, the shell renders it directly
  * and the `data-pro` attribute has no effect.
  */
 
@@ -17,7 +17,7 @@ import { brandMarkSvg } from './brand-mark.js';
 import { escapeHtml } from '../shared/utils.js';
 import { t } from './type-system.js';
 
-/* sectionStyle reaches this shell already sanitised — callers run sanitizeCssValue. */
+/* sectionStyle reaches this shell already sanitised, callers run sanitizeCssValue. */
 
 /**
  * Render a v2 cartouche section shell.
@@ -65,9 +65,7 @@ export function renderSectionShell({
   proAriaLabel = 'Toggle pro view',
   pro = true,
 }) {
-  /* Per-section opt-out (`pro: false` in YAML): drop the toggle entirely by
-     clearing proView and forcing the default action. The isInteractive check
-     below then demotes the brand mark to a static div. */
+  /* Per-section opt-out (`pro: false`): clear proView and force the default action so the brand mark demotes to a static div. */
   if (pro === false) {
     proView = '';
     proAction = 'view-swap';
@@ -83,9 +81,7 @@ export function renderSectionShell({
   const margHtml = margBody
     ? `<div class="pw-t-marg">${margBody}</div>`
     : '';
-  /* Brand mark becomes an interactive button when the section either provides a
-     proView (view-swap action) OR opts into a custom action (e.g. Wind's
-     wind-mode toggle). Otherwise it stays a non-interactive div. */
+  /* Brand mark is an interactive button only when the section has a proView or a custom action (e.g. Wind's wind-mode); otherwise a static div. */
   const hasPro = Boolean(proView);
   const isInteractive = hasPro || proAction !== 'view-swap';
   const viewBody = hasPro

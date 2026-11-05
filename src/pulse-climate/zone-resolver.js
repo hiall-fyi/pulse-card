@@ -75,7 +75,6 @@ const ZONE_TRANSLATION_KEYS = {
   comfort_target: 'comfort_target',
   open_window: 'window',
   preheat_now: 'preheat_now',
-  window_predicted: 'window_predicted',
   battery: 'battery',
   connection: 'connection',
   insights: 'insights',
@@ -94,8 +93,7 @@ const DEVICE_TRANSLATION_KEYS = {
   connection: 'connection',
 };
 
-// ── Fallback: Entity ID Suffix Patterns ─────────────────────────────
-// Used when hass.entities is unavailable or for non-Tado-CE integrations.
+// Fallback entity ID suffix patterns, used when hass.entities is unavailable or for non-Tado-CE integrations.
 
 /**
  * Tado CE entity suffixes to scan for each zone (fallback).
@@ -127,7 +125,6 @@ const TADO_ZONE_PATTERNS = {
   approach_factor:    { platform: 'sensor', suffixes: ['_ce_approach_factor', '_approach_factor'] },
   open_window:        { platform: 'binary_sensor', suffixes: ['_window', '_open_window'] },
   preheat_now:        { platform: 'binary_sensor', suffixes: ['_ce_preheat_now', '_preheat_now'] },
-  window_predicted:   { platform: 'binary_sensor', suffixes: ['_ce_window_predicted', '_window_predicted'] },
   battery:            { platform: 'sensor', suffixes: ['_ce_battery', '_battery'] },
   connection:         { platform: 'binary_sensor', suffixes: ['_ce_connection', '_connection'] },
   insights:           { platform: 'sensor', suffixes: ['_ce_insights', '_insights'] },
@@ -184,8 +181,7 @@ function buildRegistryIndex(entities) {
   for (const [entityId, entry] of Object.entries(entities)) {
     if (entry.platform !== 'tado_ce') continue;
     if (entry.translation_key) {
-      // Multiple entities may share a translation_key (e.g. per-zone "temperature").
-      // For hub entities (only one per translation_key), first match wins.
+      // Per-zone entities may share a translation_key; hub entities have one per key, so first match wins.
       if (!byTranslationKey.has(entry.translation_key)) {
         byTranslationKey.set(entry.translation_key, entityId);
       }
@@ -265,7 +261,7 @@ function discoverZonesViaRegistry(entities, zoneNames, states) {
           zoneEntities[zoneName][`${logicalKey}_${idx}`] = entityId;
         }
       } else {
-        // Standard entity — match translation_key to logical key
+        // Standard entity, match translation_key to logical key
         const logicalKey = Object.keys(ALL_ZONE_KEYS).find((k) => ALL_ZONE_KEYS[k] === tk);
         if (!logicalKey) continue;
         if (!zoneEntities[zoneName][logicalKey]) {
@@ -371,8 +367,7 @@ export function discoverTadoEntities(states, zoneNames, entities) {
       const index = buildRegistryIndex(/** @type {Record<string, import('./types.js').HassEntityRegistryEntry>} */ (entities));
       hubEntities = discoverHubViaRegistry(/** @type {Record<string, import('./types.js').HassEntityRegistryEntry>} */ (entities), index);
 
-      // Merge any entities found by suffix that registry missed
-      // (covers edge cases where translation_key is absent)
+      // Merge entities found by suffix that the registry missed (translation_key absent)
       const suffixHub = discoverHubViaSuffix(states);
       for (const [key, eid] of Object.entries(suffixHub)) {
         if (!hubEntities[key]) hubEntities[key] = eid;
@@ -387,8 +382,7 @@ export function discoverTadoEntities(states, zoneNames, entities) {
   if (useRegistry) {
     zoneEntities = discoverZonesViaRegistry(/** @type {Record<string, import('./types.js').HassEntityRegistryEntry>} */ (entities), zoneNames, states);
 
-    /* Merge any zone entities found by suffix that registry missed
-       (covers edge cases where translation_key is absent). */
+    /* Merge zone entities found by suffix that the registry missed (translation_key absent). */
     const suffixZones = discoverZonesViaSuffix(states, zoneNames);
     for (const zoneName of zoneNames) {
       if (!zoneEntities[zoneName]) zoneEntities[zoneName] = {};
@@ -409,20 +403,18 @@ export function discoverTadoEntities(states, zoneNames, entities) {
     for (const [zoneName, ze] of Object.entries(zoneEntities)) {
       const keys = Object.keys(ze);
       if (keys.length === 0) {
-        console.debug(`${LOG_PREFIX} zone "${zoneName}" — no Tado CE entities discovered. Check entity_id matches sensor.<zone>_temperature pattern, or use temperature_entity / set_point_entity overrides.`);
+        console.debug(`${LOG_PREFIX} zone "${zoneName}", no Tado CE entities discovered. Check entity_id matches sensor.<zone>_temperature pattern, or use temperature_entity / set_point_entity overrides.`);
       }
     }
   }
 
-  /* Store a copy of zoneNames in the cache — caller may mutate the array. */
+  /* Store a copy of zoneNames in the cache, caller may mutate the array. */
   _discoveryCache = { states, zoneNames: [...zoneNames], result };
 
   return result;
 }
 
-/**
- * Reset the discovery cache (for testing).
- */
+/** Reset the discovery cache (for testing). */
 export function resetDiscoveryCache() {
   _discoveryCache = { states: null, zoneNames: null, result: null };
 }
@@ -435,4 +427,19 @@ export function resetDiscoveryCache() {
  */
 export function extractZoneName(entityId) {
   return entityId.replace(/^(climate|water_heater|sensor|binary_sensor)\./, '');
+}
+
+/** Zone-config entity overrides that resolveZoneState reads for display (temperature_entity and humidity_entity are history-only). */
+const ZONE_DISPLAY_OVERRIDES = ['heating_power_entity', 'open_window_entity', 'battery_entity', 'mold_risk_entity'];
+
+/**
+ * The climate entity plus every entity bound to the zone: all discovered ids and the display overrides, de-duplicated.
+ * @param {{entity: string} & Record<string, *>} zone
+ * @param {import('./types.js').TadoDiscovery|null|undefined} discovery
+ * @returns {string[]}
+ */
+export function zoneBoundEntityIds(zone, discovery) {
+  const discovered = Object.values(discovery?.zoneEntities?.[extractZoneName(zone.entity)] || {});
+  const overrides = ZONE_DISPLAY_OVERRIDES.map((k) => zone[k]);
+  return [...new Set(/** @type {string[]} */ ([zone.entity, ...overrides, ...discovered].filter((id) => typeof id === 'string' && id)))];
 }

@@ -17,5 +17,4 @@ interface Window {
 
 // The Hass / HassEntityState shapes live in src/shared/types.js as JSDoc
 // typedefs (single source of truth, re-exported by every card's types.js).
-// They used to be duplicated here as ambient globals; that second copy is
-// removed so there is exactly one Hass definition to keep in sync.
+// Keeping a single Hass definition there avoids a second ambient copy drifting out of sync.

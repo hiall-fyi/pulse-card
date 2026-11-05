@@ -1,6 +1,6 @@
 /**
  * @module pulse-weather/brand-mark
- * @description Pulse weather card brand mark — circle + horizon + dot,
+ * @description Pulse weather card brand mark, circle + horizon + dot,
  * with 4 condition variants. Renders as an inline SVG string for use
  * inside any section's top-right corner.
  */
@@ -19,7 +19,7 @@ const BASE_TAIL = '</svg>';
  * the main circle, `.mh` for the horizon line, `.md` for the central
  * dot, `.mg` for any per-variant glyph). Default / pro fill state is
  * controlled entirely by CSS (see styles.js, Pro toggle
- * scaffolding) — this function never branches on toggle state.
+ * scaffolding): this function never branches on toggle state.
  *
  * @param {'day'|'cloudy'|'rain'|'night'|string} variant
  * @returns {string} SVG markup as a string.

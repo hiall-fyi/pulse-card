@@ -1,6 +1,6 @@
 /**
  * @module editor
- * @description Visual editor for Pulse Card — LitElement-based custom element
+ * @description Visual editor for Pulse Card, LitElement-based custom element
  * supporting multi-entity configuration with dynamic add/remove.
  * Uses ha-form for card settings + ha-entity-picker for entity list.
  * Pattern follows Mushroom Cards + HA Core entities card editor.
@@ -13,14 +13,14 @@ import {
   updateListItemField, updateListItemNested, moveListItem, removeListItem,
 } from '../shared/editor-helpers.js';
 
-/** Default swatch color — resolves HA theme primary text color, falls back to HA blue. */
+/** Default swatch color, resolves HA theme primary text color, falls back to HA blue. */
 function getDefaultSwatch() {
   if (typeof document === 'undefined') return '#44739e';
   const resolved = getComputedStyle(document.documentElement).getPropertyValue('--primary-text-color').trim();
   return toHex6(resolved) || '#44739e';
 }
 
-/** Default swatch for bar color — resolves HA theme primary color. */
+/** Default swatch for bar color, resolves HA theme primary color. */
 function getBarDefaultSwatch() {
   if (typeof document === 'undefined') return '#03a9f4';
   const resolved = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
@@ -54,15 +54,15 @@ function _resolveToHex6(c) {
   if (/^#[0-9a-f]{3}$/i.test(c)) {
     return `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}`.toLowerCase();
   }
-  // rgb() or rgba() — extract r,g,b
+  // rgb() or rgba(): extract r,g,b
   const rgbMatch = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
   if (rgbMatch) {
     const hex = (/** @type {string} */ n) => parseInt(n, 10).toString(16).padStart(2, '0');
     return `#${hex(rgbMatch[1])}${hex(rgbMatch[2])}${hex(rgbMatch[3])}`;
   }
-  // CSS variable or other unresolvable — skip
+  // CSS variable or other unresolvable, skip
   if (c.startsWith('var(')) return '';
-  // Named color — resolve via temporary element
+  // Named color: resolve via temporary element
   if (typeof document !== 'undefined') {
     const tmp = document.createElement('span');
     tmp.style.color = c;
@@ -78,11 +78,7 @@ function _resolveToHex6(c) {
   return '';
 }
 
-/**
- * ha-form schema for card-level settings.
- * Positions use flat keys (pos_name, pos_value, pos_icon) mapped to
- * nested config in _settingsChanged.
- */
+/** ha-form schema for card-level settings; positions use flat pos_* keys mapped to nested config in _settingsChanged. */
 const POSITION_OPTIONS = [
   { value: 'outside', label: 'Outside' },
   { value: 'inside', label: 'Inside' },
@@ -199,10 +195,7 @@ const SCHEMA_ADVANCED = [
  * @typedef {{entity: string, [key: string]: *}} EditorEntityEntry
  */
 
-/**
- * PulseBarCardEditor — visual config editor for Pulse Card.
- * LitElement-based, following HA Core + Mushroom patterns.
- */
+/** PulseBarCardEditor: visual config editor for Pulse Card, LitElement-based like HA Core + Mushroom. */
 class PulseBarCardEditor extends LitElement {
   /** @type {boolean} Whether HA card helpers have been loaded (prevents re-loading). */
   _helpersLoaded = false;
@@ -229,9 +222,7 @@ class PulseBarCardEditor extends LitElement {
     this._needsSwatchInject = true;
   }
 
-  /**
-   * Inject color swatches only when config changes, not on every Lit update.
-   */
+  /** Inject color swatches only when config changes, not on every Lit update. */
   updated() {
     if (this._needsSwatchInject) {
       this._needsSwatchInject = false;
@@ -246,11 +237,11 @@ class PulseBarCardEditor extends LitElement {
     for (const tf of root.querySelectorAll('ha-textfield')) {
       if (/** @type {*} */ (tf).label !== 'Color') continue;
       // Skip if already wrapped (entity template color fields have inline swatches)
-      if (tf.closest('.color-field')) continue;
+      if (tf.closest('.pb-editor-color-field')) continue;
       const parent = tf.parentElement;
       if (!parent || parent.querySelector('input[type="color"]')) continue;
       const wrapper = document.createElement('div');
-      wrapper.className = 'color-field';
+      wrapper.className = 'pb-editor-color-field';
       parent.insertBefore(wrapper, tf);
       wrapper.appendChild(tf);
       const swatch = document.createElement('input');
@@ -413,9 +404,7 @@ class PulseBarCardEditor extends LitElement {
       }
     }
 
-    /* Boolean toggles: true → set, false → delete, absent → skip.
-       complementary / limit_value / entity_row are YAML-only (no editor schema)
-       but handle gracefully if they slip into formData. */
+    /* Boolean toggles: true sets, false deletes, absent skips (YAML-only keys are handled if they slip into formData). */
     const boolKeys = ['complementary', 'limit_value', 'entity_row'];
     for (const key of boolKeys) {
       if (formData[key] === true) {
@@ -430,7 +419,7 @@ class PulseBarCardEditor extends LitElement {
 
     // --- Nested objects: flat form keys → nested config objects ---
     // Each entry: [configKey, keyMap, filterFn?]
-    // keyMap: { formKey: nestedKey } — empty values are deleted
+    // keyMap: { formKey: nestedKey }; empty values are deleted
     // filterFn: optional per-key filter (return undefined to delete)
     /** @type {[string, Record<string, string>, ((k: string, v: *) => *)?][]} */
     const nestedMaps = [
@@ -468,7 +457,7 @@ class PulseBarCardEditor extends LitElement {
       const existing = typeof newConfig.sparkline === 'object' && newConfig.sparkline !== null
         ? newConfig.sparkline : {};
       const sparkline = { ...existing, show: true };
-      // Apply sparkline detail fields (only when present in formData — absent means form didn't render them)
+      // Apply sparkline detail fields (only when present in formData; absent means form didn't render them)
       const sparkFields = {
         sparkline_hours: 'hours_to_show',
         sparkline_line_width: 'line_width',
@@ -546,7 +535,7 @@ class PulseBarCardEditor extends LitElement {
     }
 
     const entities = this._getEntities();
-    // Resolve target value for the form — supports number, string (entity ID), or object
+    // Resolve target value for the form; supports number, string (entity ID), or object
     const rawTarget = this._config.target;
     let targetFormValue = '';
     if (rawTarget !== undefined && rawTarget !== null) {

@@ -37,7 +37,7 @@ const SECTION_GROUPS = [
   },
 ];
 
-/** Card-level settings schema (just title for now — weather has no other top-level toggles). */
+/** Card-level settings schema (just title for now, weather has no other top-level toggles). */
 const SETTINGS_SCHEMA = [
   { name: 'title', label: 'Title', selector: { text: {} } },
 ];
@@ -403,7 +403,7 @@ class PulseWeatherCardEditor extends LitElement {
           class="pw-editor-atmos-source"
           .label=${'Atmos CE source (optional)'}
           .value=${this._config.atmos_source || ''}
-          .helper=${'Slug override — leave blank to auto-detect'}
+          .helper=${'Slug override: leave blank to auto-detect'}
           helperPersistent
           @input=${this._atmosSourceChanged}
         ></ha-textfield>
@@ -438,7 +438,7 @@ class PulseWeatherCardEditor extends LitElement {
         </div>
 
         ${enabledTypes.length === 0 ? html`
-          <div class="pw-editor-section-hint">No sections enabled — the card will be empty.</div>
+          <div class="pw-editor-section-hint">No sections enabled, so the card will be empty.</div>
         ` : nothing}
 
         ${SECTION_GROUPS.map((group) => html`

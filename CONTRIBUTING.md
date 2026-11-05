@@ -14,9 +14,9 @@ npm install
 
 ```bash
 npm run build              # Build all cards → dist/
-npm run build:pulse-card   # Build Bar Card + Climate/Weather editors
+npm run build:pulse-card   # Build pulse-card.js (all three cards) + the three editors
 npm run build:pulse-weather # Build Weather Card only
-npm run dev                # Watch mode (Pulse Card)
+npm run dev                # Watch mode (Bar Card entry only, no editors)
 ```
 
 To test locally in Home Assistant, copy the built files from `dist/` to your HA `config/www/` directory and add them as dashboard resources.
@@ -24,6 +24,7 @@ To test locally in Home Assistant, copy the built files from `dist/` to your HA 
 ## Testing
 
 ```bash
+npm test           # Run the test suite (vitest)
 npm run lint       # Lint source files (eslint)
 npm run typecheck  # Type check via JSDoc + tsc
 ```
@@ -92,7 +93,7 @@ src/
 ## Code Style
 
 - Pure vanilla JavaScript (ES2022+)
-- No runtime dependencies (Lit is a dev dependency for the editor only)
+- One runtime dependency: Lit, used by the visual editors
 - JSDoc comments on all public functions and classes
 - Shadow DOM for style encapsulation
 - All colours use HA CSS custom properties with fallbacks — never hardcode theme-specific values

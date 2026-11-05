@@ -36,6 +36,7 @@ const SECTION_GROUPS = [
       { value: 'thermal_strip', label: 'Thermal strip' },
       { value: 'comfort_strip', label: 'Comfort strip' },
       { value: 'energy_flow', label: 'Energy flow' },
+      { value: 'energy_flow_ac', label: 'Energy flow (AC)' },
       { value: 'timeline_group', label: '24h Timeline (tabbed)' },
     ],
   },
@@ -587,7 +588,7 @@ class PulseClimateCardEditor extends LitElement {
         ></ha-form>
 
         ${enabledCount === 0 ? html`
-          <div class="pc-editor-section-hint">No sections enabled — the card will be empty.</div>
+          <div class="pc-editor-section-hint">No sections enabled, the card will be empty.</div>
         ` : nothing}
 
         ${SECTION_GROUPS.map((group) => html`

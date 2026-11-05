@@ -3,12 +3,13 @@
  * @description Render a circular climate compass with temperature and/or
  * humidity arcs. Attribute config controls which rings are shown:
  * 'temperature' (default), 'humidity', or 'both'.
- * Pure renderer — no side effects, no DOM access.
+ * Pure renderer: no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue, isReducedMotion, formatNumericDisplay, isUnavailableState } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, isReducedMotion, isUnavailableState } from '../../shared/utils.js';
 import { temperatureToColor, humidityToColor, buildBloomFilter } from '../chart-primitives.js';
-import { resolveZoneContext, rowStateClass, computeGlowStdDev, computeShimmerScale } from '../utils.js';
+import { formatOutdoorTemp } from '../outdoor-temp.js';
+import { formatTemperature, formatPercent, resolveZoneContext, rowStateClass, computeGlowStdDev, computeShimmerScale, zoneActivityLabel, isZoneDemanding } from '../utils.js';
 
 /** Humidity arc thickness in SVG units. */
 const HUMIDITY_ARC_THICKNESS = 6;
@@ -37,6 +38,17 @@ function arcPath(cx, cy, outerR, innerR, startDeg, endDeg) {
 }
 
 /**
+ * Unescaped centre text the Radial shows when no zone is selected.
+ * @param {{attribute: string, outdoorTempText: string|null, outdoorHumidityText: string|null}} input
+ * @returns {{center: string, centerSub: string}}
+ */
+export function radialCenterDefaults({ attribute, outdoorTempText, outdoorHumidityText }) {
+  const hasHumidity = outdoorHumidityText !== null && outdoorHumidityText !== undefined;
+  if (attribute === 'humidity') return { center: hasHumidity ? `${outdoorHumidityText}%` : '--', centerSub: '' };
+  return { center: outdoorTempText ?? '--', centerSub: attribute === 'both' && hasHumidity ? `${outdoorHumidityText}%` : '' };
+}
+
+/**
  * Render Radial section HTML.
  * @param {import('../types.js').ZoneConfig[]} zones
  * @param {Record<string, *>} sectionConfig
@@ -62,29 +74,23 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   const available = 360 - totalGap;
   const arcAngle = available / zones.length;
 
-  /** @type {{name: string, temp: number|null, target: number|null, power: number, humidity: number|null, hvacAction: string, entityId: string, unit: string, rowClass: string}[]} */
+  /** @type {{name: string, temp: number|null, target: number|null, power: number, hasPowerData: boolean, humidity: number|null, hvacAction: string, isUnavailable: boolean, entityId: string, unit: string, rowClass: string, shimmer: number}[]} */
   const zoneData = [];
   for (const zoneConfig of zones) {
     const { entityId, zoneState: zs } = resolveZoneContext(zoneConfig, discovery, states);
+    const power = zs.heatingPower || zs.coolingPower || 0;
     zoneData.push({
       name: zs.name, temp: zs.currentTemp, target: zs.targetTemp,
-      power: zs.heatingPower, humidity: zs.humidity,
-      hvacAction: zs.hvacAction, entityId, unit: zs.unit,
+      power, hasPowerData: zs.hasPowerData, humidity: zs.humidity,
+      hvacAction: zs.hvacAction, isUnavailable: zs.isUnavailable, entityId, unit: zs.unit,
       rowClass: rowStateClass(zs),
+      // Heat haze is a heating effect, so a cooling zone never gets it
+      shimmer: zs.hvacAction === 'cooling' ? 0 : computeShimmerScale(power, size),
     });
   }
 
   const outsideTempEntityConfig = sectionConfig?.outdoor_temp_entity;
-  const outsideTempEntity = outsideTempEntityConfig || discovery?.hubEntities?.outside_temp;
-  let outsideTemp = null;
-  if (outsideTempEntity && states[outsideTempEntity]) {
-    const s = states[outsideTempEntity];
-    if (!isUnavailableState(s)) {
-      outsideTemp = s.attributes?.temperature !== undefined
-        ? String(s.attributes.temperature) : s.state;
-    }
-  }
-  const outsideUnit = outsideTempEntity ? (states[outsideTempEntity]?.attributes?.unit_of_measurement || '°C') : '°C';
+  const outsideTemp = formatOutdoorTemp(sectionConfig, discovery, states);
 
   const outsideHumEntityConfig = sectionConfig?.outdoor_humidity_entity;
   let outsideHumidity = null;
@@ -96,14 +102,9 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     }
   }
 
-  // Center display — depends on attribute mode
-  let centerSub = '';
-  const centerValue = attribute === 'humidity'
-    ? (outsideHumidity !== null ? `${escapeHtml(outsideHumidity)}%` : '--')
-    : (outsideTemp !== null ? `${escapeHtml(outsideTemp)}${escapeHtml(outsideUnit)}` : '--');
-  if (attribute !== 'humidity' && showHumidity && outsideHumidity !== null) {
-    centerSub = `${escapeHtml(outsideHumidity)}%`;
-  }
+  const defaults = radialCenterDefaults({ attribute, outdoorTempText: outsideTemp, outdoorHumidityText: outsideHumidity });
+  const centerValue = escapeHtml(defaults.center);
+  const centerSub = escapeHtml(defaults.centerSub);
 
   /** @type {Record<string, string>} */
   const labelMap = { temperature: 'Home Thermal View', humidity: 'Home Humidity View', both: 'Home Climate View' };
@@ -125,11 +126,11 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
   html += `<defs>`;
   html += buildBloomFilter(glowId, computeGlowStdDev(size, 280).toFixed(1));
 
-  // Heat shimmer filters — per-zone <filter> with <feTurbulence> + <feDisplacementMap>
+  // Heat shimmer filters: per-zone <filter> with <feTurbulence> + <feDisplacementMap>
   if (!reducedMotion) {
     for (let i = 0; i < zoneData.length; i++) {
       const z = zoneData[i];
-      const shimmerScale = computeShimmerScale(z.power, size);
+      const shimmerScale = z.shimmer;
       if (shimmerScale <= 0) continue;
 
       // Scale baseFrequency proportionally to arc angular size (reference: 45° arc)
@@ -152,18 +153,18 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
     const z = zoneData[i];
     const startAngle = i * (arcAngle + gapDeg) - 90;
     const endAngle = startAngle + arcAngle;
-    const isActive = z.power > 0 || z.hvacAction === 'heating' || z.hvacAction === 'cooling';
+    const isActive = isZoneDemanding(z);
     const activeClass = isActive ? ' pc-arc-active' : '';
 
-    const titleParts = [escapeHtml(z.name)];
-    if (showTemp) titleParts.push(z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--');
-    if (showHumidity && z.humidity !== null) titleParts.push(`${Math.round(z.humidity)}%`);
-    titleParts.push(isActive ? `${z.hvacAction === 'cooling' ? 'Cooling' : 'Heating'} ${z.power}%` : 'Idle');
-    const titleText = titleParts.join(', ');
+    const titleParts = [z.name];
+    if (showTemp) titleParts.push(formatTemperature(z.temp, z.unit));
+    if (showHumidity && z.humidity !== null) titleParts.push(formatPercent(z.humidity));
+    titleParts.push(zoneActivityLabel(z, z.power));
+    const titleText = escapeHtml(titleParts.join(', '));
 
     html += `<g class="pc-arc-group${activeClass}" data-idx="${i}">`;
 
-    // Invisible hit area — wider than visible arcs for easier touch targeting
+    // Invisible hit area: wider than visible arcs for easier touch targeting
     const hitOuterR = showHumidity && attribute === 'both'
       ? baseOuterR + DUAL_ARC_GAP + HUMIDITY_ARC_THICKNESS + 4
       : baseOuterR + 4;
@@ -179,7 +180,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
 
       html += `<path d="${tempD}" fill="${sanitizeCssValue(tempColor)}" class="pc-arc-path"`;
       // Shimmer takes precedence over glow for high-power zones
-      const shimmerScale = computeShimmerScale(z.power, size);
+      const shimmerScale = z.shimmer;
       if (shimmerScale > 0 && !reducedMotion) {
         html += ` filter="url(#${shimmerId(i)})"`;
       } else if (isActive) {
@@ -217,7 +218,7 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
 
   html += `</svg>`;
 
-  // Center info — sized so glass touches the inner edge of the deepest arc.
+  // Center info: sized so glass touches the inner edge of the deepest arc.
   // Per-zone arc thickness = 8 + (power/100) × 20 (range 8-28px). Compute the
   // actual max across zones at render time so glass extends to the inner edge
   // of the thickest arc, not the worst-case 28px. Min 8px applies for showHumidity-only modes.
@@ -246,9 +247,9 @@ export function renderRadialSection(zones, sectionConfig, states, discovery, _hi
       ? (z.humidity !== null ? humidityToColor(z.humidity) : 'var(--pulse-disabled)')
       : (z.temp !== null ? temperatureToColor(z.temp) : 'var(--pulse-disabled)');
     let valueText = '';
-    if (showTemp) valueText += z.temp !== null ? `${formatNumericDisplay(z.temp)}${z.unit}` : '--';
+    if (showTemp) valueText += formatTemperature(z.temp, z.unit);
     if (showTemp && showHumidity) valueText += ' · ';
-    if (showHumidity) valueText += z.humidity !== null ? `${Math.round(z.humidity)}%` : '--';
+    if (showHumidity) valueText += formatPercent(z.humidity);
     html += `<div class="pc-legend-item${z.rowClass}" data-idx="${i}">`;
     html += `<span class="pc-legend-dot" style="background:${sanitizeCssValue(dotColor)}"></span>`;
     html += `<span class="pc-legend-name">${escapeHtml(z.name)}</span> <span class="pc-legend-temp">${escapeHtml(valueText)}</span>`;

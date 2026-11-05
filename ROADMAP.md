@@ -8,6 +8,10 @@ Ideas and feature requests under consideration. No timelines — this is a "what
 
 Pulse Bar Card is stable at 1.x. Focus is on compatibility and polish — bug fixes, HA version support, and refinements based on community feedback.
 
+### Exploring
+
+- `confirmation` on tap, hold and double-tap actions, so a row that toggles something sensitive (a firewall rule, a lock) can ask first. `hold_action` already works; the confirmation prompt is the missing part.
+
 ---
 
 ## Pulse Climate Card
@@ -42,3 +46,4 @@ Separate cards that share the same compact look and visual editor. Install only 
 
 - **Pulse Energy** ([#2](https://github.com/hiall-fyi/pulse-card/issues/2)) — a compact view of solar, grid, and battery energy flow
 - **Pulse Chart** ([#2](https://github.com/hiall-fyi/pulse-card/issues/2) - @ChrisMarriott38) — a simple history chart for when ApexCharts is overkill
+- **Energy cost history** — a stacked daily electricity + gas cost trend chart, sourced from fuse_uk_ce / octopus_uk_ce's own history data

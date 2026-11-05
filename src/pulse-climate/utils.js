@@ -3,8 +3,8 @@
  * @description Climate-specific utility functions.
  */
 
-import { HVAC_VISUALS, RISK_COLORS, DEFAULTS, DEFAULT_SECTIONS, LOG_PREFIX, SECTION_DEFAULTS } from './constants.js';
-import { clamp, formatNumericDisplay, makeWarn, isUnavailableState } from '../shared/utils.js';
+import { AT_TARGET_TOLERANCE, HVAC_VISUALS, RISK_COLORS, DEFAULTS, DEFAULT_SECTIONS, LOG_PREFIX, SECTION_DEFAULTS } from './constants.js';
+import { clamp, formatNumericDisplay, makeWarn, isUnavailableState, resolveTempUnit, fromCelsius, celsiusDeltaToUnit } from '../shared/utils.js';
 import { extractZoneName } from './zone-resolver.js';
 
 /**
@@ -24,15 +24,66 @@ export const warn = makeWarn(LOG_PREFIX);
  * @returns {string}
  */
 export function rowStateClass(zs) {
-  if (zs?.isUnavailable) return ' pc-row-unavail pc-row-quiet';
-  if (zs?.hvacMode === 'sensor') return ' pc-row-sensor pc-row-quiet';
-  if (zs?.hvacAction === 'heating') return ' pc-row-heat pc-row-active';
-  if (zs?.hvacAction === 'cooling') return ' pc-row-cool pc-row-active';
-  if (zs?.hvacAction === 'off') return ' pc-row-off pc-row-quiet';
-  if (zs?.targetTemp === null || zs?.targetTemp === undefined) return ' pc-row-off pc-row-quiet';
+  const key = zoneStateKey(zs);
+  if (key === 'unavail' || key === 'sensor' || key === 'off') return ` pc-row-${key} pc-row-quiet`;
+  if (key === 'heat' || key === 'cool') return ` pc-row-${key} pc-row-active`;
+  return ` pc-row-${key} pc-row-mid`;
+}
+
+/** One capitalised word per hvac action, shared by every section. */
+export const ACTION_WORDS = { heating: 'Heating', cooling: 'Cooling', drying: 'Drying', fan: 'Fan', preheating: 'Preheating', defrosting: 'Defrosting', idle: 'Idle', off: 'Off' };
+
+/**
+ * The word every section prints for a zone, with no percentage.
+ * @param {{ isUnavailable?: boolean, hvacAction?: string }} zs
+ * @returns {string}
+ */
+export function zoneActionWord(zs) {
+  if (zs.isUnavailable) return 'Unavailable';
+  return /** @type {Record<string, string>} */ (ACTION_WORDS)[/** @type {string} */ (zs.hvacAction)] ?? 'Idle';
+}
+
+/**
+ * True when a zone is drawing power or its hvac action is heating or cooling.
+ * @param {{ power?: number, hvacAction?: string }} z
+ * @returns {boolean}
+ */
+export function isZoneDemanding(z) {
+  return (z.power ?? 0) > 0 || z.hvacAction === 'heating' || z.hvacAction === 'cooling';
+}
+
+/**
+ * The word for a zone where a power percentage fits: Heating 60% while heating or drawing power.
+ * @param {{ isUnavailable?: boolean, hvacAction?: string, hasPowerData?: boolean }} zs
+ * @param {number} power
+ * @returns {string}
+ */
+export function zoneActivityLabel(zs, power) {
+  if (zs.isUnavailable) return 'Unavailable';
+  if (isZoneDemanding({ power, hvacAction: zs.hvacAction })) {
+    return formatZoneActivity(/** @type {string} */ (zs.hvacAction), power, !!zs.hasPowerData);
+  }
+  return zoneActionWord(zs);
+}
+
+/**
+ * The single state ladder behind row classes and tags.
+ * @param {{ isUnavailable?: boolean, hvacAction?: string, hvacMode?: string, currentTemp?: number|null, targetTemp?: number|null }} zs
+ * @returns {'unavail'|'sensor'|'heat'|'cool'|'off'|'at-target'|'idle'}
+ */
+export function zoneStateKey(zs) {
+  if (zs?.isUnavailable) return 'unavail';
+  if (zs?.hvacMode === 'sensor') return 'sensor';
+  if (zs?.hvacAction === 'heating') return 'heat';
+  if (zs?.hvacAction === 'cooling') return 'cool';
+  if (zs?.hvacAction === 'off') return 'off';
+  if (['drying', 'fan', 'preheating', 'defrosting'].includes(/** @type {string} */ (zs?.hvacAction))) return 'idle';
+  if (zs?.targetTemp === null || zs?.targetTemp === undefined) {
+    return 'idle';
+  }
   const at = zs?.currentTemp !== null && zs?.currentTemp !== undefined
-    && Math.abs(/** @type {number} */ (zs.currentTemp) - /** @type {number} */ (zs.targetTemp)) <= 0.3;
-  return at ? ' pc-row-at-target pc-row-mid' : ' pc-row-idle pc-row-mid';
+    && Math.abs(/** @type {number} */ (zs.currentTemp) - /** @type {number} */ (zs.targetTemp)) <= celsiusDeltaToUnit(AT_TARGET_TOLERANCE) + 1e-9;
+  return at ? 'at-target' : 'idle';
 }
 
 /**
@@ -70,7 +121,7 @@ export function warnUnresolvedOverride(zoneName, key, entityId, states) {
   const dedupeKey = `${zoneName}|${key}|${entityId}`;
   if (_warnedOverrides.has(dedupeKey)) return;
   _warnedOverrides.add(dedupeKey);
-  warn(`zone "%s": ${key} override points at missing entity "%s" — chip will not render`, zoneName, entityId);
+  warn(`zone "%s": ${key} override points at missing entity "%s", chip will not render`, zoneName, entityId);
 }
 
 /**
@@ -79,7 +130,7 @@ export function warnUnresolvedOverride(zoneName, key, entityId, states) {
  * box-shadow on hero dots and active power bars; null for idle/off so passive
  * states don't bloom.
  * @param {string} action - hvac_action value.
- * @returns {{icon: string, token: string|null, fallback: string, label: string, glow: string|null}}
+ * @returns {{icon: string, token: string|null, fallback: string, label: string, tier: string|null, glow: string|null}}
  */
 export function resolveHvacVisual(action) {
   const entry = /** @type {Record<string, *>} */ (HVAC_VISUALS)[action] || HVAC_VISUALS.idle;
@@ -118,10 +169,11 @@ export function classifyClimateState(zoneStates) {
  * @param {string} entityId - Entity ID (climate.* or sensor.*).
  * @param {Record<string, *>} states - hass.states.
  * @param {import('./types.js').ZoneConfig} [zoneConfig] - Optional zone config for name override.
+ * @param {Record<string, string>} [discoveredEntities] - Zone entity map, so the Tado-only frost reading matches the rows.
  * @returns {{name: string, temp: number|undefined, target: number|undefined, humidity: number|undefined, hvacAction: string, unit: string}}
  */
-export function resolveZoneDisplay(entityId, states, zoneConfig) {
-  const zs = resolveZoneState(entityId, {}, states, zoneConfig || { entity: entityId }, /** @type {*} */ ({}));
+export function resolveZoneDisplay(entityId, states, zoneConfig, discoveredEntities) {
+  const zs = resolveZoneState(entityId, discoveredEntities || {}, states, zoneConfig || { entity: entityId }, /** @type {*} */ ({}));
   return {
     name: zs.name,
     temp: zs.currentTemp ?? undefined,
@@ -135,7 +187,7 @@ export function resolveZoneDisplay(entityId, states, zoneConfig) {
 /**
  * Resolve risk level color object.
  * @param {string} level - None/Low/Medium/High/Critical.
- * @returns {{token: string, fallback: string}}
+ * @returns {{token: string, fallback: string, tier: string}}
  */
 export function resolveRiskColor(level) {
   // Normalise to Title Case for RISK_COLORS lookup (handles "critical", "CRITICAL", "Critical")
@@ -168,19 +220,19 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   const auto = !chipFilter;
   const include = (/** @type {string} */ type) => auto || chipFilter.includes(type);
 
-  // Humidity — only as chip when explicitly requested (default: shown in zone header)
+  // Humidity: only as chip when explicitly requested (default: shown in zone header)
   if (chipFilter && include('humidity') && zoneState.humidity !== null) {
     chips.push({ type: 'humidity', icon: 'mdi:water-percent', label: `${Math.round(zoneState.humidity)}%` });
   }
 
-  // HVAC action
-  if (include('hvac_action')) {
+  // Auto mode never emits the HVAC action chip, since the row's state tag already prints every action word.
+  if (chipFilter && include('hvac_action')) {
     const vis = resolveHvacVisual(zoneState.hvacAction);
-    chips.push({ type: 'hvac_action', icon: vis.icon, label: vis.label, color: vis.fallback });
+    chips.push({ type: 'hvac_action', icon: vis.icon, label: vis.label, tier: vis.tier ?? undefined });
   }
 
-  // Overlay mode
-  if (include('overlay') && zoneState.overlayType) {
+  // Overlay mode: an "Off" overlay only restates the hvac_action/state-tag, so auto mode skips it too.
+  if (include('overlay') && zoneState.overlayType && !(auto && zoneState.overlayType === 'Off')) {
     const icon = zoneState.overlayType === 'Manual' ? 'mdi:hand-back-right' : 'mdi:calendar-clock';
     chips.push({ type: 'overlay', icon, label: zoneState.overlayType, entityId: discoveredEntities.overlay });
   }
@@ -191,37 +243,25 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     chips.push({ type: 'preset', icon, label: zoneState.presetMode === 'away' ? 'Away' : 'Home' });
   }
 
-  // Tado CE exclusive chips — only if entities discovered
-  // Risk-level chips (mold, condensation) share identical logic
+  // Tado CE exclusive chips (only if entities discovered); risk-level chips (mold, condensation) share logic
   /** @param {string} type @param {string} icon @param {string} entityKey */
   const pushRiskChip = (type, icon, entityKey) => {
     if (!include(type) || !discoveredEntities[entityKey]) return;
     const s = states[discoveredEntities[entityKey]];
     if (!isUnavailableState(s) && s.state.toLowerCase() !== 'none') {
       const riskColor = resolveRiskColor(s.state);
-      chips.push({ type, icon, label: s.state, color: riskColor.token, severity: s.state, entityId: discoveredEntities[entityKey] });
+      chips.push({ type, icon, label: s.state, tier: riskColor.tier, severity: s.state, entityId: discoveredEntities[entityKey] });
     }
   };
 
   if (include('open_window') && discoveredEntities.open_window) {
     const s = states[discoveredEntities.open_window];
-    if (s) {
+    if (s && !isUnavailableState(s)) {
       const isOpen = s.state === 'on';
       chips.push({
         type: 'open_window', icon: isOpen ? 'mdi:window-open' : 'mdi:window-closed',
-        label: isOpen ? 'Open' : 'Closed', color: isOpen ? 'var(--pulse-tier-gale)' : undefined,
+        label: isOpen ? 'Open' : 'Closed', tier: isOpen ? 'red' : undefined,
         entityId: discoveredEntities.open_window,
-      });
-    }
-  }
-
-  if (include('window_predicted') && discoveredEntities.window_predicted) {
-    const s = states[discoveredEntities.window_predicted];
-    if (s && s.state === 'on') {
-      chips.push({
-        type: 'window_predicted', icon: 'mdi:window-open-variant',
-        label: 'Window predicted', color: 'var(--pulse-tier-strong)',
-        entityId: discoveredEntities.window_predicted,
       });
     }
   }
@@ -239,12 +279,11 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   if (include('preheat_now') && discoveredEntities.preheat_now) {
     const s = states[discoveredEntities.preheat_now];
     if (s && s.state === 'on') {
-      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', color: 'var(--pulse-tier-strong)', entityId: discoveredEntities.preheat_now });
+      chips.push({ type: 'preheat_now', icon: 'mdi:radiator', label: 'Preheating', tier: 'amber', entityId: discoveredEntities.preheat_now });
     }
   }
 
-  // Battery chips — default: show worst state across all TRVs in the zone.
-  // Use chips: [battery_all] to show every TRV's battery individually.
+  // Battery chips: default shows worst state across TRVs; chips: [battery_all] shows each individually.
   if (include('battery') || include('battery_all')) {
     const showAll = chipFilter && chipFilter.includes('battery_all');
     // Collect all battery slots: battery, battery_2, battery_3, ...
@@ -267,8 +306,8 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
         for (let i = 0; i < batteries.length; i++) {
           const b = batteries[i];
           const battIcon = b.lower === 'low' || b.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-          const battColor = b.lower === 'critical' ? 'var(--pulse-tier-gale)' : b.lower === 'low' ? 'var(--pulse-tier-strong)' : undefined;
-          chips.push({ type: `battery${i > 0 ? `_${i + 1}` : ''}`, icon: battIcon, label: b.state, color: battColor, entityId: b.eid });
+          const battTier = b.lower === 'critical' ? 'red' : b.lower === 'low' ? 'amber' : undefined;
+          chips.push({ type: `battery${i > 0 ? `_${i + 1}` : ''}`, icon: battIcon, label: b.state, tier: battTier, entityId: b.eid });
         }
       } else {
         // Show worst battery state only (Critical > Low > Normal)
@@ -279,13 +318,13 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
           if ((SEVERITY[b.lower] || 0) > (SEVERITY[worst.lower] || 0)) worst = b;
         }
         const battIcon = worst.lower === 'low' || worst.lower === 'critical' ? 'mdi:battery-alert' : 'mdi:battery';
-        const battColor = worst.lower === 'critical' ? 'var(--pulse-tier-gale)' : worst.lower === 'low' ? 'var(--pulse-tier-strong)' : undefined;
-        chips.push({ type: 'battery', icon: battIcon, label: worst.state, color: battColor, entityId: worst.eid });
+        const battTier = worst.lower === 'critical' ? 'red' : worst.lower === 'low' ? 'amber' : undefined;
+        chips.push({ type: 'battery', icon: battIcon, label: worst.state, tier: battTier, entityId: worst.eid });
       }
     }
   }
 
-  // Smart Valve Control — reads climate entity attributes directly (not discovered entities)
+  // Smart Valve Control: reads climate entity attributes directly (not discovered entities)
   if (include('valve_control')) {
     const climateState = states[zoneState.entityId];
     const attrs = climateState?.attributes || {};
@@ -294,16 +333,15 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     const backedOff = attrs.valve_control_backed_off;
     const valveEnabled = attrs.valve_control_enabled;
     if (backedOff === true) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Backed off', color: 'var(--pulse-disabled)' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Backed off', tier: 'disabled' });
     } else if (valveActive === true && valveTarget !== undefined) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${formatNumericDisplay(valveTarget)}${zoneState.unit}`, color: 'var(--pulse-tier-strong)' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: `Valve: ${formatNumericDisplay(valveTarget)}${zoneState.unit}`, tier: 'amber' });
     } else if (valveEnabled === true) {
-      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Idle', color: 'var(--pulse-disabled)' });
+      chips.push({ type: 'valve_control', icon: 'mdi:valve', label: 'Valve: Idle', tier: 'disabled' });
     }
   }
 
-  // Data source indicators — only shown when explicitly requested via chip filter
-  // (not in auto mode — too noisy for most users)
+  // Data source indicators: only shown when explicitly requested via chip filter, too noisy for auto mode.
   if (chipFilter && include('temp_source')) {
     const climateState = states[zoneState.entityId];
     const source = climateState?.attributes?.temperature_source;
@@ -313,8 +351,7 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
     }
   }
 
-  // Heating circuit (Tado CE select) — opt-in only, like temp_source.
-  // Reads the RAW current_option; hidden when unassigned or not loaded.
+  // Heating circuit (Tado CE select): opt-in only like temp_source; reads RAW current_option, hidden when unassigned.
   if (chipFilter && include('heating_circuit') && discoveredEntities.heating_circuit) {
     const s = states[discoveredEntities.heating_circuit];
     if (s && !isUnavailableState(s) && s.state !== 'no_heating_circuit') {
@@ -327,6 +364,91 @@ export function resolveChips(zoneState, discoveredEntities, states, chipFilter) 
   }
 
   return chips;
+}
+
+/**
+ * Format a zone temperature with the shared 1-decimal rule and its unit.
+ * @param {number|null|undefined} value
+ * @param {string} unit
+ * @returns {string}
+ */
+export function formatTemperature(value, unit) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '--';
+  return `${formatNumericDisplay(value)}${unit}`;
+}
+
+/**
+ * Format a humidity or power percentage as an integer.
+ * @param {number|null|undefined} value
+ * @returns {string}
+ */
+export function formatPercent(value) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '--';
+  return `${Math.round(value)}%`;
+}
+
+/**
+ * Activity label for an active zone, with the power percentage only when the zone has power data.
+ * @param {string} hvacAction
+ * @param {number} power
+ * @param {boolean} hasPowerData
+ * @returns {string}
+ */
+export function formatZoneActivity(hvacAction, power, hasPowerData) {
+  const label = hvacAction === 'cooling' ? 'Cooling' : 'Heating';
+  return hasPowerData ? `${label} ${Math.round(power)}%` : label;
+}
+
+/**
+ * Mean power of the zones that are available, not off and have power data, rounded; null when none qualify.
+ * @param {Array<{isUnavailable?: boolean, hvacAction?: string, power: number, hasPowerData?: boolean}>} items
+ * @returns {number|null}
+ */
+export function averageZonePower(items) {
+  const used = items.filter((z) => !z.isUnavailable && z.hvacAction !== 'off' && z.hasPowerData);
+  if (used.length === 0) return null;
+  return Math.round(used.reduce((s, z) => s + z.power, 0) / used.length);
+}
+
+/**
+ * Work out the action of a climate that reports no hvac_action: power sensors first, then mode and temperatures.
+ * @param {string|undefined} mode
+ * @param {boolean} isUnavailable
+ * @param {{ low: number, high: number }|null} target
+ * @param {*} currentTemp
+ * @param {number} heatingPower
+ * @param {number} coolingPower
+ * @param {boolean} hasPowerData
+ * @returns {string}
+ */
+function inferHvacAction(mode, isUnavailable, target, currentTemp, heatingPower, coolingPower, hasPowerData) {
+  if (isUnavailable) return 'idle';
+  if (mode === 'dry') return 'drying';
+  if (mode === 'fan_only') return 'fan';
+  if (hasPowerData) {
+    if (heatingPower > 0) return 'heating';
+    if (coolingPower <= 0) return 'idle';
+    if (mode === 'heat') return 'heating';
+    if (mode === 'cool') return 'cooling';
+    return typeof currentTemp === 'number' && target && currentTemp < target.low ? 'heating' : 'cooling';
+  }
+  if (typeof currentTemp !== 'number' || !target) return 'idle';
+  const wantsHeat = mode === 'heat' || mode === 'auto' || mode === 'heat_cool';
+  const wantsCool = mode === 'cool' || mode === 'auto' || mode === 'heat_cool';
+  const tolerance = celsiusDeltaToUnit(AT_TARGET_TOLERANCE) + 1e-9;
+  if (wantsHeat && target.low - currentTemp > tolerance) return 'heating';
+  if (wantsCool && currentTemp - target.high > tolerance) return 'cooling';
+  return 'idle';
+}
+
+/**
+ * Parse a power reading to 0..100, or null when it is not a number.
+ * @param {*} raw
+ * @returns {number|null}
+ */
+function parsePower(raw) {
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? clamp(n, 0, 100) : null;
 }
 
 /**
@@ -345,39 +467,68 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
 
   const isSensor = entityId.startsWith('sensor.');
   const currentTemp = isSensor
-    ? (isUnavailable ? null : parseFloat(state?.state) || null)
+    ? (isUnavailable ? null : (Number.isFinite(parseFloat(state?.state)) ? parseFloat(state?.state) : null))
     : (attrs.current_temperature ?? null);
-  const targetTemp = isUnavailable || state?.state === 'off' ? null : (attrs.temperature ?? null);
+  const minTemp = Number(attrs.min_temp ?? fromCelsius(5));
+  // Tado frost protection (needs discovered Tado entities) is a minimum-target request, not a heating demand, so it reads as off.
+  const isFrostProtection = !isSensor && state?.state === 'heat'
+    && Object.keys(discoveredEntities || {}).length > 0
+    && typeof attrs.temperature === 'number' && attrs.temperature <= minTemp
+    && typeof attrs.hvac_action === 'string' && attrs.hvac_action !== '' && attrs.hvac_action !== 'heating';
+  const isRange = typeof attrs.temperature !== 'number'
+    && typeof attrs.target_temp_low === 'number' && typeof attrs.target_temp_high === 'number';
+  // A range thermostat shows the bound nearer the current temperature, the low bound on a tie.
+  const rangeTarget = isRange && typeof currentTemp === 'number'
+    && Math.abs(currentTemp - attrs.target_temp_high) < Math.abs(currentTemp - attrs.target_temp_low)
+    ? attrs.target_temp_high : attrs.target_temp_low;
+  const targetTemp = isUnavailable || state?.state === 'off' || isFrostProtection ? null : (isRange ? rangeTarget : (attrs.temperature ?? null));
+  let inferTarget = null;
+  if (isRange) inferTarget = { low: attrs.target_temp_low, high: attrs.target_temp_high };
+  else if (typeof attrs.temperature === 'number') inferTarget = { low: attrs.temperature, high: attrs.temperature };
   const humidity = isSensor ? null : (attrs.current_humidity ?? null);
-  const hvacAction = isSensor ? 'idle' : (attrs.hvac_action || (state?.state === 'off' ? 'off' : 'idle'));
   const hvacMode = isSensor ? 'sensor' : (state?.state || 'off');
   const presetMode = attrs.preset_mode || '';
-  const minTemp = Number(attrs.min_temp ?? 5);
-  const maxTemp = Number(attrs.max_temp ?? 35);
+  const maxTemp = Number(attrs.max_temp ?? fromCelsius(35));
   const tempStep = Number(attrs.target_temp_step ?? 0.5);
-  const unit = attrs.unit_of_measurement || '°C';
+  const unit = resolveTempUnit(attrs);
 
-  /* Heating power: per-zone override → discovered Tado CE sensor → the
-     climate entity's own attribute. The override is resolved here (before the
-     mergedEntities block below) because the heating-power read happens before
-     that merge — routing it through mergedEntities would miss this read. */
-  let heatingPower = 0;
+  /* Heating power: override → discovered Tado CE sensor → climate attribute; resolved before the action ladder and the mergedEntities block, which would miss this read; a non-heating, non-cooling action zeroes both powers and cooling zeroes heating power. */
+  let heatingParsed = null;
   const heatingPowerEntity = zoneConfig.heating_power_entity || discoveredEntities.heating_power;
   if (zoneConfig.heating_power_entity) {
     warnUnresolvedOverride(zoneConfig.name || entityId, 'heating_power_entity', zoneConfig.heating_power_entity, states);
   }
   if (heatingPowerEntity) {
     const hp = states[heatingPowerEntity];
-    if (!isUnavailableState(hp)) heatingPower = parseFloat(hp.state) || 0;
+    if (!isUnavailableState(hp)) heatingParsed = parsePower(hp.state);
   } else if (attrs.heating_power !== undefined) {
-    heatingPower = parseFloat(attrs.heating_power) || 0;
+    heatingParsed = parsePower(attrs.heating_power);
   }
+  let heatingPower = heatingParsed ?? 0;
 
-  let coolingPower = 0;
+  let coolingParsed = null;
   if (discoveredEntities.ac_power) {
     const ap = states[discoveredEntities.ac_power];
-    if (!isUnavailableState(ap)) coolingPower = parseFloat(ap.state) || 0;
+    if (!isUnavailableState(ap)) coolingParsed = parsePower(ap.state);
   }
+  let coolingPower = coolingParsed ?? 0;
+
+  // A readable numeric power source counts as data even when its value is 0 or zeroed by hvac_action.
+  const heatingSourceReadable = heatingParsed !== null;
+  const acSourceReadable = coolingParsed !== null;
+  const hasPowerData = heatingSourceReadable || acSourceReadable;
+
+  const isOffState = !isSensor && state?.state === 'off';
+  const hvacAction = isSensor ? 'idle'
+    : isOffState || isFrostProtection ? 'off'
+      : (attrs.hvac_action || inferHvacAction(state?.state, isUnavailable, inferTarget, currentTemp, heatingPower, coolingPower, hasPowerData));
+
+  // A reported action keeps its raw value here; sensor zones never zero power.
+  const powerAction = isOffState ? 'off' : (attrs.hvac_action || (isSensor ? '' : hvacAction));
+  if (powerAction && powerAction !== 'heating' && powerAction !== 'cooling') {
+    heatingPower = 0;
+    coolingPower = 0;
+  } else if (powerAction === 'cooling') heatingPower = 0;
 
   let overlayType = '';
   if (discoveredEntities.overlay) {
@@ -410,10 +561,13 @@ export function resolveZoneState(entityId, discoveredEntities, states, zoneConfi
     warnUnresolvedOverride(zoneName, 'mold_risk_entity', zoneConfig.mold_risk_entity, states);
   }
 
+  const hasBand = isRange && !isUnavailable && state?.state !== 'off';
+  const targetRange = hasBand ? { low: attrs.target_temp_low, high: attrs.target_temp_high } : null;
   const zoneState = {
     entityId, name, icon, isUnavailable,
-    currentTemp, targetTemp, humidity,
-    heatingPower, coolingPower,
+    currentTemp, targetTemp, targetRange, humidity,
+    heatingPower, coolingPower, hasPowerData,
+    hasHeatingPowerData: heatingSourceReadable, hasAcPowerData: acSourceReadable,
     hvacAction, hvacMode, presetMode, overlayType,
     minTemp, maxTemp, tempStep, unit,
     chips: /** @type {import('./types.js').ChipData[]} */ ([]),
@@ -519,7 +673,7 @@ export function normalizeClimateConfig(config) {
     }
   }
 
-  /* Clamp atmosphere intensity to known tiers — unknown values fall to medium. */
+  /* Clamp atmosphere intensity to known tiers; unknown values fall to medium. */
   const rawIntensity = config.atmosphere_intensity;
   const atmosphereIntensity = (rawIntensity === 'subtle' || rawIntensity === 'bold') ? rawIntensity : 'medium';
 
@@ -550,11 +704,10 @@ export function normalizeClimateConfig(config) {
           if (section[key] === undefined || section[key] === null) {
             section[key] = typeof defaultVal === 'boolean' ? defaultVal : defaultVal;
           } else if (typeof defaultVal === 'number') {
-            // Coerce numeric fields; surface unparseable values so users can
-            // spot typos instead of silently reverting to defaults.
+            // Coerce numeric fields; warn on unparseable values so typos do not silently revert to defaults.
             const coerced = Number(section[key]);
             if (!Number.isFinite(coerced)) {
-              warn('section "%s": %s=%o is not numeric — using default %o', section.type, key, section[key], defaultVal);
+              warn('section "%s": %s=%o is not numeric, using default %o', section.type, key, section[key], defaultVal);
               section[key] = defaultVal;
             } else {
               section[key] = coerced || defaultVal;

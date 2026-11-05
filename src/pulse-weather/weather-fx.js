@@ -1,6 +1,6 @@
 /**
  * @module pulse-weather/weather-fx
- * @description Atmospheric FX engine — rain, snow, lightning, fog, clouds,
+ * @description Atmospheric FX engine: rain, snow, lightning, fog, clouds,
  * stars, heat shimmer, air haze, and condition-based FX dispatch.
  * All functions append DOM elements to a DocumentFragment for atomic swap.
  */
@@ -9,20 +9,14 @@ import { MAX_RAIN_DROPS, MAX_SNOWFLAKES, MAX_STARS, MAX_CLOUDS, LOG_PREFIX } fro
 import { isReducedMotion } from '../shared/utils.js';
 
 /**
- * Create a DOM element with class, styles, and optional animation properties.
+ * Create a DOM element with a class.
  * @param {string} tag - Element tag name.
  * @param {string} className - CSS class name.
- * @param {Object<string, string>} [styles] - Inline style properties.
  * @returns {HTMLElement} Created element.
  */
-function el(tag, className, styles) {
+function el(tag, className) {
   const e = document.createElement(tag);
   e.className = className;
-  if (styles) {
-    for (const [k, v] of Object.entries(styles)) {
-      e.style.setProperty(k, v);
-    }
-  }
   return e;
 }
 
@@ -324,8 +318,7 @@ export function addAirHaze(frag, pm25, pm10) {
   vignette.style.background = `radial-gradient(ellipse at center, transparent 40%, rgba(80,70,50,${severity * 0.3}) 100%)`;
   frag.appendChild(vignette);
 
-  /* The overlay and vignette above are static and their opacity carries the PM
-     reading, so they render regardless. Only what follows is motion. */
+  /* The overlay and vignette above are static (opacity carries the PM reading), so they render regardless; only what follows is motion. */
   if (isReducedMotion()) return;
 
   // Dust particles
@@ -375,8 +368,7 @@ export function addAirHaze(frag, pm25, pm10) {
 export function buildConditionFx(condition, isNight, cloudCover) {
   const frag = document.createDocumentFragment();
 
-  /* Every element here exists purely to animate, so there is nothing worth
-     rendering statically under reduced motion. */
+  /* Every element here exists purely to animate, so nothing is worth rendering statically under reduced motion. */
   if (isReducedMotion()) return frag;
 
   try {
@@ -462,12 +454,12 @@ export function buildConditionFx(condition, isNight, cloudCover) {
         break;
 
       default:
-        // Unknown condition — render clouds if Atmos CE data available
+        // Unknown condition: render clouds if Atmos CE data available
         if (cloudCover && cloudCount > 0) addClouds(frag, cloudCount);
         break;
     }
   } catch (e) {
-    console.warn(`${LOG_PREFIX} buildConditionFx threw — atmospheric FX will be partial or absent for this condition. Please share the error below when reporting.`, e);
+    console.warn(`${LOG_PREFIX} buildConditionFx threw: atmospheric FX will be partial or absent for this condition. Please share the error below when reporting.`, e);
   }
 
   return frag;

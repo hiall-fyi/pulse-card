@@ -101,7 +101,7 @@ var I=globalThis,U=I.ShadowRoot&&(I.ShadyCSS===void 0||I.ShadyCSS.nativeShadow)&
           class="pw-editor-atmos-source"
           .label=${"Atmos CE source (optional)"}
           .value=${this._config.atmos_source||""}
-          .helper=${"Slug override \u2014 leave blank to auto-detect"}
+          .helper=${"Slug override: leave blank to auto-detect"}
           helperPersistent
           @input=${this._atmosSourceChanged}
         ></ha-textfield>
@@ -126,7 +126,7 @@ var I=globalThis,U=I.ShadowRoot&&(I.ShadyCSS===void 0||I.ShadyCSS.nativeShadow)&
         </div>
 
         ${s.length===0?u`
-          <div class="pw-editor-section-hint">No sections enabled — the card will be empty.</div>
+          <div class="pw-editor-section-hint">No sections enabled, so the card will be empty.</div>
         `:h}
 
         ${Se.map(n=>u`

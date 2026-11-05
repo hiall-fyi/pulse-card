@@ -3,7 +3,7 @@
  * @description Render per-zone environment health section for Tado CE.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
+import { escapeHtml } from '../../shared/utils.js';
 import { resolveRiskColor } from '../utils.js';
 import { extractZoneName } from '../zone-resolver.js';
 
@@ -38,13 +38,13 @@ export function renderEnvironmentSection(zones, states, discovery) {
     if (hasMold) {
       const val = states[entities.mold_risk].state;
       const color = resolveRiskColor(val);
-      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.mold_risk)}" style="color:${sanitizeCssValue(color.fallback)}">`;
+      html += `<span class="pc-chip pc-status-${color.tier}" data-entity="${escapeHtml(entities.mold_risk)}">`;
       html += `<ha-icon icon="mdi:mushroom"></ha-icon>${escapeHtml(val)}</span>`;
     }
     if (hasCond) {
       const val = states[entities.condensation].state;
       const color = resolveRiskColor(val);
-      html += `<span class="pc-chip" data-entity="${escapeHtml(entities.condensation)}" style="color:${sanitizeCssValue(color.fallback)}">`;
+      html += `<span class="pc-chip pc-status-${color.tier}" data-entity="${escapeHtml(entities.condensation)}">`;
       html += `<ha-icon icon="mdi:water-alert"></ha-icon>${escapeHtml(val)}</span>`;
     }
     if (hasComfort) {

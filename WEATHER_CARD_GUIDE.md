@@ -1,14 +1,14 @@
 [← Back to README](README.md)
 
-# Pulse Weather Card — Configuration Guide
+# Pulse Weather Card: Configuration Guide
 
-Pulse Weather Card is a weather visualisation card for Home Assistant. It works with any `weather.*` entity and builds up progressively — a single entity gives you the essentials, and pairing it with the [Atmos CE](https://github.com/hiall-fyi/atmos_ce) integration unlocks atmospheric stability, air quality, astronomy, and weather alerts with zero extra configuration.
+Pulse Weather Card is a weather visualisation card for Home Assistant. It works with any `weather.*` entity and builds up progressively: a single entity gives you the essentials, and pairing it with the [Atmos CE](https://github.com/hiall-fyi/atmos_ce) integration unlocks atmospheric stability, air quality, astronomy, and weather alerts with no extra configuration in most setups.
 
 ---
 
 ## Quick Start
 
-Point the card at a weather entity — that's all you need:
+Point the card at a weather entity, and that's all you need:
 
 ```yaml
 type: custom:pulse-weather-card
@@ -18,6 +18,8 @@ sections:
 ```
 
 Drop `weather_entity` entirely and the card picks up the first `weather.*` entity it finds in your HA instance.
+
+Temperatures use the unit of the Atmos CE sensor when one is used, then the weather entity's own temperature unit, then the Home Assistant unit setting.
 
 ---
 
@@ -45,20 +47,22 @@ sections:
   - type: atmosphere
 ```
 
+A section with an unknown or missing `type` is shown as `overview`.
+
 ### Section Compatibility
 
 | Section | Standard weather entity | Needs Atmos CE |
 |---|---|---|
-| `overview` | ✅ | — (enriched with Atmos CE) |
-| `forecast` | ✅ | — |
-| `meteogram` | ✅ | — (enriched with Atmos CE) |
-| `wind` | ✅ | — (enriched with Atmos CE) |
-| `astro` | ✅ (needs `sun.sun`) | — (enriched with Atmos CE) |
-| `air_quality` | — | ✅ |
-| `alerts` | — | ✅ |
-| `atmosphere` | — | ✅ |
+| `overview` | ✅ | No (enriched with Atmos CE) |
+| `forecast` | ✅ | No |
+| `meteogram` | ✅ | No (enriched with Atmos CE) |
+| `wind` | ✅ | No (enriched with Atmos CE) |
+| `astro` | ✅ (needs `sun.sun`) | No (enriched with Atmos CE) |
+| `air_quality` | No | ✅ |
+| `alerts` | No | ✅ |
+| `atmosphere` | No | ✅ |
 
-Sections marked "Needs Atmos CE" require entities from the [Atmos CE](https://github.com/hiall-fyi/atmos_ce) integration. Without them the sections return nothing and take up no space.
+Sections marked "Needs Atmos CE" require entities from the [Atmos CE](https://github.com/hiall-fyi/atmos_ce) integration. Without them `air_quality` and `atmosphere` return nothing and take up no space. `alerts` still renders and always reads "All Clear", because it finds no alert entities. Add `alerts` only when Atmos CE is installed, as "All Clear" otherwise does not mean there are no warnings in your area.
 
 ---
 
@@ -71,7 +75,6 @@ The hero section: current temperature in large type, a contextual weather summar
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `location_label` | string | `Now` | Label shown next to the timestamp in the top-left corner of the section |
-| `pro` | boolean | `true` | The brand-mark corner acts as a toggle between the default compact view and a pro view with the 7-day sparkline and extended stats. Set to `false` to make the brand mark a static decoration |
 
 ```yaml
 sections:
@@ -96,14 +99,13 @@ The narrative line above the list highlights the warmest day in the week and fla
 
 ### meteogram
 
-A professional yr.no-style time-series chart on a shared time axis. Shows temperature as a coloured curve with area fill, precipitation as bars growing up from the baseline, cloud cover as a translucent background wash, and wind barbs (NWS standard notation) — all in one SVG.
+A professional yr.no-style time-series chart on a shared time axis. Shows temperature as a coloured curve with area fill, precipitation as bars growing up from the baseline, cloud cover as a translucent background wash, and wind barbs (NWS standard notation), all in one SVG.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `horizon` | string | `short` | Time window to display. `short` = 12 hours, `long` = 24 hours |
-| `hours` | number | — | Override the horizon with an explicit hour count (4–48). When set, this takes priority over `horizon` |
+| `hours` | number | none | Override the horizon with an explicit hour count (4–48). When set, this takes priority over `horizon` |
 | `show_cloud` | boolean / `auto` | `auto` | Whether to show the cloud cover background band. `auto` shows it only when cloud data is available from Atmos CE |
-| `show_wind` | boolean / `auto` | `auto` | Whether to show wind barbs on the staggered cluster. `auto` shows them when wind data is available |
 | `pro` | boolean | `true` | The brand-mark corner toggles between 12-hour and 24-hour view at runtime |
 
 ```yaml
@@ -129,7 +131,7 @@ sections:
     speed_mode: gust
 ```
 
-When wind speed exceeds 80 km/h, a dashed red ring appears at the outer edge of the rose to indicate that the arrow has hit its visual cap and the real speed is higher.
+When wind speed exceeds 80, a dashed red ring appears at the outer edge of the rose to indicate that the arrow has hit its visual cap and the real speed is higher. The thresholds assume km/h and the number is not converted, so an entity reporting mph or m/s reaches them at a different real speed.
 
 ### astro
 
@@ -150,7 +152,7 @@ An AQI gauge with a colour-coded band, pollutant breakdown, and a PM-driven atmo
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `scale` | string | `eu` | Which AQI scale to use — `eu` (European, 0–100) or `us` (US EPA, 0–300) |
+| `scale` | string | `eu` | Which AQI scale to use: `eu` (European, 0–100) or `us` (US EPA, 0–300) |
 | `aqi_entity` | string | auto | Override the AQI entity. Defaults to the Atmos CE `european_aqi` or `us_aqi` sensor depending on scale |
 | `pro` | boolean | `true` | The brand-mark corner toggles between EU and US scale at runtime |
 
@@ -168,16 +170,9 @@ A radar-style display with active weather alerts from Atmos CE's Meteoalarm inte
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `alert_entities` | list | auto | Override the entity IDs to read alerts from. Auto-discovers `sensor.<slug>_active_alert`, `sensor.<slug>_upcoming_alert`, and related entities |
 | `pro` | boolean | `true` | The brand-mark corner switches between a compact ticker view (default) and a full detail-card view with headline, description, and location |
 
-```yaml
-sections:
-  - type: alerts
-    alert_entities:
-      - sensor.met_office_warnings_active_alert
-      - sensor.met_office_warnings_upcoming_alert
-```
+Alert sensors are found automatically from Atmos CE (`sensor.<slug>_active_alert`, `sensor.<slug>_upcoming_alert` and related entities).
 
 When there are no active alerts, the section shows an "All Clear" radar with a calm green sweep. The pro view is only available when at least one alert is active.
 
@@ -218,6 +213,8 @@ The card logs a console warning when Atmos CE-dependent sections are configured 
 
 When Atmos CE is present, the card fetches the extended hourly forecast via `atmos_ce.get_extended_forecast` before falling back to the standard `weather.get_forecasts` service. The extended forecast adds dew point, CAPE, cloud cover layers, and precipitation type breakdown to each hourly slot, which the meteogram and overview CAPE sparkline use directly.
 
+Finding the Atmos CE config entry first calls `config/entity_registry/list`, which needs a Home Assistant admin user. For other users the card falls back to the standard hourly forecast and logs one console warning.
+
 ---
 
 ## Styling with `card-mod`
@@ -226,7 +223,7 @@ The Weather Card exposes three layers for `card-mod` or theme overrides: CSS cus
 
 ### CSS Custom Properties
 
-**Family tokens** (shared with every Pulse card — override once, all cards update):
+**Family tokens** (shared with every Pulse card, so override once, all cards update):
 
 | Variable | Controls | Default |
 |---|---|---|
@@ -241,10 +238,10 @@ The Weather Card exposes three layers for `card-mod` or theme overrides: CSS cus
 |---|---|---|
 | `--pw-sky-top` | Top of the cartouche sky gradient | `#1d2530` |
 | `--pw-sky-mid` | Middle of the sky gradient | `#384452` |
-| `--pw-sky-bot` | Bottom of the sky gradient | `#827a6a` |
+| `--pw-sky-bot` | Bottom of the sky gradient | `#413d35` |
 | `--pw-ink-cream` | Primary text on the dark sky background | `#fdf6e3` |
 | `--pw-ink-cream-muted` | Muted text (labels, axis ticks) | `rgba(229, 217, 194, 0.85)` |
-| `--pw-ink-cream-dim` | Dim text (secondary labels) | `rgba(229, 217, 194, 0.55)` |
+| `--pw-ink-cream-dim` | Dim text (secondary labels) | `rgba(229, 217, 194, 0.72)` |
 | `--pw-vermilion` | Accent colour (now-line, max temp) | `#a83d2a` |
 | `--pw-wind` | Wind / min-temp / blue-hour accent | `#5ac8fa` |
 | `--pw-warn-amber` | Amber warning (golden hour, moderate risk) | `#ff9f0a` |
@@ -275,8 +272,8 @@ card_mod:
 
 | Selector | What it targets |
 |---|---|
-| `.pw-card` | The outer card wrapper (inside `<ha-card>`) |
-| `.pw-section` | Each section root — one per section in your config |
+| `.pw-card` | The outer card wrapper (rendered straight into the card's shadow root, with no `<ha-card>`) |
+| `.pw-section` | Each section root, one per section in your config |
 | `.pw-cartouche` | The inner frame for each section (sky-gradient background with an inset border) |
 
 **Section containers:**
@@ -399,7 +396,7 @@ Each section has a small brand-mark in the corner. On sections that support it, 
 
 | Section | Toggle action |
 |---|---|
-| `overview` | Default compact view ↔ pro view (7-day sparkline + extended stats) |
+| `overview` | No toggle: the brand mark is a static decoration |
 | `forecast` | Static decoration (no toggle) |
 | `wind` | Speed mode ↔ gust mode |
 | `air_quality` | EU AQI scale ↔ US AQI scale |
@@ -408,16 +405,15 @@ Each section has a small brand-mark in the corner. On sections that support it, 
 | `atmosphere` | Static decoration (no toggle) |
 | `meteogram` | 12-hour view ↔ 24-hour view |
 
-Set `pro: false` on any section to convert the brand mark to a static decorator and disable the toggle. The toggle state resets on page reload — it is runtime-only.
+Set `pro: false` on any section except the overview (which has no toggle) to convert the brand mark to a static decorator and disable the toggle. The toggle state resets on page reload, as it is runtime-only.
 
 ---
 
 ## Known Limitations
 
-- **History-based features need a sensor entity** — sparklines and CAPE trend data read from Atmos CE's extended forecast or the standard `weather.get_forecasts` service. Climate entities don't expose hourly history the same way sensors do
-- **Atmos CE extended forecast is hourly only** — daily forecast data always comes from the standard `weather.get_forecasts` (daily) service regardless of whether Atmos CE is installed
-- **`show_wind` in the meteogram** only controls the wind barbs in the staggered cluster; wind streaks in the wind section are always shown when wind data is available
-- **Forecast data refreshes every 30 minutes** — the card does not subscribe to forecast push updates, so the chart lags behind real-time changes by up to 30 minutes. Reloading the page forces an immediate refresh
-- **Alerts rely on Atmos CE Meteoalarm** — the standard HA `weather.*` entity does not carry alert data. Without Atmos CE, the `alerts` section has nothing to display
-- **Moon phase is approximate** — the phase glyph and illumination percentage come from Atmos CE `moon_phase` sensor attributes. Without Atmos CE, the astro section still shows sunrise/sunset and the 24-hour ribbon, but the moon row shows a plain disc with no illumination data
-- **Multiple cards on the same view** — works, but each card makes its own forecast fetch independently. If you need several weather cards on one view, consider using a single card with multiple sections instead
+- **Charts need forecast data**: the meteogram, the 7-day trend and the storm-risk sparkline come from your weather entity's `weather.get_forecasts` service (or Atmos CE's extended forecast), not from recorder history. If your integration provides no hourly forecast, the meteogram and the storm-risk sparkline stay hidden
+- **Atmos CE extended forecast is hourly only**: daily forecast data always comes from the standard `weather.get_forecasts` (daily) service regardless of whether Atmos CE is installed
+- **Forecast data refreshes every 30 minutes**: the card does not subscribe to forecast push updates, so the chart lags behind real-time changes by up to 30 minutes. Reloading the page forces an immediate refresh. When a refresh fails, the card logs a console warning and keeps the last forecast for the same weather entity. Changing `weather_entity` clears the old forecast straight away
+- **Alerts rely on Atmos CE Meteoalarm**: the standard HA `weather.*` entity does not carry alert data. Without Atmos CE, the `alerts` section always reads "All Clear", which does not mean there are no warnings
+- **Moon phase is approximate**: the phase glyph and illumination percentage come from Atmos CE `moon_phase` sensor attributes. Without Atmos CE, the astro section still shows sunrise/sunset and the 24-hour ribbon, but the moon row shows a plain disc with no illumination data
+- **Multiple cards on the same view**: works, but each card makes its own forecast fetch independently. If you need several weather cards on one view, consider using a single card with multiple sections instead

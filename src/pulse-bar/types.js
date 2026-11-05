@@ -1,7 +1,7 @@
 /**
  * @module types
  * @description JSDoc type definitions for Pulse Card.
- * This file is never imported at runtime — it exists solely for
+ * This file is never imported at runtime; it exists solely for
  * TypeScript's checkJs type-checking via JSDoc annotations.
  */
 
@@ -9,7 +9,7 @@
 export {};
 
 /**
- * HA-framework typedefs are shared — see src/shared/types.js.
+ * HA-framework typedefs are shared, see src/shared/types.js.
  * @typedef {import('../shared/types.js').ActionConfig} ActionConfig
  * @typedef {import('../shared/types.js').Hass} Hass
  * @typedef {import('../shared/types.js').HassEntityState} HassEntityState
@@ -95,7 +95,7 @@ export {};
  * @property {string} [attribute] - Show this entity attribute's value.
  * @property {string} [text] - Show static text.
  * @property {string} [template] - Interpolate {attribute_name} placeholders from entity attributes. bytes/packets auto-format as K/M/G.
- * @property {string} [type] - 'last_changed' — show relative time since last state change.
+ * @property {string} [type] - 'last_changed': show relative time since last state change.
  */
 
 /**
@@ -184,7 +184,7 @@ export {};
  */
 
 /**
- * Computed bar state for a single entity — shared between render and update.
+ * Computed bar state for a single entity, shared between render and update.
  * @typedef {object} BarState
  * @property {boolean} isUnavailable
  * @property {number} min

@@ -1,6 +1,6 @@
 /**
  * @module pulse-climate/sections/api
- * @description Thin shell — renders the section header and delegates the body
+ * @description Thin shell: renders the section header and delegates the body
  * to api-view. Same module powers system_health_group's API tab.
  *
  * updateApiSection (DOM-differential update for tap-free re-renders) stays

@@ -1,6 +1,6 @@
 /**
  * @module pulse-card
- * @description Main PulseBarCard custom element — renders horizontal bar chart(s)
+ * @description Main PulseBarCard custom element; renders horizontal bar chart(s)
  * for Home Assistant sensor data. Entry point for the card.
  */
 
@@ -37,10 +37,7 @@ import {
 /** @typedef {import('./types.js').Hass} Hass */
 /** @typedef {import('./types.js').BarState} BarState */
 
-/**
- * PulseBarCard — compact horizontal bar chart card for Home Assistant.
- * @extends HTMLElement
- */
+/** PulseBarCard: compact horizontal bar chart card for Home Assistant. @extends HTMLElement */
 class PulseBarCard extends HTMLElement {
   /** @type {NormalizedConfig|null} Normalized config. */
   _config = null;
@@ -69,6 +66,9 @@ class PulseBarCard extends HTMLElement {
   /** @type {number} Timestamp of last sparkline fetch. */
   _sparklineLastFetch = 0;
 
+  /** @type {number} Bumped by setConfig so in-flight fetches from an older config are discarded. */
+  _fetchGen = 0;
+
   /** @type {ShadowRoot} */
   _shadow;
 
@@ -81,7 +81,7 @@ class PulseBarCard extends HTMLElement {
   }
 
   /**
-   * Non-null config accessor — avoids verbose type casts throughout the class.
+   * Non-null config accessor, avoids verbose type casts throughout the class.
    * Only call after setConfig() has been called.
    * @returns {NormalizedConfig}
    */
@@ -108,8 +108,7 @@ class PulseBarCard extends HTMLElement {
   /** Re-bind listeners when reconnected after dashboard edit. */
   connectedCallback() {
     if (this._config && this._hass && this._elements.container) {
-      /* DOM preserved across reconnect, but disconnectedCallback cleaned up
-         the listeners — re-bind action + slider listeners. */
+      /* DOM survives reconnect but disconnectedCallback removed the listeners, so re-bind them. */
       this._cacheBarElements();
     }
   }
@@ -124,6 +123,7 @@ class PulseBarCard extends HTMLElement {
     /* Reset async data caches so stale entries from old entities don't linger. */
     this._sparklineData = {};
     this._sparklineLastFetch = 0;
+    this._fetchGen++;
     this._indicators = {};
     if (this._hass) {
       this._fullRender();
@@ -370,9 +370,7 @@ class PulseBarCard extends HTMLElement {
     return { lineHtml, labelRowHtml };
   }
 
-  /**
-   * Differential update — only change fill width, value text, color, icon.
-   */
+  /** Differential update: only change fill width, value text, color, icon. */
   _updateBars() {
     const cfg = this._cfg;
     for (const ec of cfg.entities) {
@@ -395,10 +393,9 @@ class PulseBarCard extends HTMLElement {
       if (fillEl) {
         const scaledWidth = `${bs.fill * barWidthScale}%`;
         fillEl.style.width = scaledWidth;
-        fillEl.style.backgroundColor = bs.color || '';
+        fillEl.style.backgroundColor = sanitizeCssValue(bs.color);
 
-        /* Sparkline width must mirror the bar_width clamp so the line never
-           runs past the bar end. */
+        /* Sparkline width mirrors the bar_width clamp so the line never runs past the bar end. */
         /** @type {HTMLElement|null} */
         const sparkSvg = /** @type {HTMLElement|null} */ (row.querySelector('.pb-sparkline'));
         if (sparkSvg) sparkSvg.style.width = `${barWidthScale * 100}%`;
@@ -431,8 +428,7 @@ class PulseBarCard extends HTMLElement {
 
       /** @type {HTMLElement|null} */
       const targetEl = /** @type {HTMLElement|null} */ (row.querySelector('.pb-target'));
-      // Label is its own row now (see _buildTargetHtml), not a .pb-target
-      // child, so its position/visibility need updating separately.
+      // Label is its own row (see _buildTargetHtml), not a .pb-target child, so update it separately.
       const labelEl = /** @type {HTMLElement|null} */ (row.querySelector('.pb-target-label'));
       const targetCfg = ec.target ?? cfg.target;
       const { value: targetNum } = resolveTarget(targetCfg, this._hass);
@@ -457,9 +453,7 @@ class PulseBarCard extends HTMLElement {
     }
   }
 
-  /**
-   * Schedule indicator data fetch with debounce.
-   */
+  /** Schedule indicator data fetch with debounce. */
   _scheduleIndicatorFetch() {
     const cfg = this._cfg;
     if (!cfg) return;
@@ -474,13 +468,11 @@ class PulseBarCard extends HTMLElement {
     this._indicatorTimer = setTimeout(() => this._fetchIndicators(), 500);
   }
 
-  /**
-   * Fetch history data and update indicator elements.
-   * Uses a single batch WS call for all indicator entities.
-   */
+  /** Fetch history data and update indicator elements with one batch WS call. */
   async _fetchIndicators() {
     const cfg = this._cfg;
     if (!cfg) return;
+    const gen = this._fetchGen;
 
     try {
       /** @type {Map<string, EntityConfig>} */
@@ -502,6 +494,7 @@ class PulseBarCard extends HTMLElement {
       for (const [period, entries] of byPeriod) {
         const entityIds = entries.map((e) => e.entity);
         const prevValues = await fetchPreviousValues(this._hass, entityIds, period);
+        if (gen !== this._fetchGen) return;
 
         for (const { entity, icfg } of entries) {
           const ec = entityMap.get(entity);
@@ -595,9 +588,7 @@ class PulseBarCard extends HTMLElement {
     );
   }
 
-  /**
-   * Schedule sparkline data fetch with interval gating.
-   */
+  /** Schedule sparkline data fetch with interval gating. */
   _scheduleSparklineFetch() {
     const cfg = this._cfg;
     if (!cfg) return;
@@ -621,12 +612,11 @@ class PulseBarCard extends HTMLElement {
     this._sparklineTimer = setTimeout(() => this._fetchSparklines(), 1000);
   }
 
-  /**
-   * Fetch sparkline history data and update SVG paths.
-   */
+  /** Fetch sparkline history data and update SVG paths. */
   async _fetchSparklines() {
     const cfg = this._cfg;
     if (!cfg) return;
+    const gen = this._fetchGen;
 
     try {
       /** @type {Map<number, string[]>} */
@@ -641,8 +631,9 @@ class PulseBarCard extends HTMLElement {
 
       for (const [hours, entityIds] of byHours) {
         const data = await fetchSparklineData(this._hass, entityIds, hours);
+        if (gen !== this._fetchGen) return;
         for (const eid of entityIds) {
-          this._sparklineData[eid] = data[eid] || [];
+          if (data[eid]?.length) this._sparklineData[eid] = data[eid];
         }
       }
 
@@ -653,10 +644,7 @@ class PulseBarCard extends HTMLElement {
     }
   }
 
-  /**
-   * Update sparkline SVG path elements in the DOM.
-   * Creates SVG elements if they don't exist yet (first fetch after render).
-   */
+  /** Update sparkline SVG path elements, creating them on first fetch after render. */
   _updateSparklines() {
     const cfg = this._cfg;
     if (!cfg) return;
@@ -676,8 +664,7 @@ class PulseBarCard extends HTMLElement {
       const sparkWidth = `${barWidthScale * 100}%`;
 
       if (!svg) {
-        // SVG doesn't exist yet — inject it into pb-container between track and fill.
-        // Must use DOMParser to create proper SVG namespace elements (innerHTML creates HTMLUnknownElement).
+        // Inject the SVG into pb-container between track and fill; DOMParser is needed because innerHTML creates HTMLUnknownElement.
         const container = row.querySelector('.pb-container');
         if (!container) continue;
         const svgMarkup = this._buildSparklineMarkup(
@@ -694,7 +681,7 @@ class PulseBarCard extends HTMLElement {
           container.appendChild(svgEl);
         }
       } else {
-        // SVG exists — update path and width
+        // SVG exists: update path and width
         const pathEl = svg.querySelector('path');
         if (pathEl) pathEl.setAttribute('d', path);
         /** @type {HTMLElement} */ (svg).style.width = sparkWidth;
@@ -769,7 +756,7 @@ class PulseBarCard extends HTMLElement {
 
   /**
    * Return grid sizing for HA's sections (grid) view. Uses `rows: 'auto'` so
-   * the cell sizes to content — bar rows wrap by the `columns` config and each
+   * the cell sizes to content; bar rows wrap by the `columns` config and each
    * row can carry a sparkline, so a fixed row count would clip taller layouts
    * and overlap the card below. See {@link buildGridOptions}.
    * @returns {{columns: number, min_columns: number, rows: 'auto'}}
@@ -812,8 +799,7 @@ if (!customElements.get('pulse-card')) {
   customElements.define('pulse-card', class extends PulseBarCard {});
 }
 
-// Register in card picker — primary name is `pulse-bar-card`. Old
-// `pulse-card` configs still resolve via the alias above.
+// Register in card picker under `pulse-bar-card`; old `pulse-card` configs resolve via the alias above.
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'pulse-bar-card',

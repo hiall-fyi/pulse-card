@@ -4,61 +4,62 @@
  * of zones sorted by a selectable metric with proportional bars and summary stats.
  */
 
-import { escapeHtml, sanitizeCssValue, formatNumericDisplay } from '../../shared/utils.js';
-import { resolveZoneContext, rowStateClass } from '../utils.js';
-import { getAvailableMetrics, resolveMetricValue } from '../feature-availability.js';
-
-/** Uniform calm blue for temp and humidity bars (Apple system, shared tier token). */
-const BLUE = 'var(--pulse-tier-calm)';
+import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
+import { resolveZoneContext, rowStateClass, formatTemperature, formatPercent, averageZonePower } from '../utils.js';
+import { getAvailableMetrics } from '../feature-availability.js';
+import { computeComfortScore, resolveComfortInputs } from './comfort-strip.js';
 
 /**
- * Colour a power value by severity.
+ * Tier a power value by severity.
  * @param {number} v
  * @returns {string}
  */
-function powerColor(v) {
-  if (v <= 40) return 'var(--pulse-tier-moderate)';
-  if (v <= 70) return 'var(--pulse-tier-strong)';
-  return 'var(--pulse-tier-gale)';
+function powerTier(v) {
+  if (v <= 40) return 'green';
+  if (v <= 70) return 'amber';
+  return 'red';
 }
 
 /**
- * Colour a comfort value by severity.
+ * Tier a comfort value by severity.
  * @param {number} v
  * @returns {string}
  */
-function comfortColor(v) {
-  if (v >= 80) return 'var(--pulse-tier-moderate)';
-  if (v >= 50) return 'var(--pulse-tier-strong)';
-  return 'var(--pulse-tier-gale)';
+function comfortTier(v) {
+  if (v >= 80) return 'green';
+  if (v >= 50) return 'amber';
+  return 'red';
 }
 
-/** @typedef {{ label: string, unit: string|null, max: number|null, colorFn: (v: number) => string }} MetricDef */
+/** @typedef {{ label: string, unit: string|null, max: number|null, tierFn: (v: number) => string }} MetricDef */
 
 /** @type {Record<string, MetricDef>} */
 const METRIC_DEFS = {
-  power:    { label: 'Power',    unit: '%',  max: 100,  colorFn: powerColor },
-  temp:     { label: 'Temp',     unit: null, max: null, colorFn: () => BLUE },
-  humidity: { label: 'Humidity', unit: '%',  max: 100,  colorFn: () => BLUE },
-  comfort:  { label: 'Comfort',  unit: '',   max: 100,  colorFn: comfortColor },
+  power:    { label: 'Power',    unit: '%',  max: 100,  tierFn: powerTier },
+  temp:     { label: 'Temp',     unit: null, max: null, tierFn: () => 'blue' },
+  humidity: { label: 'Humidity', unit: '%',  max: 100,  tierFn: () => 'blue' },
+  comfort:  { label: 'Comfort',  unit: '',   max: 100,  tierFn: comfortTier },
 };
 
 /**
  * Extract the metric value for a zone.
  * @param {string} metricKey
- * @param {*} zoneState - From resolveZoneState.
- * @param {string} zoneName
- * @param {import('../types.js').TadoDiscovery} discovery
+ * @param {import('../types.js').ZoneConfig} zoneConfig
+ * @param {ReturnType<typeof resolveZoneContext>} zoneContext
  * @param {Record<string, *>} states
  * @returns {number|null}
  */
-function extractValue(metricKey, zoneState, zoneName, discovery, states) {
+function extractValue(metricKey, zoneConfig, zoneContext, states) {
+  const zoneState = zoneContext.zoneState;
   if (zoneState.isUnavailable) return null;
   switch (metricKey) {
-    case 'power': return zoneState.heatingPower;
+    case 'power': return zoneState.hasPowerData ? (zoneState.heatingPower || zoneState.coolingPower || 0) : null;
     case 'temp': return zoneState.currentTemp;
     case 'humidity': return zoneState.humidity;
-    case 'comfort': return resolveMetricValue('comfort', zoneName, discovery, states);
+    case 'comfort': {
+      const c = resolveComfortInputs(zoneConfig, zoneContext, states);
+      return computeComfortScore(c.temp, c.target, c.humidity, c.level);
+    }
     default: return null;
   }
 }
@@ -67,23 +68,25 @@ function extractValue(metricKey, zoneState, zoneName, discovery, states) {
  * Compute summary statistics from metric values.
  * @param {Array<number|null>} values
  * @param {string} unit
+ * @param {number|null} [avgOverride] - Replaces the mean when given (null prints --).
  * @returns {{ avg: string, high: string, low: string, spread: string }}
  */
-export function computeRankingSummary(values, unit) {
+export function computeRankingSummary(values, unit, avgOverride) {
   const valid = values.filter((/** @type {number|null} */ v) => v !== null && v !== undefined);
   if (valid.length === 0) {
     return { avg: '--', high: '--', low: '--', spread: '--' };
   }
-  const avg = /** @type {number[]} */ (valid).reduce((s, v) => s + v, 0) / valid.length;
+  const avg = avgOverride !== undefined ? avgOverride : /** @type {number[]} */ (valid).reduce((s, v) => s + v, 0) / valid.length;
   const high = Math.max(.../** @type {number[]} */ (valid));
   const low = Math.min(.../** @type {number[]} */ (valid));
   const spread = high - low;
   const u = unit || '';
+  const fmt = (/** @type {number} */ v) => (u === '%' ? formatPercent(v) : formatTemperature(v, u));
   return {
-    avg: `${formatNumericDisplay(avg)}${u}`,
-    high: `${formatNumericDisplay(high)}${u}`,
-    low: `${formatNumericDisplay(low)}${u}`,
-    spread: `${formatNumericDisplay(spread)}${u}`,
+    avg: avg === null ? '--' : fmt(avg),
+    high: fmt(high),
+    low: fmt(low),
+    spread: fmt(spread),
   };
 }
 
@@ -103,12 +106,13 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
   const def = METRIC_DEFS[metric];
   if (!def) return '';
 
-  /** @type {Array<{entityId: string, name: string, value: number|null, unit: string, rowClass: string}>} */
+  /** @type {Array<{entityId: string, name: string, value: number|null, unit: string, rowClass: string, isUnavailable: boolean, hvacAction: string, hasPowerData: boolean}>} */
   const zoneData = [];
   for (const zoneConfig of zones) {
-    const { entityId, zoneName, zoneState: zs } = resolveZoneContext(zoneConfig, discovery, states);
-    const value = extractValue(metric, zs, zoneName, discovery, states);
-    zoneData.push({ entityId, name: zs.name, value, unit: zs.unit || '°C', rowClass: rowStateClass(zs) });
+    const ctx = resolveZoneContext(zoneConfig, discovery, states);
+    const { entityId, zoneState: zs } = ctx;
+    const value = extractValue(metric, zoneConfig, ctx, states);
+    zoneData.push({ entityId, name: zs.name, value, unit: zs.unit || '°C', rowClass: rowStateClass(zs), isUnavailable: zs.isUnavailable, hvacAction: zs.hvacAction, hasPowerData: !!zs.hasPowerData });
   }
 
   /* Sort descending by value, nulls to bottom. */
@@ -149,14 +153,16 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
     const rank = i + 1;
     const topClass = rank === 1 && z.value !== null ? ' pc-top' : '';
     const pct = z.value !== null && scaleMax > 0 ? Math.round((z.value / scaleMax) * 100) : 0;
-    const barColor = z.value !== null ? def.colorFn(z.value) : '';
+    const barTier = z.value !== null ? def.tierFn(z.value) : null;
     const barWidth = z.value !== null ? `${pct}%` : '0%';
 
     let displayValue;
     if (z.value === null) {
       displayValue = '--';
     } else if (metric === 'temp') {
-      displayValue = `${z.value}${z.unit}`;
+      displayValue = formatTemperature(z.value, z.unit);
+    } else if (displayUnit === '%') {
+      displayValue = formatPercent(z.value);
     } else {
       displayValue = `${z.value}${displayUnit}`;
     }
@@ -164,14 +170,15 @@ export function renderZoneRankingSection(zones, states, discovery, activeMetric 
     html += `<div class="pc-rank-row${z.rowClass}" role="button" tabindex="0" data-entity="${escapeHtml(z.entityId)}">`;
     html += `<div class="pc-rank-num${topClass}">${rank}</div>`;
     html += `<div class="pc-rank-name">${escapeHtml(z.name)}</div>`;
-    html += `<div class="pc-rank-bar-track"><div class="pc-rank-bar-fill" style="width:${sanitizeCssValue(barWidth)};background:${sanitizeCssValue(barColor)}"></div></div>`;
+    html += `<div class="pc-rank-bar-track"><div class="pc-rank-bar-fill${barTier ? ` pc-status-${barTier}` : ''}" style="width:${sanitizeCssValue(barWidth)}"></div></div>`;
     html += `<div class="pc-rank-value">${escapeHtml(displayValue)}</div>`;
     html += `</div>`;
   }
   html += `</div>`;
 
   const summaryValues = zoneData.map((z) => z.value);
-  const summary = computeRankingSummary(summaryValues, displayUnit);
+  const powerAvg = metric === 'power' ? averageZonePower(zoneData.map((z) => ({ ...z, power: z.value ?? 0 }))) : undefined;
+  const summary = computeRankingSummary(summaryValues, displayUnit, powerAvg);
   html += `<div class="pc-ranking-summary">`;
   html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.avg)}</div><div class="pc-stat-label">Average</div></div>`;
   html += `<div class="pc-stat"><div class="pc-stat-value">${escapeHtml(summary.high)}</div><div class="pc-stat-label">Highest</div></div>`;

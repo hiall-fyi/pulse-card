@@ -18,7 +18,7 @@ export const HOLD_THRESHOLD = 500;
  * `role` and `tabindex` are set unconditionally, so a wrong pre-existing role is
  * corrected. `preventDefault` is already called; nested activatables must
  * `stopPropagation` themselves or the ancestor also fires. Ripple is not
- * attached — call `attachRipple` separately where tap feedback is wanted.
+ * attached; call `attachRipple` separately where tap feedback is wanted.
  *
  * @param {HTMLElement} el - Element to make operable.
  * @param {(ev: KeyboardEvent) => void} onActivate - Invoked on Enter/Space.
@@ -51,7 +51,7 @@ export function fireEvent(element, type, detail) {
 
 /**
  * Whitelist URL schemes that `action: url` may open in a new tab.
- * User config reaches the new-tab opener — anything outside this set is
+ * User config reaches the new-tab opener: anything outside this set is
  * rejected so a malicious YAML can't smuggle `javascript:`, `data:`, or
  * `vbscript:`.
  * @param {string} url
@@ -73,7 +73,7 @@ function isSafeUrl(url) {
 }
 
 /**
- * Whitelist navigation paths — must be same-origin relative paths. Rejects
+ * Whitelist navigation paths: must be same-origin relative paths. Rejects
  * protocol-relative (`//host`) and scheme URLs to stop navigation hijack
  * via a malicious `navigation_path` YAML value.
  * @param {string} path
@@ -109,7 +109,7 @@ export function executeAction(element, hass, actionConfig, entityId, warnFn) {
         history.pushState(null, '', actionConfig.navigation_path);
         fireEvent(element, 'location-changed', { replace: false });
       } else if (actionConfig.navigation_path) {
-        warnFn('navigation_path rejected — must be a same-origin relative path: %s', actionConfig.navigation_path);
+        warnFn('navigation_path rejected: must be a same-origin relative path: %s', actionConfig.navigation_path);
       }
       break;
     case 'call-service':
@@ -118,7 +118,7 @@ export function executeAction(element, hass, actionConfig, entityId, warnFn) {
       if (!svc || typeof svc !== 'string') break;
       const dotIdx = svc.indexOf('.');
       if (dotIdx <= 0 || dotIdx === svc.length - 1) {
-        warnFn('Service rejected — expected "domain.service" format, got: %s', svc);
+        warnFn('Service rejected: expected "domain.service" format, got: %s', svc);
         break;
       }
       const domain = svc.slice(0, dotIdx);
@@ -131,7 +131,7 @@ export function executeAction(element, hass, actionConfig, entityId, warnFn) {
       if (actionConfig.url_path && isSafeUrl(actionConfig.url_path)) {
         window.open(actionConfig.url_path, '_blank', 'noopener,noreferrer');
       } else if (actionConfig.url_path) {
-        warnFn('url_path rejected — only http/https/mailto/tel schemes or relative paths are allowed: %s', actionConfig.url_path);
+        warnFn('url_path rejected: only http/https/mailto/tel schemes or relative paths are allowed: %s', actionConfig.url_path);
       }
       break;
     case 'toggle':

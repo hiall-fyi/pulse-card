@@ -56,9 +56,7 @@ export function discoverWeatherEntities(states, config) {
     }
   }
 
-  /* If fewer than MIN_SENSORS found, assume the integration isn't Atmos CE
-     and zero out the discovery — better to render with weather-entity attrs
-     only than to half-fill from another integration's sensor namespace. */
+  /* If fewer than MIN_SENSORS found, assume the integration isn't Atmos CE and zero out discovery rather than half-fill from another integration's sensors. */
   const isAtmosCe = Object.keys(atmosCe).length >= ATMOS_CE_MIN_SENSORS;
   const validAtmosCe = isAtmosCe ? atmosCe : {};
 
@@ -70,8 +68,7 @@ export function discoverWeatherEntities(states, config) {
       if (eid in states) alertEntityIds.push(eid);
     }
   } else if (isAtmosCe) {
-    /* Atmos CE Meteoalarm uses a separate source name (e.g. "met_office_warnings"),
-       so scan both {slug}_{key} and {slug}_warnings_{key} patterns. */
+    /* Atmos CE Meteoalarm uses a separate source name (e.g. "met_office_warnings"), so scan both {slug}_{key} and {slug}_warnings_{key}. */
     for (const key of ATMOS_CE_ALERT_KEYS) {
       const eid = `sensor.${slug}_${key}`;
       const eidWarnings = `sensor.${slug}_warnings_${key}`;

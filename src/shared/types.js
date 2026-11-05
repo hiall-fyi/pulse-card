@@ -1,7 +1,7 @@
 /**
  * @module shared/types
  * @description Shared JSDoc type definitions for the Home Assistant framework
- * surface used by every Pulse Card. Never imported at runtime — exists solely
+ * surface used by every Pulse Card. Never imported at runtime; exists solely
  * for TypeScript's checkJs type-checking via `import('../shared/types.js')`.
  *
  * Card-specific config / state typedefs (EntityConfig, ZoneState, PortState…)

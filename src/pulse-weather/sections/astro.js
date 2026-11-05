@@ -68,7 +68,7 @@ export function computeMoonVisibility(now, moonrise, moonset) {
 
 /**
  * Render a phase-aware moon SVG. The waxing branch puts the lit
- * portion on the right, waning on the left — matching what a
+ * portion on the right, waning on the left, matching what a
  * Northern-hemisphere observer sees.
  *
  * @param {number} cx
@@ -85,14 +85,14 @@ function moonPhaseSvg(cx, cy, r, illum, age) {
   const frac = Math.max(0, Math.min(1, illum / 100));
   const waxing = age !== null && age !== undefined ? isWaxing(age) : true;
 
-  // Dark side — base disc.
+  // Dark side: base disc.
   let moon = `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="#2a2a3a"/>`;
 
   if (frac >= 0.99) {
     moon += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="#e8e0d0"/>`;
   } else if (frac > 0.01) {
     // Lit half built as a half-disc plus a flipped half-ellipse whose
-    // x-radius tapers from r (full) to 0 (new) — the ellipse forms the
+    // x-radius tapers from r (full) to 0 (new), the ellipse forms the
     // terminator that slides across the moon as it phases.
     const top = cy - r;
     const bot = cy + r;
@@ -114,10 +114,7 @@ function moonPhaseSvg(cx, cy, r, illum, age) {
   return moon;
 }
 
-/* 24h ribbon palette — phase order: night → civil twilight → blue hour →
-   golden hour → daytime, mirrored on the PM side. Each adjacent pair gets at
-   least one mid-tone so CSS interpolation reads as a smooth wash even when
-   the magic-hour anchors are minutes apart. */
+/* 24h ribbon palette: night → twilight → blue hour → golden hour → day, mirrored on the PM side, with a mid-tone per adjacent pair so CSS interpolation stays smooth. */
 const RIBBON_NIGHT = '#050510';
 const RIBBON_NIGHT_EDGE = '#0a1226';
 const RIBBON_CIVIL = '#172b4f';
@@ -165,7 +162,7 @@ function buildRibbonGradient(
   const sr = sunrise.getTime();
   const ss = sunset.getTime();
 
-  // Fallbacks (in ms) for missing anchors — tuned for mid-latitudes
+  // Fallbacks (in ms) for missing anchors, tuned for mid-latitudes
   // so a feed without Atmos CE still produces a recognisable dawn /
   // dusk wash.
   const civilDawnMs = (civilDawn ?? new Date(sr - 35 * 60_000)).getTime();
@@ -182,8 +179,7 @@ function buildRibbonGradient(
   const pct = (/** @type {number} */ ms) => safe(((ms - dayStart.getTime()) / DAY_MS) * 100);
   const mid = (/** @type {number} */ a, /** @type {number} */ b) => pct((a + b) / 2);
 
-  // Solar-noon plateau capped at ±1h so the daytime block doesn't
-  // read as a single flat colour even on long summer days.
+  // Solar-noon plateau capped at ±1h so the daytime block doesn't read as one flat colour on long summer days.
   const dayPeakSpread = Math.min(60, (ss - sr) / 8) * 60_000;
   const dayPeakStartMs = solarNoonMs - dayPeakSpread;
   const dayPeakEndMs = solarNoonMs + dayPeakSpread;
@@ -259,8 +255,7 @@ export function renderAstro({ hass, config, discovery }) {
   const ce = discovery.atmosCe;
   const readSensor = (/** @type {string} */ key) =>
     ce[key] ? new Date(String(hass.states[ce[key]]?.state)) : null;
-  // Twilight sensors used only for stat-tile precision: the ribbon
-  // paints fixed-width transitions independent of these times.
+  // Twilight sensors are used only for stat-tile precision; the ribbon paints fixed-width transitions independent of these times.
   const goldenAmStart = anchorEventOn(readSensor('golden_hour_morning_start'), sunrise);
   const goldenAmEnd = anchorEventOn(readSensor('golden_hour_morning_end'), sunrise);
   const blueAmStart = anchorEventOn(readSensor('blue_hour_morning_start'), sunrise);

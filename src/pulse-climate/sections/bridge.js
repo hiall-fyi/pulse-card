@@ -1,6 +1,6 @@
 /**
  * @module pulse-climate/sections/bridge
- * @description Thin shell — renders the section header and delegates the body
+ * @description Thin shell: renders the section header and delegates the body
  * to bridge-view. Same module that powers system_health_group's Bridge tab.
  */
 

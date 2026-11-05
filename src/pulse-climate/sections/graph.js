@@ -2,12 +2,12 @@
  * @module pulse-climate/sections/graph
  * @description Multi-line time series graph section for Pulse Climate Card.
  * Uses buildFilledSparkline for filled-area rendering matching the pulse
- * visual language. Pure renderer — no side effects, no DOM access.
+ * visual language. Pure renderer: no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue, uniqueDomId } from '../../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, uniqueDomId, resolveTempUnit } from '../../shared/utils.js';
 import { CHART_PALETTE } from '../constants.js';
-import { buildFilledSparkline, buildMultiLinePaths, buildLegendChips, buildBloomFilter, uniqueBloomId } from '../chart-primitives.js';
+import { buildFilledSparkline, buildLegendChips, buildBloomFilter, uniqueBloomId } from '../chart-primitives.js';
 import { extractZoneName } from '../zone-resolver.js';
 import { resolveHistoryTempSensor, resolveHistoryHumSensor } from '../sensor-resolver.js';
 
@@ -52,28 +52,14 @@ function renderFilledGraph(series, height, ariaLabel) {
     }
   }
 
-  // Fallback to line-only if no filled sparklines produced
-  if (filled.length === 0) {
-    const paths = buildMultiLinePaths(series, width, height);
-    const hasData = paths.some((p) => p.d !== '');
-    if (!hasData) return `<div class="pc-chart-empty">No data available</div>`;
-
-    let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="pc-chart-svg" preserveAspectRatio="none">`;
-    for (const p of paths) {
-      if (p.d === '') continue;
-      svg += `<path d="${p.d}" fill="none" stroke="${sanitizeCssValue(p.color)}" stroke-width="var(--pc-chart-line-width, 1.5)" data-entity="${escapeHtml(p.entityId)}" />`;
-    }
-    svg += '</svg>';
-    return svg;
-  }
+  if (filled.length === 0) return `<div class="pc-chart-empty">No data available</div>`;
 
   // Pre-allocate unique gradient ids for each series to prevent cross-graph
   // collision when multiple graph SVGs live in the same shadow DOM (e.g.
   // stacked mode renders temperature + humidity back-to-back).
   const gradIds = filled.map(() => uniqueGraphGradId());
 
-  // Per-instance unique glow filter id — prevents collision when multiple
-  // graph SVGs share the same shadow DOM (stacked temp + humidity).
+  // Per-instance unique glow filter id: prevents collision when graph SVGs share a shadow DOM.
   const glowId = uniqueBloomId('graph-glow');
 
   let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}" class="pc-chart-svg" preserveAspectRatio="none">`;
@@ -129,6 +115,23 @@ export function renderGraphSection(sectionConfig, zones, historyCache, states, d
 }
 
 /**
+ * Resolve the temperature and humidity history sensors a graph reads for one climate entity.
+ * @param {string} climateId
+ * @param {Record<string, *>} states
+ * @param {import('../types.js').TadoDiscovery|null|undefined} discovery
+ * @param {import('../types.js').ZoneConfig[]} [zones]
+ * @returns {{temp: import('../sensor-resolver.js').ResolvedSensor, hum: import('../sensor-resolver.js').ResolvedSensor|null}}
+ */
+export function resolveGraphHistorySensors(climateId, states, discovery, zones) {
+  const zoneEntities = discovery?.zoneEntities?.[extractZoneName(climateId)] || {};
+  const zoneConfig = zones?.find((/** @type {*} */ z) => z.entity === climateId);
+  return {
+    temp: resolveHistoryTempSensor(climateId, states, zoneEntities, zoneConfig),
+    hum: resolveHistoryHumSensor(climateId, states, zoneEntities, zoneConfig),
+  };
+}
+
+/**
  * Render a single attribute graph with legend.
  * @param {string[]} climateIds
  * @param {string} attribute
@@ -150,16 +153,14 @@ function renderAttributeGraph(climateIds, attribute, label, height, palette, his
     const climateId = climateIds[i];
     const color = resolveChartColor(i, palette);
     const zoneName = extractZoneName(climateId);
-    const zoneEntities = discovery?.zoneEntities?.[zoneName] || {};
     const zoneConfig = zones?.find((/** @type {*} */ z) => z.entity === climateId);
-    const resolved = isHumidity
-      ? resolveHistoryHumSensor(climateId, states, zoneEntities, zoneConfig)
-      : resolveHistoryTempSensor(climateId, states, zoneEntities, zoneConfig);
+    const sensors = resolveGraphHistorySensors(climateId, states, discovery, zones);
+    const resolved = isHumidity ? sensors.hum : sensors.temp;
     const historyEntityId = resolved?.entityId || climateId;
     const data = historyCache.data[historyEntityId] || [];
     const friendlyName = zoneConfig?.name || states[climateId]?.attributes?.friendly_name || zoneName;
     const currentValue = states[climateId]?.attributes?.[attribute];
-    const unit = isHumidity ? '%' : (states[climateId]?.attributes?.unit_of_measurement || '°C');
+    const unit = isHumidity ? '%' : resolveTempUnit(states[climateId]?.attributes);
 
     series.push({ entityId: historyEntityId, data, color });
     legendItems.push({

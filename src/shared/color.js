@@ -1,7 +1,7 @@
 /**
  * @module shared/color
  * @description Shared colour parsing + interpolation for all Pulse Card family
- * members. Pure functions — hex / rgb string in, colour value out. No DOM, no
+ * members. Pure functions: hex / rgb string in, colour value out. No DOM, no
  * state.
  *
  * `parseHexColor` is the single parse core; the three card-specific output
@@ -80,7 +80,7 @@ export function mixToHex(hex1, hex2, t) {
 /**
  * Convert a colour to a CSS `rgba()` string with the given alpha.
  * Supports `#rgb`, `#rrggbb`, and `rgb(r,g,b)` inputs. Unknown / unsupported
- * formats (named colours, HSL, currentColor) fall through unchanged — callers
+ * formats (named colours, HSL, currentColor) fall through unchanged; callers
  * cannot expect those to carry an alpha override.
  * @param {string} color
  * @param {number} alpha - 0..1 (clamped).

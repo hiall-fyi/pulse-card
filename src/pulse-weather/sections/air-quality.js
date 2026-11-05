@@ -45,8 +45,7 @@ function categoryLabelToTierKey(label) {
   if (l.includes('very unhealthy') || l.includes('hazardous') || l.includes('extremely poor')) return 'very_unhealthy';
   if (l.includes('sensitive')) return 'unhealthy_sg';
   if (l.includes('unhealthy') || l.includes('very poor')) return 'unhealthy';
-  // EU's bare "Poor" (health effects possible for everyone) is genuinely
-  // worse than "Fair"/"Moderate" and must not share their bucket.
+  // EU's bare "Poor" is genuinely worse than "Fair"/"Moderate" and must not share their bucket.
   if (l.includes('poor')) return 'unhealthy_sg';
   if (l.includes('moderate') || l.includes('fair')) return 'moderate';
   if (l.includes('good')) return 'good';
@@ -77,8 +76,7 @@ export function renderAirQuality({ hass, config, discovery, weatherEntity: _weat
 
   const aqiEntity = hass.states[aqiEntityId];
   const aqiValue = Number(aqiEntity.state);
-  // An unavailable/unknown AQI entity must not read as AQI 0 ("Good"),
-  // the best possible reading, when there's no data at all.
+  // An unavailable/unknown AQI entity must not read as AQI 0 ("Good") when there is no data at all.
   if (!Number.isFinite(aqiValue)) return null;
   const ceCategory = /** @type {string|null} */ (aqiEntity.attributes?.category || null);
   const ceColor = /** @type {string|null} */ (aqiEntity.attributes?.color || null);
@@ -111,8 +109,7 @@ export function renderAirQuality({ hass, config, discovery, weatherEntity: _weat
   const scaleMax = inUsScale ? 300 : 100;
   const markerLeft = Math.min(100, Math.max(0, (aqiValue / scaleMax) * 100));
 
-  // Kicker reads "air quality" or "air quality · us" so the user
-  // knows which scale is active without a separate toggle pill.
+  // Kicker reads "air quality" or "air quality · us" so the active scale is visible without a toggle pill.
   const kickerText = inUsScale ? 'air quality · us' : 'air quality';
 
   const heroHtml = t.heroBlock({

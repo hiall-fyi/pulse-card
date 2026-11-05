@@ -1,6 +1,6 @@
 /**
  * @module action-handler
- * @description Tap, hold, and double-tap action handling for Pulse Card —
+ * @description Tap, hold, and double-tap action handling for Pulse Card;
  * resolves action config and dispatches HA events.
  */
 

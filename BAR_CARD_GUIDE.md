@@ -1,12 +1,12 @@
 [← Back to README](README.md)
 
-# Pulse Bar Card — Configuration Guide
+# Pulse Bar Card: Configuration Guide
 
-Pulse Bar Card is a compact horizontal bar chart card for Home Assistant. It replaces the discontinued bar-card with a modern, lightweight alternative that works out of the box — sensible defaults, a visual editor, and a single bundled file under 50KB.
+Pulse Bar Card is a compact horizontal bar chart card for Home Assistant. It replaces the discontinued bar-card with a modern, lightweight alternative that works out of the box, with sensible defaults, a visual editor, and one resource entry for all three Pulse cards.
 
 This guide covers every configuration option, style presets, migration from bar-card, CSS custom properties, and known limitations.
 
-> **Note on `type: custom:pulse-bar-card`** — the canonical card name is `custom:pulse-bar-card`, and every YAML example below uses it. The old `custom:pulse-card` still works as an alias in v1.5.0, so existing dashboards keep loading without changes — but the alias will be removed in v2.0.0. When you next edit a dashboard on the old name, swap `pulse-card` for `pulse-bar-card` in the `type` field.
+> **Note on `type: custom:pulse-bar-card`**: the canonical card name is `custom:pulse-bar-card`, and every YAML example below uses it. The old `custom:pulse-card` still works as an alias, so existing dashboards keep loading without changes, but the alias will be removed in v2.0.0. When you next edit a dashboard on the old name, swap `pulse-card` for `pulse-bar-card` in the `type` field.
 
 ---
 
@@ -17,16 +17,16 @@ This guide covers every configuration option, style presets, migration from bar-
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `entity` | string | **required** | The sensor to display (e.g. `sensor.battery_level`) |
-| `entities` | list | — | Show multiple sensors in one card (see [Style Presets](#style-presets) for worked examples) |
-| `name` | string | auto | Custom label — defaults to the entity's friendly name |
-| `icon` | string | auto | Custom icon (e.g. `mdi:battery`) — defaults to the entity's icon |
-| `title` | string | — | Card title shown above the bars |
+| `entities` | list | none | Show multiple sensors in one card (see [Style Presets](#style-presets) for worked examples) |
+| `name` | string | auto | Custom label. Defaults to the entity's friendly name |
+| `icon` | string | auto | Custom icon (e.g. `mdi:battery`). Defaults to the entity's icon |
+| `title` | string | none | Card title shown above the bars |
 
 ### Bar Appearance
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `color` | string | theme color | Bar color (e.g. `red`, `#4CAF50`, `rgb(0,150,0)`) |
+| `color` | string | theme color | Bar color (e.g. `red`, `#4CAF50`, `rgb(0,150,0)`). Colour and size values are cleaned before use, so characters such as `;`, `{`, `}`, quotes and `<` `>` are removed and `url(` is disabled. Ordinary values (`#4CAF50`, `rgba()`, `var(--x)`, `40px`) are unaffected |
 | `height` | string | `8px` | How tall the bar is (e.g. `40px` for a chunky bar) |
 | `border_radius` | string | `4px` | Corner rounding (e.g. `0px` for sharp corners, `20px` for pill shape) |
 | `decimal` | number | auto | How many decimal places to show (e.g. `1` → "23.5°C"). When not set, the card uses Home Assistant's display precision for the sensor. If HA has no precision configured either, the raw value is shown as-is |
@@ -36,13 +36,13 @@ This guide covers every configuration option, style presets, migration from bar-
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `min` | number | `0` | The value where the bar is empty. Can be set at card level (applies to all bars) or per-entity to override |
-| `max` | number | `100` | The value where the bar is full. Can be set at card level or per-entity to override |
-| `complementary` | boolean | `false` | Flip the bar — show what's left instead of what's used. Useful for "remaining" displays (e.g. disk space free) |
+| `min` | number | entity attribute, then `0` | The value where the bar is empty. Can be set at card level (applies to all bars) or per-entity to override. If neither is set, the entity's own `min` or `min_temp` attribute is used, then `0` |
+| `max` | number | entity attribute, then `100` | The value where the bar is full. Can be set at card level or per-entity to override. If neither is set, the entity's own `max` or `max_temp` attribute is used, then `100` |
+| `complementary` | boolean | `false` | Flip the bar: show what's left instead of what's used. Useful for "remaining" displays (e.g. disk space free) |
 | `limit_value` | boolean | `false` | If the value goes beyond min/max, cap the displayed number. Without this, a value of 120 with max 100 still shows "120" |
-| `attribute` | string | — | Read a specific attribute instead of the main state (e.g. `brightness` from a light entity) |
+| `attribute` | string | none | Read a specific attribute instead of the main state (e.g. `brightness` from a light entity) |
 
-Per-entity min/max override — useful when most bars share one range but a few need their own:
+Per-entity min/max override, useful when most bars share one range but a few need their own:
 
 ```yaml
 type: custom:pulse-bar-card
@@ -60,11 +60,11 @@ entities:
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `columns` | number | `1` | Arrange bars in a grid — e.g. `2` for two bars side by side |
-| `gap` | string/number | — | Space between bars (e.g. `8` or `8px`) |
+| `columns` | number | `1` | Arrange bars in a grid (e.g. `2` for two bars side by side) |
+| `gap` | string/number | none | Space between bars (e.g. `8` or `8px`) |
 | `bar_width` | number | `100` | How much of the bar track the fill can use (1–100). Set to `70` to keep the fill from overlapping inside labels at high values |
-| `entity_row` | boolean | `false` | Embed mode — removes the card border so the bar can sit inside an `entities` card as a row |
-| `font_size` | number/string | auto | Base font size for name, value, and icon (e.g. `12` or `12px`). Inside bars auto-scale to the bar height when not set |
+| `entity_row` | boolean | `false` | Embed mode: removes the card border so the bar can sit inside an `entities` card as a row |
+| `font_size` | number/string | auto | Base font size for name, value, and icon (e.g. `12` or `12px`). Default `14px`, also inside bars; inside text does not scale with the bar height |
 
 ### Target Marker
 
@@ -72,7 +72,7 @@ A vertical line on the bar showing a goal or reference value.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `target` | number/string/object | — | A fixed number (e.g. `80`), an entity ID (e.g. `input_number.goal`), or an object (see below) |
+| `target` | number/string/object | none | A fixed number (e.g. `80`), an entity ID (e.g. `input_number.goal`), or an object (see below) |
 
 Object format for more control:
 
@@ -84,14 +84,14 @@ target:
 
 ### Trend Indicator
 
-Shows an arrow (▲ up / ▼ down) by comparing the current value to what it was some time ago. Requires the HA recorder to be enabled.
+Shows an arrow (▲ up / ▼ down, or a neutral ▶ when there is no history or no change) by comparing the current value to what it was some time ago. Requires the HA recorder to be enabled.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `indicator.show` | boolean | `false` | Turn on the trend arrow |
 | `indicator.period` | number | `60` | How many minutes to look back (e.g. `30` = compare to 30 min ago) |
 | `indicator.show_delta` | boolean | `false` | Show the actual change next to the arrow (e.g. ▲ +0.3%) |
-| `indicator.inverted` | boolean | `false` | Flip arrow colors — up shows red, down shows green. Use for sensors where rising is bad (CPU, memory, disk usage) |
+| `indicator.inverted` | boolean | `false` | Flip arrow colors: up shows red, down shows green. Use for sensors where rising is bad (CPU, memory, disk usage) |
 
 ```yaml
 indicator:
@@ -101,12 +101,14 @@ indicator:
   inverted: true    # CPU going up = bad (red), going down = good (green)
 ```
 
-Don't forget to set the indicator position so it's visible:
+`indicator.show: true` is enough on its own: the arrow appears outside the bar. To place it inside the bar instead, set the position:
 
 ```yaml
 positions:
-  indicator: outside    # or "inside"
+  indicator: inside    # or "outside"
 ```
+
+Setting only `positions.indicator` without `indicator.show: true` shows a neutral arrow and never fetches history, so it will not follow the trend.
 
 ### Positions
 
@@ -149,7 +151,12 @@ severity:
     color: "#4CAF50"           # green
 ```
 
-For smooth color blending between ranges, add `mode: gradient` to each entry.
+For smooth color blending between ranges, add `mode: gradient` to each entry. In gradient mode:
+
+- Colours blend between the `from` values of neighbouring entries. The `to` value is not used.
+- Above the last `from`, the colour stays flat at that entry's colour.
+- Colours must be hex (`#rgb` or `#rrggbb`). Named colours and `rgb()` are not blended, so a stretch that needs one falls back to the plain `color` setting.
+- `icon` in a severity entry is not used.
 
 ### Sparkline
 
@@ -167,15 +174,15 @@ The on/off toggle, hours, line width, points per hour, smoothing, aggregation fu
 | `sparkline.smoothing` | boolean | `true` | Smooth curves (true) or raw straight lines (false) |
 | `sparkline.color` | string | text color | Override sparkline color (e.g. `"rgba(255,255,255,0.4)"`) |
 | `sparkline.line_width` | number | `1.5` | Line thickness |
-| `sparkline.update_interval` | number | `300` | How often to refresh history data, in seconds. Set higher for slow-changing sensors like battery |
+| `sparkline.update_interval` | number | `300` | How often, in seconds, history may be refreshed. 300 is both the default and the effective maximum, so a higher value changes nothing. Lower values refresh sooner, and the shortest value on the card applies to every bar. A refresh happens when a bar's state changes |
 
 ```yaml
-# Simple — just turn it on
+# Simple: just turn it on
 type: custom:pulse-bar-card
 entity: sensor.temperature
 sparkline: true
 
-# Advanced — custom lookback and refresh
+# Advanced: custom lookback and refresh
 type: custom:pulse-bar-card
 entity: sensor.battery_level
 sparkline:
@@ -183,12 +190,12 @@ sparkline:
   hours_to_show: 48
   points_per_hour: 0.5
   aggregate_func: max
-  update_interval: 1800    # 30 min — battery doesn't change fast
+  update_interval: 120     # refresh history at most every 2 min (300 is the maximum)
   line_width: 2
   color: "rgba(255, 255, 255, 0.4)"
 ```
 
-Per-entity sparkline overrides work too:
+Per-entity sparkline overrides work too. A per-entity `sparkline` block replaces the card-level one, so repeat `show: true` and any other options you want:
 
 ```yaml
 type: custom:pulse-bar-card
@@ -196,17 +203,18 @@ sparkline: true
 entities:
   - entity: sensor.cpu_usage
     sparkline:
+      show: true
       hours_to_show: 6
-      update_interval: 120    # CPU changes fast — refresh every 2 min
+      update_interval: 120    # CPU changes fast, refresh sooner
   - entity: sensor.battery_level
     sparkline:
+      show: true
       hours_to_show: 48
-      update_interval: 1800   # battery is slow — refresh every 30 min
 ```
 
 ### Conditional Visibility
 
-Show or hide individual bars based on their current value. Only bars that meet the condition are displayed — the card shrinks automatically.
+Show or hide individual bars based on their current value. Only bars that meet the condition are displayed, and the card shrinks automatically.
 
 | Option | Type | Description |
 |---|---|---|
@@ -215,10 +223,10 @@ Show or hide individual bars based on their current value. Only bars that meet t
 | `visibility.state_equal` | string | Show only when state equals this string |
 | `visibility.state_not_equal` | string | Show only when state does not equal this string |
 
-Multiple conditions are AND-ed — all must be true. Unavailable/unknown entities are hidden by default.
+Multiple conditions are AND-ed: all must be true. Unavailable/unknown entities are hidden by default.
 
 ```yaml
-# Alert dashboard — only show sensors above 80%
+# Alert dashboard: only show sensors above 80%
 type: custom:pulse-bar-card
 title: Alerts
 entities:
@@ -243,16 +251,16 @@ severity:
     color: "#F44336"
 ```
 
-When all sensors are healthy (below threshold), the card shows empty — just the title.
+When all sensors are healthy (below threshold), the card shows empty, with just the title.
 
 ### Layout Mode
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `layout` | string | `default` | `compact` reduces padding, gaps, and font sizes for dense dashboards |
+| `layout` | string | `default` | `compact` lowers the card padding and the gap inside each row, and shrinks the trend arrow, for dense dashboards. Name and value keep the same font size |
 
 ```yaml
-# Compact mode — fits more data in less space
+# Compact mode: fits more data in less space
 type: custom:pulse-bar-card
 title: Room Sensors
 layout: compact
@@ -274,11 +282,11 @@ What happens when you interact with a bar.
 
 | Option | Default | Description |
 |---|---|---|
-| `tap_action` | `more-info` | Single tap — opens the entity detail popup by default |
+| `tap_action` | `more-info` | Single tap: opens the entity detail popup by default |
 | `hold_action` | `none` | Long press |
 | `double_tap_action` | `none` | Double tap |
 
-Available actions: `more-info`, `navigate`, `call-service`, `url`, `toggle`, `none`
+Available actions: `more-info`, `navigate`, `call-service`, `perform-action`, `url`, `toggle`, `none`
 
 Each entity in a multi-entity card can have its own tap actions.
 
@@ -298,14 +306,14 @@ Set `interactive: true` at the card level to make all entities interactive, or p
 Supported entity types (auto-detected): `input_number`, `number`, `light` (brightness), `cover` (position), `fan` (percentage), `media_player` (volume), `climate` (target temperature).
 
 ```yaml
-# Simple — auto-detect everything
+# Simple: auto-detect everything
 type: custom:pulse-bar-card
 interactive: true
 entities:
   - entity: input_number.heating_threshold
   - entity: number.lcd_brightness
 
-# Climate — point at the temperature attribute
+# Climate: point at the temperature attribute
 - entity: climate.living_room
   attribute: temperature
   interactive: true
@@ -321,15 +329,15 @@ entities:
 
 ### Secondary Info
 
-Show a second line of text below the entity name — an attribute value, static text, or when the entity last changed.
+Show a second line of text below the entity name: an attribute value, static text, or when the entity last changed.
 
 | Option | Type | Description |
 |---|---|---|
 | `secondary_info.text` | string | Static text (e.g. `"input · drop"`) |
 | `secondary_info.attribute` | string | Show an entity attribute value (e.g. `hvac_action`) |
-| `secondary_info.type` | string | `last_changed` — show relative time since last state change |
+| `secondary_info.type` | string | `last_changed`: show relative time since last state change |
 
-Priority when multiple are set: `text` > `attribute` > `type`.
+Priority when multiple are set: `text`, then `template` (text with `{attribute_name}` placeholders), then `attribute`, then `type`.
 
 ```yaml
 - entity: climate.dining
@@ -395,7 +403,7 @@ Falls back to severity when the attribute value isn't in the map. Set `attribute
 
 The Bar Card ships with a minimal default (8px thin bar, labels outside). Here are ready-to-use presets for common styles.
 
-### Default — Minimal Thin Bar
+### Default: Minimal Thin Bar
 
 ```yaml
 type: custom:pulse-bar-card
@@ -407,7 +415,7 @@ entity: sensor.battery_level
   ┌████████████████████████████░░░░░░░░░░┐   ← 8px bar
 ```
 
-### Classic — bar-card Style
+### Classic: bar-card Style
 
 Matches the original bar-card look with a chunky bar and labels inside.
 
@@ -427,7 +435,7 @@ positions:
      └─────────────────────────────────────┘
 ```
 
-### Compact — Dashboard Overview
+### Compact: Dashboard Overview
 
 Ideal for packing many sensors into a small card.
 
@@ -506,7 +514,7 @@ target:
 
 ### Embed Mode (Entity Row)
 
-Use inside an `entities` card — renders the bar without a card wrapper so it blends in as a row.
+Use inside an `entities` card. It renders the bar without a card wrapper so it blends in as a row.
 
 ```yaml
 type: entities
@@ -554,11 +562,11 @@ severity:
     color: "#4CAF50"
 ```
 
-If disk usage is 80%, the bar shows 20% (the free space) — and severity colors apply to the remaining value.
+If disk usage is 80%, the bar shows 20% (the free space), and severity colors apply to the remaining value.
 
 ### Severity with Icon Override
 
-Different value ranges can show different icons — useful for battery levels or signal strength.
+Different value ranges can show different icons, useful for battery levels or signal strength.
 
 ```yaml
 type: custom:pulse-bar-card
@@ -586,7 +594,7 @@ severity:
 
 ### Target from Another Entity
 
-Use a dynamic target that follows another sensor or input number — the target line moves as the reference value changes.
+Use a dynamic target that follows another sensor or input number, so the target line moves as the reference value changes.
 
 ```yaml
 type: custom:pulse-bar-card
@@ -622,7 +630,7 @@ entities:
     color: "#009688"
 ```
 
-### Mixed — Severity + Target + Indicator
+### Mixed: Severity + Target + Indicator
 
 Combine multiple features for a full-featured monitoring bar.
 
@@ -660,7 +668,7 @@ positions:
   indicator: outside
 ```
 
-### Inverted Indicator — "Less is Better"
+### Inverted Indicator: "Less is Better"
 
 For sensors where rising values are bad (CPU, memory, disk usage), flip the indicator colors so up = red and down = green.
 
@@ -699,7 +707,7 @@ entities:
     name: Disk
 ```
 
-Per-entity override — mix inverted and normal indicators in one card:
+Per-entity override: mix inverted and normal indicators in one card:
 
 ```yaml
 entities:
@@ -712,7 +720,7 @@ entities:
       inverted: false   # battery up = good, override card default
 ```
 
-### Sparkline — See the Trend
+### Sparkline: See the Trend
 
 Add a mini history line behind the bar. No extra card needed.
 
@@ -724,7 +732,7 @@ sparkline: true
 height: "30px"
 ```
 
-### Alert Dashboard — Conditional Visibility
+### Alert Dashboard: Conditional Visibility
 
 Only show sensors that need attention. The card stays clean when everything is healthy.
 
@@ -753,7 +761,7 @@ severity:
     color: "#F44336"
 ```
 
-### Compact Tile — Dense Dashboard
+### Compact Tile: Dense Dashboard
 
 Pack more data into a small card. Works well in sections view at narrow column widths.
 
@@ -800,7 +808,8 @@ severity:
 **Key differences from bar-card:**
 - Default bar height is `8px` (bar-card was `40px`)
 - Default positions: name/value `outside`, icon `off`
-- `rounding` is renamed to `border_radius`
+- `rounding` is renamed to `border_radius`; bar-card keys the Pulse Bar Card does not know are ignored without a warning, so rename it yourself
+- Other bar-card layout keys may not carry over, so check the card after switching
 - `width`, `saturation`, `hue`, `entity_config` are not supported
 
 ---
@@ -811,7 +820,7 @@ Bar Card exposes three layers you can target from `card-mod` or an HA theme: CSS
 
 ### CSS custom properties
 
-Family-shared tokens (used by every Pulse card) live on the `--pulse-*` prefix — change them once and every card in your dashboard picks up the new value. Bar-Card-only knobs use the `--pb-*` prefix.
+Family-shared tokens (used by every Pulse card) live on the `--pulse-*` prefix. Change them once and every card in your dashboard picks up the new value. Bar-Card-only knobs use the `--pb-*` prefix.
 
 **Family tokens** (used by every card in the family):
 
@@ -820,9 +829,9 @@ Family-shared tokens (used by every Pulse card) live on the `--pulse-*` prefix �
 | `--pulse-bg-card` | Card background colour | HA theme card background |
 | `--pulse-text-primary` | Name, value, and icon-inside-bar colour | HA theme primary text |
 | `--pulse-text-secondary` | Icon, secondary info colour | HA theme secondary text |
-| `--pulse-font-body` | Base font size for name, value, icon | `14px` (auto-scales inside bars) |
+| `--pulse-font-body` | Base font size for name, value, icon | `14px` |
 
-The family surface also exposes named tokens for typography (`--pulse-font-display` / `-hero` / `-summary` / `-large` / `-stat` / `-kicker`), border radii (`--pulse-radius-panel` / `-row` / `-element` / `-pill` / `-small` / `-tight` / `-hairline` / `-circle`), animation durations (`--pulse-anim-instant` / `-fast` / `-base` / `-medium` / `-mode` / `-slow` / `-color` / `-reveal` / `-fill`), spacing (`--pulse-space-card` / `-panel` / `-section` / `-row` / `-element` / `-chip` / `-tight` / `-hairline` / `-pin`), and Apple-system tier colours (`--pulse-tier-calm` / `-moderate` / `-strong` / `-gale`). Defaults match what shipped before — overriding any one cascades cleanly to every card in your dashboard. Source of truth lives in `src/shared/styles.js`.
+The family surface also exposes named tokens for typography (`--pulse-font-display` / `-hero` / `-summary` / `-large` / `-stat` / `-kicker`), border radii (`--pulse-radius-panel` / `-row` / `-element` / `-pill` / `-small` / `-tight` / `-hairline` / `-circle`), animation durations (`--pulse-anim-instant` / `-fast` / `-base` / `-medium` / `-mode` / `-slow` / `-color` / `-reveal` / `-fill`), spacing (`--pulse-space-card` / `-panel` / `-section` / `-row` / `-element` / `-chip` / `-tight` / `-hairline` / `-pin`), and Apple-system tier colours (`--pulse-tier-calm` / `-moderate` / `-strong` / `-gale`). Overriding any one of them changes it for every Pulse card on the dashboard.
 
 **Bar-Card-only tokens:**
 
@@ -830,7 +839,7 @@ The family surface also exposes named tokens for typography (`--pulse-font-displ
 |---|---|---|
 | `--pb-columns` | Multi-column grid column count | `1` |
 | `--pb-track-opacity` | Bar track background opacity | `0.12` |
-| `--pb-animation-speed` | Bar fill transition duration | `0.8s` |
+| `--pb-animation-speed` | Bar fill transition duration; set it with `animation.speed`, because each bar sets this token itself and a value set through card-mod on the host does not win | `0.8s` |
 | `--pb-indicator-color` | Indicator arrow colour (overrides directional colours) | Auto (green / red by direction) |
 | `--pb-sparkline-color` | Sparkline line colour | `--pulse-text-primary` |
 
@@ -848,28 +857,28 @@ card_mod:
 
 ### Class selectors
 
-Use these for structural changes that custom properties don't cover — padding, borders, hover states, layout tweaks. Each row in the bar list is a `.pb-row`; the wrapper is `.pb-card`.
+Use these for structural changes that custom properties don't cover, such as padding, borders, hover states, layout tweaks. Each row in the bar list is a `.pb-row`; the wrapper is `.pb-card`.
 
 | Selector | What it targets |
 |---|---|
 | `.pb-card` | The card chrome (sits inside `<ha-card>`) |
-| `.pb-row` | One bar row — repeat once per entity |
+| `.pb-row` | One bar row, repeated once per entity |
 | `.pb-icon`, `.pb-name`, `.pb-value` | The icon, name label, and value label inside a row |
 | `.pb-track`, `.pb-fill` | The bar's background track and the coloured fill |
 | `.pb-indicator` | The trend arrow next to the value |
 | `.pb-sparkline` | The optional sparkline overlay on the bar |
 | `.pb-target`, `.pb-target-label` | The target marker line and its label |
-| `.pb-secondary` | The secondary info row below the bar |
+| `.pb-secondary` | The secondary text line under the name (inside `.pb-name-group`) |
 | `.pb-step-btn` | The +/- buttons in slider mode |
 
 ### Data attributes for state-driven styling
 
 Each bar row carries data attributes that flip with the entity's state. Pair them with `.pb-row` to style the same bar differently when its value changes.
 
-- `data-state` — the current numeric value (or `"unavailable"`)
-- `data-entity` — the entity ID
-- `data-severity-color` — the resolved severity / state colour (e.g. `"#4CAF50"`)
-- `data-interactive` — present when the bar is in slider mode
+- `data-state`: the current numeric value (or `"unavailable"`)
+- `data-entity`: the entity ID
+- `data-severity-color`: the final fill colour (from severity, state or attribute colour, or your own `color` setting), for example `"#4CAF50"`. Absent when no colour is set
+- `data-interactive`: present when the bar is in slider mode
 
 ```yaml
 type: custom:pulse-bar-card
@@ -890,10 +899,10 @@ v1.5.0 reorganised the design tokens. Concerns shared with other cards in the fa
 
 ## Known Limitations
 
-- Per-entity severity ranges are YAML-only — severity involves arrays of value ranges with colors and optional icons, which doesn't map well to a simple editor form. The visual editor handles per-entity name, color, secondary info, and interactive toggle
-- `state_map`, `state_color`, and `secondary_info.type` are YAML-only — the editor supports secondary info text and attribute fields
-- Conditional visibility is YAML-only — conditions are per-entity with multiple possible operators (above, below, equal, not equal) that combine with AND logic. Better expressed in YAML than a form
-- Slider mode with `complementary` is not supported — if both are set, `interactive` takes priority
+- Per-entity severity ranges are YAML-only: severity involves arrays of value ranges with colors and optional icons, which doesn't map well to a simple editor form. The visual editor handles per-entity name, color, secondary info, and interactive toggle
+- `state_map`, `state_color`, and `secondary_info.type` are YAML-only: the editor supports secondary info text and attribute fields
+- Conditional visibility is YAML-only: conditions are per-entity with multiple possible operators (above, below, equal, not equal) that combine with AND logic. Better expressed in YAML than a form
+- Do not combine slider mode (`interactive`) with `complementary`: the fill is flipped, but the slider still maps left to right as minimum to maximum, so dragging feels reversed
 - The color picker uses your browser's native picker, which only supports solid hex colors. For rgba() with transparency or CSS variables, type the value directly in the text field
 - Sparkline and the trend indicator both need the HA recorder component to be enabled (it is by default)
 - `width`, `saturation`, `hue`, and `entity_config` from bar-card are not supported

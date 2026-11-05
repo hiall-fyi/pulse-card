@@ -4,18 +4,15 @@
  * indicator, sorted zone rows with deviation bars, and a summary footer.
  */
 
-import { escapeHtml, sanitizeCssValue } from '../../shared/utils.js';
-import { resolveZoneContext, rowStateClass } from '../utils.js';
+import { escapeHtml, sanitizeCssValue, formatNumericDisplay, celsiusDeltaToUnit } from '../../shared/utils.js';
+import { resolveZoneContext, rowStateClass, zoneActionWord, formatTemperature, averageZonePower } from '../utils.js';
+
+/** @param {{isUnavailable?: boolean, hvacAction?: string, targetTemp?: number|null}} zs @returns {boolean} */
+const isListedActive = (zs) => !zs.isUnavailable && zs.hvacAction !== 'off'
+  && (Number.isFinite(zs.targetTemp) || ['heating', 'cooling', 'drying', 'fan'].includes(/** @type {string} */ (zs.hvacAction)));
 
 /** Maximum deviation for bar scale (±5 units). */
 const MAX_DELTA = 5;
-
-/** Colour map — tier tokens for visual coherence with hero. */
-const STATUS_COLORS = {
-  green: 'var(--pulse-tier-moderate)',
-  amber: 'var(--pulse-tier-strong)',
-  red: 'var(--pulse-tier-gale)',
-};
 
 /** Hero icon map. */
 const HERO_ICONS = {
@@ -24,35 +21,58 @@ const HERO_ICONS = {
   red: 'mdi:alert-circle',
 };
 
+// Modes other than heat and cool stay symmetric because either side can be the problem.
+/** @param {{currentTemp?: number|null, targetTemp?: number|null, hvacMode?: string, targetRange?: {low: number, high: number}|null}} zone */
+function targetShortfall(zone) {
+  const { currentTemp, targetTemp } = zone;
+  if (currentTemp === null || currentTemp === undefined
+    || targetTemp === null || targetTemp === undefined) {
+    return Infinity;
+  }
+  if (zone.hvacMode === 'cool') return Math.max(0, currentTemp - targetTemp);
+  if (zone.hvacMode === 'heat') return Math.max(0, targetTemp - currentTemp);
+  if (zone.targetRange) return Math.max(0, zone.targetRange.low - currentTemp, currentTemp - zone.targetRange.high);
+  return Math.abs(currentTemp - targetTemp);
+}
+
+/** @param {{currentTemp?: number|null, targetTemp?: number|null, hvacMode?: string, targetRange?: {low: number, high: number}|null}} zone */
+function isShortOfTarget(zone) {
+  return targetShortfall(zone) > celsiusDeltaToUnit(1);
+}
+
 /**
  * Compute hero status from active zones.
- * @param {Array<{currentTemp: number|null, targetTemp: number|null}>} activeZones
+ * @param {Array<{currentTemp: number|null, targetTemp: number|null, isUnavailable?: boolean}>} activeZones
+ * @param {Array<{isUnavailable?: boolean}>} [allZones] - Every zone, to tell an offline home from one that is all off.
  * @returns {{ label: string, color: 'green'|'amber'|'red', detail: string }}
  */
-export function computeHeroStatus(activeZones) {
+export function computeHeroStatus(activeZones, allZones = activeZones) {
   if (activeZones.length === 0) {
+    if (allZones.length > 0 && allZones.every((z) => z.isUnavailable)) {
+      return { label: 'Unavailable', color: 'amber', detail: 'No zone is reporting' };
+    }
     return { label: 'All Good', color: 'green', detail: 'All zones off' };
   }
-  const onTarget = activeZones.filter(
-    (z) => z.currentTemp !== null && z.currentTemp !== undefined
-      && z.targetTemp !== null && z.targetTemp !== undefined
-      && Math.abs(z.currentTemp - z.targetTemp) <= 1,
-  ).length;
+  const offTarget = activeZones.filter((z) => isShortOfTarget(z));
   const total = activeZones.length;
+  const notOnTarget = offTarget.length;
+  const onTarget = total - notOnTarget;
   const ratio = onTarget / total;
-  const notOnTarget = total - onTarget;
+  const isAbove = (/** @type {{currentTemp: number|null, targetTemp: number|null}} */ z) => /** @type {number} */ (z.currentTemp) > /** @type {number} */ (z.targetTemp);
+  const allAbove = notOnTarget > 0 && offTarget.every(isAbove);
+  const side = allAbove ? 'above' : offTarget.some(isAbove) ? 'away from' : 'short of';
 
   if (ratio >= 0.8) {
-    return { label: 'All Good', color: 'green', detail: `${onTarget} of ${total} zones at target` };
+    return { label: 'All Good', color: 'green', detail: `${onTarget} of ${total} zones at or past target` };
   }
   if (ratio >= 0.4) {
     return {
-      label: 'Warming Up',
+      label: allAbove ? 'Cooling Down' : 'Warming Up',
       color: 'amber',
-      detail: `${notOnTarget} zone${notOnTarget !== 1 ? 's' : ''} still catching up`,
+      detail: `${notOnTarget} zone${notOnTarget !== 1 ? 's' : ''} still ${side} target`,
     };
   }
-  return { label: 'Cold Start', color: 'red', detail: `${notOnTarget} of ${total} zones below target` };
+  return { label: allAbove ? 'Too Warm' : 'Cold Start', color: 'red', detail: `${notOnTarget} of ${total} zones still ${side} target` };
 }
 
 /**
@@ -67,7 +87,7 @@ export function sortZonesForDisplay(zoneStates) {
   for (const z of zoneStates) {
     if (z.isUnavailable) {
       unavailable.push(z);
-    } else if (z.hvacAction === 'off' || !z.targetTemp) {
+    } else if (!isListedActive(z)) {
       off.push(z);
     } else {
       active.push(z);
@@ -87,7 +107,7 @@ export function sortZonesForDisplay(zoneStates) {
 
 /**
  * Compute summary footer statistics from active zones.
- * @param {Array<{currentTemp: number|null, targetTemp: number|null, heatingPower: number, unit: string}>} activeZones
+ * @param {Array<{currentTemp: number|null, targetTemp: number|null, heatingPower: number, coolingPower?: number, hasPowerData?: boolean, hvacAction?: string, unit: string}>} activeZones
  * @returns {{ onTarget: string, avgActual: string, avgTarget: string, avgPower: string }}
  */
 export function computeSummary(activeZones) {
@@ -95,20 +115,25 @@ export function computeSummary(activeZones) {
     return { onTarget: '--', avgActual: '--', avgTarget: '--', avgPower: '--' };
   }
   const onTarget = activeZones.filter(
-    (z) => z.currentTemp !== null && z.currentTemp !== undefined
-      && z.targetTemp !== null && z.targetTemp !== undefined
-      && Math.abs(z.currentTemp - z.targetTemp) <= 1,
+    (z) => Number.isFinite(z.currentTemp) && Number.isFinite(z.targetTemp) && !isShortOfTarget(z),
   ).length;
   const total = activeZones.length;
-  const avgActual = (activeZones.reduce((s, z) => s + (z.currentTemp ?? 0), 0) / total).toFixed(1);
-  const avgTarget = (activeZones.reduce((s, z) => s + (z.targetTemp ?? 0), 0) / total).toFixed(1);
-  const avgPower = Math.round(activeZones.reduce((s, z) => s + z.heatingPower, 0) / total);
   const unit = activeZones[0].unit || '°C';
+  const meanTemp = (/** @type {'currentTemp'|'targetTemp'} */ key) => {
+    const vals = /** @type {number[]} */ (activeZones.map((z) => z[key]).filter((v) => Number.isFinite(v)));
+    return vals.length > 0 ? formatTemperature(vals.reduce((s, v) => s + v, 0) / vals.length, unit) : '--';
+  };
+  const avgActual = meanTemp('currentTemp');
+  const avgTarget = meanTemp('targetTemp');
+  const power = averageZonePower(activeZones.map((z) => ({
+    isUnavailable: false, hvacAction: z.hvacAction, power: z.heatingPower || z.coolingPower || 0, hasPowerData: z.hasPowerData !== false,
+  })));
+  const avgPower = power === null ? '--' : `${power}%`;
   return {
     onTarget: `${onTarget}/${total}`,
-    avgActual: `${avgActual}${unit}`,
-    avgTarget: `${avgTarget}${unit}`,
-    avgPower: `${avgPower}%`,
+    avgActual,
+    avgTarget,
+    avgPower,
   };
 }
 
@@ -120,8 +145,8 @@ export function computeSummary(activeZones) {
 function renderZoneRow(zs) {
   const entityAttr = escapeHtml(zs.entityId);
   const name = escapeHtml(zs.name);
-  const unit = escapeHtml(zs.unit || '°C');
-  const isActive = !zs.isUnavailable && zs.hvacAction !== 'off' && zs.targetTemp;
+  const rawUnit = zs.unit || '°C';
+  const isActive = isListedActive(zs);
 
   let tempsHtml;
   let deltaHtml;
@@ -135,39 +160,38 @@ function renderZoneRow(zs) {
       + `<span class="pc-home-status-delta-text">--</span>`
       + `</div>`;
   } else if (!isActive) {
-    const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
-      ? `${escapeHtml(zs.currentTemp)}${unit}` : '--';
+    const actualDisplay = escapeHtml(formatTemperature(zs.currentTemp, rawUnit));
     tempsHtml = `<span class="pc-home-status-actual pc-off">${actualDisplay}</span>`
       + `<span class="pc-home-status-arrow"></span>`
-      + `<span class="pc-home-status-target">Off</span>`;
+      + `<span class="pc-home-status-target">${escapeHtml(zoneActionWord(zs))}</span>`;
     deltaHtml = `<div class="pc-home-status-delta">`
       + `<div class="pc-home-status-bar-track"><div class="pc-home-status-bar-center"></div></div>`
-      + `<span class="pc-home-status-delta-text">Off</span>`
+      + `<span class="pc-home-status-delta-text">${escapeHtml(zoneActionWord(zs))}</span>`
       + `</div>`;
   } else {
-    const actualDisplay = zs.currentTemp !== null && zs.currentTemp !== undefined
-      ? `${escapeHtml(zs.currentTemp)}${unit}` : '--';
+    const actualDisplay = escapeHtml(formatTemperature(zs.currentTemp, rawUnit));
     tempsHtml = `<span class="pc-home-status-actual">${actualDisplay}</span>`
       + `<span class="pc-home-status-arrow">→</span>`
-      + `<span class="pc-home-status-target">${escapeHtml(zs.targetTemp)}${unit}</span>`;
+      + `<span class="pc-home-status-target">${Number.isFinite(zs.targetTemp) ? escapeHtml(formatTemperature(zs.targetTemp, rawUnit)) : '--'}</span>`;
 
-    if (zs.currentTemp !== null && zs.currentTemp !== undefined) {
+    if (zs.currentTemp !== null && zs.currentTemp !== undefined && Number.isFinite(zs.targetTemp)) {
       const delta = zs.currentTemp - zs.targetTemp;
       const absDelta = Math.abs(delta);
-      const pct = Math.min(absDelta / MAX_DELTA, 1) * 50;
+      const pct = Math.min(absDelta / celsiusDeltaToUnit(MAX_DELTA), 1) * 50;
       const barLeft = delta < 0 ? `${sanitizeCssValue(50 - pct)}%` : '50%';
       const barWidth = `${sanitizeCssValue(pct)}%`;
-      const barColorKey = absDelta < 1 ? 'green' : absDelta <= 2.5 ? 'amber' : 'red';
-      const barColor = STATUS_COLORS[barColorKey];
-      const sign = delta >= 0 ? '+' : '−';
-      const deltaText = `${sign}${escapeHtml(absDelta.toFixed(1))}°`;
+      const shortfall = targetShortfall(zs);
+      const barColorKey = !isShortOfTarget(zs) ? 'green' : shortfall <= celsiusDeltaToUnit(2.5) ? 'amber' : 'red';
+      const absText = formatNumericDisplay(absDelta);
+      const sign = absText === '0' ? '' : delta >= 0 ? '+' : '−';
+      const deltaText = `${sign}${escapeHtml(absText + rawUnit)}`;
 
       deltaHtml = `<div class="pc-home-status-delta">`
         + `<div class="pc-home-status-bar-track">`
         + `<div class="pc-home-status-bar-center"></div>`
-        + `<div class="pc-home-status-bar-fill" style="left:${barLeft};width:${barWidth};background:${sanitizeCssValue(barColor)}"></div>`
+        + `<div class="pc-home-status-bar-fill pc-status-${barColorKey}" style="left:${barLeft};width:${barWidth}"></div>`
         + `</div>`
-        + `<span class="pc-home-status-delta-text" style="color:${sanitizeCssValue(barColor)}">${deltaText}</span>`
+        + `<span class="pc-home-status-delta-text pc-status-${barColorKey}">${deltaText}</span>`
         + `</div>`;
     } else {
       deltaHtml = `<div class="pc-home-status-delta">`
@@ -201,11 +225,10 @@ export function renderHomeStatusSection(zones, states, discovery, cardConfig) {
   const zoneStates = zones.map((zoneConfig) => resolveZoneContext(zoneConfig, discovery, states).zoneState);
 
   const activeZones = zoneStates.filter(
-    (z) => !z.isUnavailable && z.hvacAction !== 'off' && z.targetTemp,
+    (z) => isListedActive(z) && Number.isFinite(z.targetTemp),
   );
 
-  const hero = computeHeroStatus(activeZones);
-  const heroColor = STATUS_COLORS[hero.color];
+  const hero = computeHeroStatus(activeZones, zoneStates);
   const heroIcon = HERO_ICONS[hero.color];
 
   const sorted = sortZonesForDisplay(zoneStates);
@@ -214,12 +237,11 @@ export function renderHomeStatusSection(zones, states, discovery, cardConfig) {
   let html = `<div class="pc-section pc-section-home-status">`;
   html += `<div class="pulse-section-label">Home Status</div>`;
 
-  /* Defer to the card-level hero when enabled — render the inner hero only
-     when show_hero is explicitly disabled, so we don't show two focal points. */
+  // Defer to the card-level hero: render the inner hero only when show_hero is false, to avoid two focal points.
   if (cardConfig?.show_hero === false) {
     html += `<div class="pc-home-status-hero">`;
-    html += `<ha-icon class="pc-home-status-icon" icon="${escapeHtml(heroIcon)}" style="color:${sanitizeCssValue(heroColor)}"></ha-icon>`;
-    html += `<div class="pc-home-status-label" style="color:${sanitizeCssValue(heroColor)}">${escapeHtml(hero.label)}</div>`;
+    html += `<ha-icon class="pc-home-status-icon pc-status-${hero.color}" icon="${escapeHtml(heroIcon)}"></ha-icon>`;
+    html += `<div class="pc-home-status-label pc-status-${hero.color}">${escapeHtml(hero.label)}</div>`;
     html += `<div class="pc-home-status-detail">${escapeHtml(hero.detail)}</div>`;
     html += `</div>`;
   }

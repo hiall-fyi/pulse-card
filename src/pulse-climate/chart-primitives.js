@@ -1,10 +1,10 @@
 /**
  * @module pulse-climate/chart-primitives
  * @description Reusable SVG chart rendering functions shared across section types.
- * Pure functions — no side effects, no DOM access.
+ * Pure functions: no side effects, no DOM access.
  */
 
-import { escapeHtml, sanitizeCssValue, uniqueDomId, smoothPathFromPoints, formatHHMM } from '../shared/utils.js';
+import { escapeHtml, sanitizeCssValue, uniqueDomId, smoothPathFromPoints, formatHHMM, toCelsius } from '../shared/utils.js';
 import { mixToHex } from '../shared/color.js';
 
 /**
@@ -124,7 +124,7 @@ export function buildDonutArcs(segments, size, outerRadius, innerRadius) {
     if (values[i] === 0) continue;
 
     let angle = (values[i] / total) * 360;
-    // SVG arc with start=end renders nothing — cap at 359.9° for full circle
+    // SVG arc with start=end renders nothing; cap at 359.9° for full circle
     if (angle >= 360) angle = 359.9;
     const endAngle = startAngle + angle;
 
@@ -137,10 +137,7 @@ export function buildDonutArcs(segments, size, outerRadius, innerRadius) {
   return arcs;
 }
 
-/**
- * Counter for unique bloom filter ids — every consumer gets its own id,
- * preventing CSS / SVG defs collision across multiple SVGs in a shadow DOM.
- */
+/** Counter for unique bloom filter ids so SVG defs never collide within a shadow DOM. */
 /**
  * Generate a unique bloom filter id. Use as both the `<filter id>` and the
  * referencing `filter="url(#id)"` attribute. Thin wrapper over the shared
@@ -154,7 +151,7 @@ export function uniqueBloomId(prefix = 'pc-bloom') {
 }
 
 /**
- * Build the markup for a Gaussian-blur bloom filter — the family-wide visual
+ * Build the markup for a Gaussian-blur bloom filter, the family-wide visual
  * primitive used by radial heating arcs, donut active segments, graph lines,
  * energy-flow ribbons, zones sparklines, and api gauges.
  *
@@ -169,8 +166,7 @@ export function uniqueBloomId(prefix = 'pc-bloom') {
 export function buildBloomFilter(id, stdDeviation = 1.5, padding) {
   const pad = padding || '-30%';
   const ext = padding === '-5%' ? '110%' : '160%';
-  // Avoid serialising padding/ext when they default — keep markup compact for
-  // tight-bounds consumers (zones sparkline) that rely on default region.
+  // Skip padding/ext when they default, keeping markup compact for tight-bounds consumers (zones sparkline).
   const region = padding === undefined
     ? ''
     : ` x="${pad}" y="${pad}" width="${ext}" height="${ext}"`;
@@ -199,10 +195,10 @@ export function renderDonut(segments, opts = {}) {
 
   if (segments.length === 0) return { html: '', total: 0 };
 
-  // Per-instance unique filter id — avoids collision with other donut SVGs.
+  // Per-instance unique filter id: avoids collision with other donut SVGs.
   const filterId = uniqueBloomId('donut-bloom');
 
-  // Largest segment auto-bloom — mirrors radial active arc.
+  // Largest segment auto-bloom: mirrors radial active arc.
   let maxValue = 0;
   let maxIdx = -1;
   for (let i = 0; i < arcs.length; i++) {
@@ -210,7 +206,7 @@ export function renderDonut(segments, opts = {}) {
     if (v > maxValue) { maxValue = v; maxIdx = i; }
   }
 
-  // Bloom intensity scales with size — small donut (api) needs less spread.
+  // Bloom intensity scales with size: small donut (api) needs less spread.
   const bloomDeviation = size <= 80 ? 1.5 : 3;
 
   let svg = `<svg viewBox="0 0 ${size} ${size}" role="img" aria-label="${escapeHtml(ariaLabel)}">`;
@@ -262,7 +258,7 @@ export function buildLegendChips(items) {
  * Map a temperature value to a CSS color string.
  * Uses discrete color stops for vivid,
  * distinct colors at each temperature range.
- * Pure function — no side effects, no DOM access.
+ * Pure function: no side effects, no DOM access.
  * @param {number} temp - Temperature in degrees.
  * @returns {string} Hex color string.
  */
@@ -300,8 +296,9 @@ export const TEMP_COLOR_BANDS = [
  * @returns {string}
  */
 export function temperatureToColor(temp) {
+  const celsius = toCelsius(temp);
   for (const band of TEMP_COLOR_BANDS) {
-    if (band.upper === null || temp <= band.upper) return band.color;
+    if (band.upper === null || celsius <= band.upper) return band.color;
   }
   return '#C62828';   /* unreachable; satisfies the type checker */
 }
@@ -328,7 +325,7 @@ export function humidityToColor(humidity) {
 
 /**
  * Build a single SVG arc path between two angles with variable inner/outer radii.
- * Pure function — no side effects, no DOM access.
+ * Pure function: no side effects, no DOM access.
  * @param {number} cx - Center X.
  * @param {number} cy - Center Y.
  * @param {number} innerR - Inner radius.
@@ -367,7 +364,7 @@ export function buildArcPath(cx, cy, innerR, outerR, startAngle, endAngle) {
 /**
  * Build a filled-area sparkline (line path + closed area path).
  * Returns both paths for rendering line stroke + gradient fill.
- * Pure function — no side effects, no DOM access.
+ * Pure function: no side effects, no DOM access.
  * @param {{t: number, v: number}[]} data - Time-value pairs sorted by t.
  * @param {number} width - SVG viewBox width.
  * @param {number} height - SVG viewBox height.
@@ -380,7 +377,7 @@ export function buildFilledSparkline(data, width, height, slots = 48) {
   const clean = data.filter((pt) => isFinite(pt.v));
   if (clean.length < 2) return null;
 
-  // Ensure data extends to "now" — carry forward last value if gap > 10 min
+  // Ensure data extends to "now"; carry forward last value if gap > 10 min
   const now = Date.now();
   const last = clean[clean.length - 1];
   if (now - last.t > 600000) {
@@ -512,9 +509,7 @@ export function resolveBreakdownSegments(attrs, palette) {
   return segments;
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * Per-state gradient endpoints
- * ────────────────────────────────────────────────────────────────────────── */
+/* Per-state gradient endpoints */
 
 const STATE_ENDPOINTS = {
   heating: { cold: '#171717', hot: '#ff9f0a' },
@@ -527,7 +522,7 @@ const STATE_ENDPOINTS = {
  * Map a temperature to a state-tier gradient endpoint. Linear sRGB
  * interpolation between dark cold-end and state-tier hot-end. Out-of-range
  * temps clamp to the nearest endpoint. Unknown states fall back to off
- * endpoints (charcoal — quiet, doesn't draw the eye).
+ * endpoints (charcoal, quiet, doesn't draw the eye).
  *
  * @param {number} temp
  * @param {{minTemp: number, maxTemp: number}} range

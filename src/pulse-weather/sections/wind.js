@@ -15,14 +15,14 @@ const ROSE_SIZE = 240;
 const ROSE_CX = ROSE_SIZE / 2;
 const ROSE_CY = ROSE_SIZE / 2;
 const ROSE_MAX_R = 90;
-const ARROW_WIDTH = 0.12;       // radians — half-width of arrow body
+const ARROW_WIDTH = 0.12;       // radians, half-width of arrow body
 const ARROW_HEAD_SIZE = 6;      // px
-const ARROW_HEAD_HALF = 0.5;    // radians — half-angle of arrowhead
-const GUST_CONE_HALF = 0.25;    // radians — half-angle of gust cone
+const ARROW_HEAD_HALF = 0.5;    // radians, half-angle of arrowhead
+const GUST_CONE_HALF = 0.25;    // radians, half-angle of gust cone
 const GUST_THRESHOLD = 0.3;
 const SWAY_MAX_ANGLE = 6;       // degrees at gale
 const SWAY_FWD_RATIO = 0.7;
-const SWAY_THRESHOLD = 0.2;     // degrees — below this, no sway
+const SWAY_THRESHOLD = 0.2;     // degrees, below this, no sway
 const STREAK_DUR_MAX = 4;
 const STREAK_DUR_SPAN = 3.3;
 const STREAK_W_BASE = 15;
@@ -182,7 +182,7 @@ export function renderWind({ hass, config, discovery, weatherEntity }) {
 
   const parts = [];
 
-  // Grid circles — tinted with tier color for visual richness
+  // Grid circles: tinted with tier color for visual richness
   for (let ri = 1; ri <= 3; ri++) {
     parts.push(svgEl('circle', { cx: ROSE_CX, cy: ROSE_CY, r: ri * 30, fill: 'none', stroke: tierColor, 'stroke-width': 0.5, opacity: 0.08 + ri * 0.02 }));
   }
@@ -204,7 +204,7 @@ export function renderWind({ hass, config, discovery, weatherEntity }) {
   // Arrow
   parts.push(buildArrow(displaySpeed, rad, speedRatio, tierColor));
 
-  // Saturation ring — when wind / gust exceeds SPEED_CAP the arrow
+  // Saturation ring: when wind / gust exceeds SPEED_CAP the arrow
   // and gust cone clamp at the outer radius, hiding how much further
   // the real value has gone. Render a dashed ring so users see the
   // rose has saturated.
@@ -233,9 +233,7 @@ export function renderWind({ hass, config, discovery, weatherEntity }) {
   const innerAlpha = Math.round(6 + speedRatio * 25).toString(16).padStart(2, '0');
   const washBg = withSkyBaseline(`radial-gradient(ellipse at 50% 50%, ${tierColor}${glowAlpha} 0%, ${tierColor}${innerAlpha} 40%, transparent 85%)`);
 
-  /* Brand mark doubles as the speed/gust toggle — outline = speed, filled
-     disc = gust. aria-label reflects the toggle's purpose so screen readers
-     announce it as a control, not decoration. */
+  /* Brand mark doubles as the speed/gust toggle (outline = speed, filled disc = gust); aria-label announces it as a control. */
   const variant = brandMarkVariant(weatherEntity?.state || 'sunny', false);
   const inGustMode = speedMode === 'gust';
   // The kicker reads "wind" in speed mode and "wind · gust" when toggled

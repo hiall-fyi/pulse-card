@@ -25,11 +25,11 @@ function resolveApiColor(pct) {
 }
 
 /** @param {string} status @returns {string} */
-function resolveStatusColor(status) {
+function resolveStatusTier(status) {
   const s = (status || '').toLowerCase();
-  if (s === 'ok' || s === 'healthy') return 'var(--pulse-tier-moderate)';
-  if (s === 'warning') return 'var(--pulse-tier-strong)';
-  return 'var(--pulse-tier-gale)';
+  if (s === 'ok' || s === 'healthy') return 'green';
+  if (s === 'warning') return 'amber';
+  return 'red';
 }
 
 /**
@@ -115,7 +115,7 @@ function renderBreakdownDonut(attrs) {
 }
 
 /**
- * Render the API body (no section header — caller's responsibility).
+ * Render the API body (no section header: caller's responsibility).
  *
  * @param {Record<string, string>} hubEntities
  * @param {Record<string, *>} states
@@ -132,7 +132,7 @@ export function renderApiView(hubEntities, states, sectionConfig, historyCache, 
   const pct = limit > 0 ? Math.min(100, (usage / limit) * 100) : 0;
   const gaugeColor = resolveApiColor(pct);
   const status = states[hubEntities.api_status]?.state || 'unknown';
-  const statusColor = resolveStatusColor(status);
+  const statusTier = resolveStatusTier(status);
 
   let html = `<div class="pc-api-dashboard">`;
 
@@ -170,8 +170,8 @@ export function renderApiView(hubEntities, states, sectionConfig, historyCache, 
     let nextDisplay = nextRaw;
     let targetMs = 0;
     if (nextRaw && nextRaw.includes('T')) {
-      try {
-        const d = new Date(nextRaw);
+      const d = new Date(nextRaw);
+      if (!Number.isNaN(d.getTime())) {
         targetMs = d.getTime();
         const diffMs = targetMs - Date.now();
         if (diffMs > 0 && diffMs < 3600000) {
@@ -181,7 +181,7 @@ export function renderApiView(hubEntities, states, sectionConfig, historyCache, 
         } else {
           nextDisplay = formatHHMM(d, timeZone);
         }
-      } catch { /* keep raw display */ }
+      }
     }
     html += `<span class="pc-chip chip-next-sync" data-entity="${escapeHtml(hubEntities.next_sync)}" data-target="${targetMs}">Next: ${escapeHtml(nextDisplay)}</span>`;
   }
@@ -189,17 +189,15 @@ export function renderApiView(hubEntities, states, sectionConfig, historyCache, 
     const resetRaw = states[hubEntities.api_reset].state;
     let resetDisplay = resetRaw;
     if (resetRaw && resetRaw.includes('T')) {
-      try {
-        const d = new Date(resetRaw);
-        resetDisplay = formatHHMM(d, timeZone);
-      } catch { /* keep raw display */ }
+      const d = new Date(resetRaw);
+      if (!Number.isNaN(d.getTime())) resetDisplay = formatHHMM(d, timeZone);
     }
     html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.api_reset)}">Reset: ${escapeHtml(resetDisplay)}</span>`;
   }
   if (hubEntities.token_status && states[hubEntities.token_status]) {
     html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.token_status)}">Token: ${escapeHtml(states[hubEntities.token_status].state)}</span>`;
   }
-  html += `<span class="pc-chip" data-entity="${hubEntities.api_status ? escapeHtml(hubEntities.api_status) : ''}" style="color:${sanitizeCssValue(statusColor)}">${escapeHtml(status)}</span>`;
+  html += `<span class="pc-chip pc-status-${statusTier}" data-entity="${hubEntities.api_status ? escapeHtml(hubEntities.api_status) : ''}">${escapeHtml(status)}</span>`;
   html += `</div>`;
 
   html += `</div>`;

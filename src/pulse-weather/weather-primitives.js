@@ -122,7 +122,7 @@ export function deriveBrandVariant(hass, weatherEntity, discovery) {
  * The card lives in a shadow root so cross-card collision is already
  * prevented, but duplicate sections (e.g. two meteograms, two astro blocks)
  * in the same card render with the same static id would make url(#id)
- * resolve to the first match — the later sections silently pick up the
+ * resolve to the first match: the later sections silently pick up the
  * wrong gradient. Backed by the shared id counter.
  * @param {string} [prefix='pw-id']
  * @returns {string}
@@ -138,7 +138,7 @@ export function uniqueSvgId(prefix = 'pw-id') {
  * needs its own atmospheric wash (wind tier, atmosphere, air quality), it
  * must paint *both* layers because CSS `background:` replaces, not extends.
  * This helper makes the layered intent explicit and keeps sky tokens in one
- * place — change `--pw-sky-*` and every section follows.
+ * place: change `--pw-sky-*` and every section follows.
  *
  * @param {string} topGradient - Section-specific gradient (typically a
  *   radial-gradient or transparent overlay) painted above the sky.

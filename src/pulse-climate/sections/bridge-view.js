@@ -19,7 +19,7 @@ export function isBridgeAvailable(hubEntities) {
 }
 
 /**
- * Render the Bridge body (no section header — caller's responsibility).
+ * Render the Bridge body (no section header: caller's responsibility).
  *
  * @param {Record<string, string>} hubEntities
  * @param {Record<string, *>} states
@@ -32,9 +32,7 @@ export function renderBridgeView(hubEntities, states, historyCache) {
   const connState = states[hubEntities.bridge_connected];
   if (!connState) return '';
   const connected = connState.state === 'on';
-  const connColor = connected
-    ? 'var(--pulse-tier-moderate)'
-    : 'var(--pulse-tier-gale)';
+  const connTier = connected ? 'green' : 'red';
   const connLabel = connected ? 'Connected' : 'Disconnected';
   const dotClass = connected ? 'pc-pulse-dot pc-connected' : 'pc-pulse-dot pc-disconnected';
 
@@ -46,14 +44,14 @@ export function renderBridgeView(hubEntities, states, historyCache) {
 
   let html = '';
   html += `<div class="pc-zone-chips">`;
-  html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.bridge_connected)}" style="color:${sanitizeCssValue(connColor)}">`;
+  html += `<span class="pc-chip pc-status-${connTier}" data-entity="${escapeHtml(hubEntities.bridge_connected)}">`;
   html += `<span class="${dotClass}"></span>`;
   html += `${escapeHtml(connLabel)}</span>`;
   if (responseTime !== undefined) {
     html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.bridge_connected)}">${escapeHtml(Math.round(responseTime))}ms</span>`;
   }
   if (failures !== undefined && failures > 0) {
-    html += `<span class="pc-chip" data-entity="${escapeHtml(hubEntities.bridge_connected)}" style="color:var(--pulse-tier-gale)">Failures: ${escapeHtml(failures)}</span>`;
+    html += `<span class="pc-chip pc-status-red" data-entity="${escapeHtml(hubEntities.bridge_connected)}">Failures: ${escapeHtml(failures)}</span>`;
   }
   html += `</div>`;
 
@@ -88,7 +86,7 @@ export function renderBridgeView(hubEntities, states, historyCache) {
     html += `</div>`;
   }
 
-  /* boiler_max_output is a number entity — chip is tappable to open the more-info dialog. */
+  /* boiler_max_output is a number entity: chip is tappable to open the more-info dialog. */
   if (hubEntities.boiler_max_output && states[hubEntities.boiler_max_output]) {
     const maxTemp = states[hubEntities.boiler_max_output].state;
     if (maxTemp !== 'unavailable' && maxTemp !== 'unknown') {
@@ -101,7 +99,7 @@ export function renderBridgeView(hubEntities, states, historyCache) {
 
   if (lastError && lastError !== 'None' && lastError !== 'null') {
     html += `<div class="pc-zone-chips">`;
-    html += `<span class="pc-chip" style="color:var(--pulse-tier-gale)">Error: ${escapeHtml(lastError)}</span>`;
+    html += `<span class="pc-chip pc-status-red">Error: ${escapeHtml(lastError)}</span>`;
     html += `</div>`;
   }
 

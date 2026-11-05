@@ -7,7 +7,7 @@
  *
  * History data: reads historyCache.stateData[entityId] populated by the
  * card's hvac_action + heating_power fetch path. Missing/empty history
- * degrades gracefully — every slot renders idle so the grid still tells
+ * degrades gracefully, every slot renders idle so the grid still tells
  * the user "no demand here" rather than rendering a blank box.
  */
 
@@ -20,7 +20,7 @@ const POWER_FULL = 70;
 
 /**
  * Bucket history into N × 30-min slots. Each slot picks the dominant state
- * (heating > cooling > idle > off — heating wins ties because the user
+ * (heating > cooling > idle > off: heating wins ties because the user
  * almost always cares about heat demand first) and the average power
  * within that state.
  *
@@ -54,8 +54,7 @@ export function computeStateSlots(history, slotCount) {
         powerCount += 1;
       }
     }
-    /* Priority order ensures heating beats cooling beats idle beats off
-       on tied counts — the user wants to know about active demand first. */
+    // Priority order heating > cooling > idle > off on tied counts: active demand matters first.
     const dominant = ['heating', 'cooling', 'idle', 'off']
       .reduce((/** @type {string} */ best, /** @type {string} */ s) => counts[s] > counts[best] ? s : best, 'idle');
     const avgPower = powerCount > 0 ? powerSum / powerCount : 0;
@@ -103,7 +102,7 @@ function aggregateMinutes(slots) {
 /**
  * Longest contiguous run of active demand (heating or cooling). Returns
  * minutes (slots × 30) and which mode dominated the streak. Streaks
- * mixing heat + cool count together — the user usually wants total
+ * mixing heat + cool count together: the user usually wants total
  * "system was working" duration, not a per-mode split.
  * @param {Array<{state: string, power: number}>} slots
  * @returns {{minutes: number, mode: 'heat' | 'cool' | 'mixed' | 'none'}}
@@ -166,9 +165,7 @@ export function busiestHour(slots) {
     }
   }
   if (bestHour < 0) return null;
-  /* Bucket 0 = the hour starting 24h ago. Anchor the window to a clean hour
-     boundary, then add bestHour hours to get the bucket's absolute start
-     timestamp — the caller formats it in the HA-configured zone. */
+  // Bucket 0 starts 24h ago on a clean hour boundary; add bestHour hours for the absolute start timestamp.
   const windowStart = new Date(Date.now() - 24 * 3600 * 1000);
   windowStart.setMinutes(0, 0, 0);
   const ts = windowStart.getTime() + bestHour * 3600 * 1000;
@@ -176,14 +173,14 @@ export function busiestHour(slots) {
 }
 
 /**
- * Format heat/cool durations into the row stat. Em-dash when both zero —
+ * Format heat/cool durations into the row stat. Placeholder dash when both zero,
  * keeps the column tabular and visually quiet for idle zones.
  * @param {number} heatMin
  * @param {number} coolMin
  * @returns {string}
  */
 function formatRowDuration(heatMin, coolMin) {
-  if (heatMin === 0 && coolMin === 0) return '—';
+  if (heatMin === 0 && coolMin === 0) return '\u2014';
   const total = heatMin + coolMin;
   const hours = Math.floor(total / 60);
   const mins = total % 60;
@@ -216,7 +213,7 @@ function slotTimeLabel(slotIdx, timeZone) {
 }
 
 /**
- * Map a slot back to its tooltip text — matches the heatmap "HH:MM: value"
+ * Map a slot back to its tooltip text, matches the heatmap "HH:MM: value"
  * shape so the same tooltip handler handles both tabs.
  * @param {{state: string, power: number}} slot
  * @returns {string}
@@ -306,7 +303,7 @@ function renderFooter(totalHeatMin, totalCoolMin, zoneCount) {
   const heatLabel = totalHeatMin > 0 ? `${formatDurationCompact(totalHeatMin)} heat` : '';
   const coolLabel = totalCoolMin > 0 ? `${formatDurationCompact(totalCoolMin)} cool` : '';
   const parts = [heatLabel, coolLabel].filter(Boolean).join(' · ');
-  const display = parts || '—';
+  const display = parts || '\u2014';
   return `<div class="pc-timeline-group-footer">`
     + renderLegend()
     + `<span><strong>${escapeHtml(display)}</strong> · ${zoneCount} zones</span>`

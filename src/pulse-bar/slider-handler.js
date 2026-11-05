@@ -1,6 +1,6 @@
 /**
  * @module slider-handler
- * @description Pointer event handling for Pulse Card slider mode —
+ * @description Pointer event handling for Pulse Card slider mode;
  * drag/tap interaction, optimistic UI updates, and HA service dispatch.
  * Separated from action-handler.js for clean separation of concerns.
  *
@@ -105,9 +105,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     for (const el of valueEls) el.textContent = display;
   }
 
-  /**
-   * Revert bar to saved state.
-   */
+  /** Revert bar to saved state. */
   function revertUI() {
     if (!dragState) return;
     const fillEl = /** @type {HTMLElement|null} */ (container.querySelector('.pb-fill'));
@@ -163,7 +161,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
     container.setPointerCapture(ev.pointerId);
     rowEl.classList.add('sliding');
 
-    /* Disable CSS transition during drag — instant tracking matches pointer. */
+    /* Disable CSS transition during drag so instant tracking matches pointer. */
     if (fillEl) fillEl.style.transition = 'none';
 
     const value = clientXToValue(ev.clientX);
@@ -193,8 +191,7 @@ export function bindSliderListeners(rowEl, cardEl, cfg, ec) {
 
     dragState = null;
 
-    /* Defer clearing the sliding flag — without delay, the synthetic click
-       fires immediately after pointerup and triggers tap_action. */
+    /* Defer clearing the sliding flag: otherwise the synthetic click right after pointerup triggers tap_action. */
     flagTimer = setTimeout(() => {
       /** @type {*} */ (rowEl).__pulseSliding = false;
     }, SLIDING_FLAG_DELAY);

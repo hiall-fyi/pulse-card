@@ -4,6 +4,7 @@
  */
 
 import { conditionIcon, escapeHtml, finiteNumber, sanitizeCssValue, deriveBrandVariant, formatDateTime, resolveHassTimeZone } from '../weather-primitives.js';
+import { resolveTempUnit } from '../../shared/utils.js';
 import { brandMarkVariant } from '../brand-mark.js';
 import { renderSectionShell } from '../section-shell.js';
 
@@ -46,17 +47,15 @@ export function renderForecast({ hass, config, discovery, forecastData, weatherE
   const daily = forecastData?.daily || [];
   if (daily.length === 0) return null;
 
-  // Weekday labels render in the HA-configured zone (browser-local when the
-  // profile prefers 'local') so a user abroad sees home calendar days.
+  // Weekday labels render in the HA-configured zone (browser-local when the profile prefers 'local') so a user abroad sees home calendar days.
   const timeZone = resolveHassTimeZone(hass);
   const ce = discovery.atmosCe;
   const tempSensor = ce.temperature ? hass.states[ce.temperature] : null;
-  const tempUnit = /** @type {string} */ (tempSensor?.attributes?.unit_of_measurement || '°C');
+  const tempUnit = /** @type {string} */ (resolveTempUnit({ unit_of_measurement: tempSensor?.attributes?.unit_of_measurement, temperature_unit: weatherEntity?.attributes?.temperature_unit }));
 
   const days = daily.slice(0, 7);
 
-  /* Range bars normalise against the week-wide min/max so taller days render
-     longer bars; weekSpan floor of 1 prevents division-by-zero on flat weeks. */
+  /* Range bars normalise against the week-wide min/max; the weekSpan floor of 1 prevents division-by-zero on flat weeks. */
   const allTemps = days.flatMap((d) => [finiteNumber(d.temperature, 0), finiteNumber(d.templow, 0)]);
   const weekMin = Math.min(...allTemps);
   const weekMax = Math.max(...allTemps);

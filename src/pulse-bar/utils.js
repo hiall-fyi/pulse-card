@@ -1,6 +1,6 @@
 /**
  * @module utils
- * @description Pure utility functions for Pulse Card — bar fill calculation,
+ * @description Pure utility functions for Pulse Card: bar fill calculation,
  * severity resolution, color interpolation, value formatting, and logging.
  */
 
@@ -9,10 +9,10 @@ export { escapeHtml, sanitizeCssValue, clamp, cssValue, fetchSparklineData, buil
 import { clamp, makeWarn, isUnavailableState } from '../shared/utils.js';
 import { parseHexColor, mixToRgbString } from '../shared/color.js';
 
-/** Known HA active/truthy states — O(1) Set lookup. */
+/** Known HA active/truthy states, O(1) Set lookup. */
 const BINARY_ACTIVE = new Set(['on', 'open', 'home', 'locked', 'playing', 'active']);
 
-/** Known HA inactive/falsy states — O(1) Set lookup. */
+/** Known HA inactive/falsy states, O(1) Set lookup. */
 const BINARY_INACTIVE = new Set(['off', 'closed', 'not_home', 'unlocked', 'idle', 'paused', 'standby']);
 
 /**
@@ -117,8 +117,7 @@ function resolveGradientColor(value, severityArray) {
   const num = parseFloat(value);
   if (isNaN(num)) return null;
 
-  // Assumes array is pre-sorted by `from` (done in normalizeConfig).
-  // Falls back to runtime sort for safety if called externally.
+  // Assumes pre-sorted by `from` (normalizeConfig); falls back to a runtime sort if called externally.
   const sorted = severityArray[0].from <= severityArray[severityArray.length - 1].from
     ? severityArray
     : [...severityArray].sort((a, b) => a.from - b.from);
@@ -230,8 +229,7 @@ export function computeIndicator(currentValue, previousValue) {
   if (isNaN(current) || isNaN(previous)) {
     return { direction: 'neutral', delta: 0 };
   }
-  // Guard against garbage history values (e.g. unit conversion mismatch in recorder)
-  // A delta > 1000× the current absolute value is almost certainly bad data.
+  // Guard against garbage history values (e.g. recorder unit mismatch): a delta > 1000× current is almost certainly bad data.
   if (!isFinite(current) || !isFinite(previous)) {
     return { direction: 'neutral', delta: 0 };
   }
@@ -351,7 +349,7 @@ export function normalizeConfig(config) {
     positions: { ...DEFAULTS.positions, ...config.positions },
   };
 
-  // Coerce numeric config values — YAML may deliver strings for number fields
+  // Coerce numeric config values, YAML may deliver strings for number fields
   if (merged.columns !== null && merged.columns !== undefined) merged.columns = Number(merged.columns) || 1;
   if (merged.animation.speed !== null && merged.animation.speed !== undefined) merged.animation.speed = Number(merged.animation.speed) || DEFAULTS.animation.speed;
 
@@ -360,9 +358,7 @@ export function normalizeConfig(config) {
     merged.severity = preSortSeverity(merged.severity);
   }
 
-  /* Legacy YAML may set `indicator: { show: true }` without `positions.indicator`.
-     Promote it here so `positions.indicator` is the single source of truth that
-     both editor and runtime agree on. */
+  /* Promote legacy `indicator: { show: true }` so `positions.indicator` is the single source of truth for editor and runtime. */
   if (merged.indicator?.show === true && merged.positions.indicator === 'off') {
     merged.positions = { ...merged.positions, indicator: 'outside' };
   }
@@ -385,11 +381,11 @@ export function normalizeConfig(config) {
       })
     : [{ entity: config.entity }];
 
-  // Warn on duplicate entity IDs — second row would shadow the first in DOM cache
+  // Warn on duplicate entity IDs: second row would shadow the first in DOM cache
   const seen = new Set();
   for (const ec of merged.entities) {
     if (seen.has(ec.entity)) {
-      warn('Duplicate entity "%s" in config — only the last bar will update dynamically', ec.entity);
+      warn('Duplicate entity "%s" in config: only the last bar will update dynamically', ec.entity);
     }
     seen.add(ec.entity);
   }
@@ -540,7 +536,7 @@ export function computeBarWidthScale(ec, cfg) {
 /**
  * Evaluate whether an entity bar should be visible based on visibility conditions.
  * Returns true if no visibility config is set (default: always visible).
- * All conditions are AND-ed — all must be true for the bar to show.
+ * All conditions are AND-ed; all must be true for the bar to show.
  * @param {import('./types.js').EntityConfig} ec - Entity config.
  * @param {import('./types.js').Hass|null|undefined} hass - Home Assistant instance.
  * @returns {boolean} Whether the entity bar should be visible.
@@ -704,7 +700,7 @@ export function resolveSecondaryInfo(ec, hass) {
   const state = hass?.states[ec.entity];
   if (!state) return '';
 
-  // Priority 2: template — interpolate {attribute_name} placeholders
+  // Priority 2: template, interpolate {attribute_name} placeholders
   if (si.template) {
     return si.template.replace(/\{(\w+)\}/g, (/** @type {string} */ _, /** @type {string} */ attr) => {
       const val = state.attributes?.[attr];
@@ -730,11 +726,7 @@ export function resolveSecondaryInfo(ec, hass) {
   return '';
 }
 
-/**
- * Internal functions exposed for unit testing only.
- * Do NOT import in production code.
- * @internal
- */
+/** Internal functions exposed for unit testing only, do NOT import in production code. @internal */
 export const _testExports = {
   computeFill,
   resolveSeverity,

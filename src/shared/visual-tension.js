@@ -5,16 +5,16 @@
  * parameter (opacity, speed, size, glow) is driven by an intensity ratio
  * computed from actual sensor data.
  *
- * All exports are pure functions — data in, CSS values out. No DOM, no
+ * All exports are pure functions: data in, CSS values out. No DOM, no
  * state, no side effects.
  *
  * Primitive categories:
- * - **intensityRatio** — core mapper: value → 0.0–1.0
- * - **tensionWash** — radial-gradient background that scales with intensity
- * - **breatheDuration** — animation cycle speed (calm=slow, extreme=rapid)
- * - **tensionGlow** — text/box shadow that scales with intensity
- * - **tensionVignette** — edge-darkening overlay that closes in with intensity
- * - **sweepDuration** — rotation animation speed
+ * - **intensityRatio**: core mapper: value → 0.0–1.0
+ * - **tensionWash**: radial-gradient background that scales with intensity
+ * - **breatheDuration**: animation cycle speed (calm=slow, extreme=rapid)
+ * - **tensionGlow**: text/box shadow that scales with intensity
+ * - **tensionVignette**: edge-darkening overlay that closes in with intensity
+ * - **sweepDuration**: rotation animation speed
  *
  * Usage:
  * ```js
@@ -39,7 +39,7 @@ export function intensityRatio(value, calm, extreme) {
 
 /**
  * Generate a tension wash radial-gradient background.
- * Opacity and spread scale with intensity — barely visible at 0, dominant at 1.
+ * Opacity and spread scale with intensity: barely visible at 0, dominant at 1.
  * Always returns a non-empty gradient (calm state has minimal tint for presence).
  * @param {string} color - Base hex color (e.g. '#ff453a').
  * @param {number} ratio - Intensity ratio 0.0–1.0.
